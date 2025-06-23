@@ -1,7 +1,7 @@
 import { useActiveSymbol } from '@/hooks/use-active-symbol';
 import { useCurrencySymbol } from '@/providers/currency-symbols';
-import React, { useMemo, useState, useTransition } from 'react'
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useMemo } from 'react'
+import { ScrollView, Text, View } from 'react-native'
 import { TradingPrices } from './TradingPrices';
 import { useTranslation } from 'react-i18next';
 // import { ChevronDown } from 'react-native-feather' // or your preferred icon library

@@ -69,10 +69,10 @@ export default function RootLayout() {
         >
           <ClerkLoaded>
             <QueryProvider>
-              <Stack>
-                {/* <AccountsProvider> */}
-                  {/* <AccountDetailsProvider> */}
-                    {/* <CurrencySymbolProvider> */}
+              <AccountsProvider>
+                <AccountDetailsProvider>
+                  <CurrencySymbolProvider>
+                    <Stack>
                       <Stack.Screen name='index' options={{ headerShown: false }} />
                       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                       <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
@@ -89,10 +89,10 @@ export default function RootLayout() {
                           animationTypeForReplace: 'push'
                         }}
                       />
-                    {/* </CurrencySymbolProvider> */}
-                  {/* </AccountDetailsProvider> */}
-                {/* </AccountsProvider> */}
-              </Stack>
+                    </Stack>
+                  </CurrencySymbolProvider>
+                </AccountDetailsProvider>
+              </AccountsProvider>
               <StatusBar style="auto" />
             </QueryProvider>
           </ClerkLoaded>

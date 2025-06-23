@@ -8,7 +8,6 @@ import {
     SymbolFavoritesResponse,
 } from '../schema/user';
 import { useQueryClient } from '@tanstack/react-query';
-import { symbol } from 'd3';
 
 export function useGetUserPlatform(
     params: {

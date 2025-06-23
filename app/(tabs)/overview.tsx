@@ -12,7 +12,6 @@ import TimeSeriesChart from '@/components/TimeSeriesChart';
 import { getDateRangeFromTimeframe, timeframes } from '@/components/timeframe-selector';
 import { AccountTypeEnum } from '@/constants/enums';
 import { useFetchAccountsOverviewDetails } from '@/hooks/api/useFetchAccountsOverviewDetails';
-import { set } from 'date-fns';
 
 interface ActivityData {
   time: string;
