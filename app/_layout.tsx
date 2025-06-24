@@ -15,6 +15,9 @@ import { QueryProvider } from '@/providers/query';
 import { AccountsProvider } from '@/providers/accounts';
 import { CurrencySymbolProvider } from '@/providers/currency-symbols';
 import { AccountDetailsProvider } from '@/providers/account-details';
+import { AppState } from 'react-native';
+import { WebSocketManager } from '@/services/websocket-manager';
+import { OpenPositionsProvider } from '@/providers/open-positions';
 
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -56,6 +59,27 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  //listener for WebSocket cleanup
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        console.log('[App] App going to background/inactive')
+      } else if (nextAppState === 'active') {
+        console.log('[App] App becoming active')
+      }
+    }
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    //Cleanup function for app termination
+    return () => {
+      subscription?.remove();
+      //Cleanup WebSocket connections when app is terminated
+      console.log('[App] App terminating, cleaning up WebSocket connections');
+      WebSocketManager.cleanup();
+    }
+  }, []);
+
   if (!loaded) {
     return null;
   }
@@ -72,24 +96,26 @@ export default function RootLayout() {
               <AccountsProvider>
                 <AccountDetailsProvider>
                   <CurrencySymbolProvider>
-                    <Stack>
-                      <Stack.Screen name='index' options={{ headerShown: false }} />
-                      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                      <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-                      <Stack.Screen name='menu'
-                        options={{
-                          headerShown: false,
-                          animation: 'slide_from_right',
-                        }}
-                      />
-                      <Stack.Screen name='assets'
-                        options={{
-                          headerShown: false,
-                          // presentation: 'modal',
-                          animationTypeForReplace: 'push'
-                        }}
-                      />
-                    </Stack>
+                    <OpenPositionsProvider>
+                      <Stack>
+                        <Stack.Screen name='index' options={{ headerShown: false }} />
+                        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                        <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+                        <Stack.Screen name='menu'
+                          options={{
+                            headerShown: false,
+                            animation: 'slide_from_right',
+                          }}
+                        />
+                        <Stack.Screen name='assets'
+                          options={{
+                            headerShown: false,
+                            // presentation: 'modal',
+                            animationTypeForReplace: 'push'
+                          }}
+                        />
+                      </Stack>
+                    </OpenPositionsProvider>
                   </CurrencySymbolProvider>
                 </AccountDetailsProvider>
               </AccountsProvider>

@@ -10,17 +10,15 @@ import AccountBottomSheet from './AccountBottomSheet';
 import MenuAccounts from './MenuAccounts';
 import SearchInput from './SearchInput';
 import { BrokerAccount } from '@/types';
-import { useBrokerAccounts } from '@/hooks';
-import TimeSeriesChart from './TimeSeriesChart';
 import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './timeframe-selector';
 import { AccountTypeEnum } from '@/constants/enums';
-import { useFetchAccountsOverviewDetails } from '@/hooks/api/useFetchAccountsOverviewDetails';
 
-interface ActivityData {
-  time: string;
-  value: number;
-  isHourMark?: boolean;
-}
+import { 
+  useGetBrokerAccounts, 
+  useFetchBrokerAccountsOverview,
+  useFetchAccountsOverviewDetails 
+} from '@/api/hooks/accounts';
+import TimeSeriesChart from './TimeSeriesChart';
 
 interface NoBrokerAccountProps {
   showCart?: boolean;
@@ -32,7 +30,7 @@ interface NoBrokerAccountProps {
   showSearchBar?: boolean;
 }
 
-//BrokerAccount component format
+// BrokerAccount component format
 interface DisplayAccount {
   id: number;
   name: string;
@@ -40,7 +38,6 @@ interface DisplayAccount {
   dailyPL: string;
   changePercentage: string;
   type: 'Live' | 'Demo';
-  //maybe we should only add this...
   originalData?: BrokerAccount;
 }
 
@@ -56,40 +53,48 @@ function NoBrokerAccount({
 
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
 
-  // API hook to fetch broker accounts
   const {
     data: brokerAccountsData,
-    loading: brokerAccountsLoading,
+    isLoading: brokerAccountsLoading,
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
-  } = useBrokerAccounts();
+  } = useGetBrokerAccounts();
 
-  const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
-  const ownBrokerTabs = ['Live', 'Demo']; // I removed the 'Competition' tab...
-  const tabs = ownBrokerTabs;
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const {
+    data: brokerOverviewData,
+    isLoading: overviewLoading,
+    error: overviewError
+  } = useFetchBrokerAccountsOverview();
 
-  const [loading, setLoading] = useState<boolean>(true);
-
-  // State for time period selection
+  // State for time period selection and chart data
   const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
-  const [tabState] = useState<AccountTypeEnum>(AccountTypeEnum.DEMO);
+  const [tabState] = useState<AccountTypeEnum>(AccountTypeEnum.LIVE); // Default to LIVE for broker accounts
 
-  // Date range calculation (same as your web version)
+  // Date range calculation for chart
   const dateRange = useMemo(() => {
-    setLoading(false);
     return getDateRangeFromTimeframe(timeframe);
   }, [timeframe]);
 
-  // API call with same parameters structure
-  const { data } = useFetchAccountsOverviewDetails({
+  const { 
+    data: chartDetailsData, 
+    isLoading: chartLoading, 
+    error: chartError 
+  } = useFetchAccountsOverviewDetails({
     account_type: tabState,
     ...dateRange,
+  }, {
+    enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    staleTime: 1 * 60 * 1000, // 1 minute for chart data
   });
 
+  // Other state
+  const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const ownBrokerTabs = ['Live', 'Demo'];
+  const tabs = ownBrokerTabs;
+  const [activeTab, setActiveTab] = useState(tabs[0]);
 
-  //State for processed accounts
+  // State for processed accounts
   const [liveAccounts, setLiveAccounts] = useState<DisplayAccount[]>([]);
   const [demoAccounts, setDemoAccounts] = useState<DisplayAccount[]>([]);
   const [filteredLiveAccounts, setFilteredLiveAccounts] = useState<DisplayAccount[]>([]);
@@ -99,18 +104,12 @@ function NoBrokerAccount({
   // Process broker accounts data
   useEffect(() => {
     if (brokerAccountsData?.broker_accounts) {
-      // console.log('Processing broker accounts:', brokerAccountsData.broker_accounts);
-
       const processedAccounts = brokerAccountsData.broker_accounts.map((account: BrokerAccount): DisplayAccount => {
-        // Format balance with currency
         const formattedBalance = `${account.currency} ${account.balance.toLocaleString()}`;
-
-        // Format daily P&L with + or - sign
         const dailyPLFormatted = account.daily_pl >= 0
           ? `+${account.currency} ${account.daily_pl.toLocaleString()}`
           : `${account.currency} ${account.daily_pl.toLocaleString()}`;
 
-        // Calculate percentage change based on total performance
         const totalGainLoss = account.balance - account.starting_balance;
         const totalPerformancePercentage = account.starting_balance > 0
           ? (totalGainLoss / account.starting_balance) * 100
@@ -120,7 +119,7 @@ function NoBrokerAccount({
           ? `+${totalPerformancePercentage.toFixed(4)}%`
           : `${totalPerformancePercentage.toFixed(4)}%`;
 
-        const processedAccount: DisplayAccount = {
+        return {
           id: account.id,
           name: account.name,
           balance: formattedBalance,
@@ -129,11 +128,8 @@ function NoBrokerAccount({
           type: account.account_type === 'demo' ? 'Demo' : 'Live',
           originalData: account
         };
-
-        return processedAccount;
       });
 
-      // Separate accounts by type
       const live = processedAccounts.filter(acc => acc.type === 'Live');
       const demo = processedAccounts.filter(acc => acc.type === 'Demo');
 
@@ -144,13 +140,12 @@ function NoBrokerAccount({
     }
   }, [brokerAccountsData]);
 
-
   const tabCounts = {
     'Live': liveAccounts.length,
     'Demo': demoAccounts.length
   }
 
-  //Search function
+  // Search function
   const handleSearch = (text: string) => {
     setSearchQuery(text.toLowerCase());
 
@@ -174,25 +169,21 @@ function NoBrokerAccount({
     setFilteredDemoAccounts(filteredDemo);
   }
 
+  // ✅ Calculate total metrics from broker overview data
+  const totalBalance = useMemo(() => {
+    if (!brokerOverviewData) return '$0';
+    return `$${brokerOverviewData.total_balances?.toLocaleString() || '0'}`;
+  }, [brokerOverviewData]);
 
-  //Calculate total metrics from real data
-  const totalBalance = React.useMemo(() => {
-    if (!brokerAccountsData?.broker_accounts) return '$0';
-
-    const total = brokerAccountsData.broker_accounts.reduce((sum, account) => sum + account.balance, 0);
-    return `$${total.toLocaleString()}`;
-  }, [brokerAccountsData]);
-
-  const totalDailyPL = React.useMemo(() => {
-    if (!brokerAccountsData?.broker_accounts) return '$0';
-
-    const total = brokerAccountsData.broker_accounts.reduce((sum, account) => sum + account.daily_pl, 0);
-    const sign = total >= 0 ? '+' : '';
-    return `${sign}$${total.toLocaleString()}`;
-  }, [brokerAccountsData]);
+  const totalDailyPL = useMemo(() => {
+    if (!brokerOverviewData) return '$0';
+    const daily = brokerOverviewData.daily_pl || 0;
+    const sign = daily >= 0 ? '+' : '';
+    return `${sign}$${daily.toLocaleString()}`;
+  }, [brokerOverviewData]);
 
   const renderTabContent = () => {
-    //Show loading state while fetching data
+    // Show loading state while fetching data
     if (brokerAccountsLoading) {
       return (
         <View className='flex-1 items-center justify-center'>
@@ -201,12 +192,12 @@ function NoBrokerAccount({
       )
     }
 
-    //Error and shiit
+    // Error state
     if (brokerAccountsError) {
       return (
         <View className='flex-1 items-center justify-center'>
           <Text className='text-red-400 text-base font-Inter mb-4'>
-            Error loading accounts: {brokerAccountsError}
+            Error loading accounts: {brokerAccountsError.message}
           </Text>
           <TouchableOpacity
             onPress={refetchBrokerAccounts}
@@ -264,7 +255,6 @@ function NoBrokerAccount({
   }
 
   const handleAccountPress = useCallback((account: DisplayAccount) => {
-    //create enahanced account data for the bottom sheet
     const enhancedAccountData = {
       id: account.id,
       name: account.name,
@@ -272,9 +262,7 @@ function NoBrokerAccount({
       dailyPL: account.dailyPL,
       changePercentage: account.changePercentage,
       type: account.type,
-
-      originalData: account.originalData, // Attach original data for more details
-
+      originalData: account.originalData,
       currency: account.originalData?.currency || 'USD',
       firm: account.originalData?.firm,
       exchange: account.originalData?.exchange,
@@ -282,7 +270,6 @@ function NoBrokerAccount({
       status: account.originalData?.status,
       totalPL: account.originalData?.total_pl,
       startingBalance: account.originalData?.starting_balance
-
     }
     setSelectedAccount(enhancedAccountData);
     demoBottomSheetRef.current?.present();
@@ -291,14 +278,28 @@ function NoBrokerAccount({
   return (
     <SafeAreaView className={`flex-1 `}>
       <StatusBar barStyle="light-content" />
+      
+      {/* ✅ Chart Section */}
       <View className='h-[150px] mb-4'>
-        <TimeSeriesChart
-          data={data ?? undefined}
-          timeframe={timeframe}
-          height={180}
-          showLabels={true}
-        />
+        {chartLoading ? (
+          <View className='flex-1 justify-center items-center'>
+            <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
+          </View>
+        ) : chartError ? (
+          <View className='flex-1 justify-center items-center'>
+            <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
+          </View>
+        ) : (
+          <TimeSeriesChart
+            data={chartDetailsData}
+            timeframe={timeframe}
+            height={180}
+            showLabels={true}
+            accountType="broker" // ✅ Specify this is broker account data
+          />
+        )}
       </View>
+
       <View className='flex-1 p-2 mt-10'>
         <View className='flex-row items-center justify-between'>
           <View className='flex-1 mr-2'>
@@ -317,23 +318,26 @@ function NoBrokerAccount({
             </View>
           )}
         </View>
+        
         {showSearchBar && (
           <SearchInput onSearch={handleSearch} />
         )}
+        
         {showMetrics && (
           <View className='flex-row mb-1'>
             <MetricCard
               title="Total Balance (AUM)"
-              value={totalBalance}
+              value={overviewLoading ? "Loading..." : totalBalance}
               iconType="balance"
             />
             <MetricCard
               title="Daily P/L"
-              value={totalDailyPL}
+              value={overviewLoading ? "Loading..." : totalDailyPL}
               iconType="profit"
             />
           </View>
         )}
+        
         {renderTabContent()}
 
         <AccountBottomSheet
@@ -345,7 +349,6 @@ function NoBrokerAccount({
             dailyPL: '$0',
             changePercentage: '0%',
             type: activeTab as 'Live' | 'Demo',
-
             originalData: undefined,
             currency: 'USD',
             firm: null,
@@ -354,13 +357,11 @@ function NoBrokerAccount({
             status: 'inactive',
             totalPL: 0,
             startingBalance: 0
-          }
-          }
+          }}
         />
       </View>
     </SafeAreaView>
   );
 }
-
 
 export default NoBrokerAccount;

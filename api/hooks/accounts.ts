@@ -28,55 +28,74 @@ import { ApiRoutes, QueryKeys } from '../types';
 import { useAuthenticatedApi } from '../services/api';
 import { AccountTypeEnum } from '@/constants/enums';
 
-export function useGetUsers() {
-    const { fetchFromApi } = useAuthenticatedApi<Users>();
+export function useGetUsers(options?: Partial<UseQueryOptions<Users, Error>>) {
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<Users>();
 
     return useQuery<Users>({
         queryKey: [QueryKeys.GET_USERS],
-        queryFn: () => fetchFromApi(ApiRoutes.GET_USERS)
+        queryFn: () => fetchFromApi(ApiRoutes.GET_USERS),
+        enabled: isLoaded && isSignedIn,
+        staleTime: 5 * 60 * 1000,
+        ...options
     })
 }
 
-export function useGetAccounts() {
-    const { fetchFromApi } = useAuthenticatedApi<Accounts>();
+export function useGetAccounts(options?: Partial<UseQueryOptions<Accounts, Error>>) {
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<Accounts>();
 
     return useQuery<Accounts>({
         queryKey: [QueryKeys.GET_ACCOUNTS],
-        queryFn: () => fetchFromApi(ApiRoutes.GET_ACCOUNTS)
+        queryFn: () => fetchFromApi(ApiRoutes.GET_ACCOUNTS),
+        enabled: isLoaded && isSignedIn,
+        staleTime: 3 * 60 * 1000,
+        ...options
     })
 }
 
-export function useFetchPropFirmAccountsOverview() {
-    const { fetchFromApi } = useAuthenticatedApi<PropFirmAccountsOverviewSchemaType>();
+export function useFetchPropFirmAccountsOverview(options?: Partial<UseQueryOptions<PropFirmAccountsOverviewSchemaType, Error>>) {
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<PropFirmAccountsOverviewSchemaType>();
 
     return useQuery<PropFirmAccountsOverviewSchemaType>({
         queryKey: [QueryKeys.FETCH_PROP_FIRM_ACCOUNTS_OVERVIEW],
         queryFn: () => fetchFromApi(ApiRoutes.FETCH_PROP_FIRM_OVERVIEW),
-        staleTime: 0,
+        staleTime: 2 * 60 * 1000,//2 minutes - overview data is more dynamic...
+        ...options
     })
 }
 
-export function useFetchBrokerAccountsOverview() {
-    const { fetchFromApi } = useAuthenticatedApi<BrokerAccountsOverviewSchemaType>();
+export function useFetchBrokerAccountsOverview(options?: Partial<UseQueryOptions<BrokerAccountsOverviewSchemaType, Error>>) {
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<BrokerAccountsOverviewSchemaType>();
 
     return useQuery<BrokerAccountsOverviewSchemaType>({
         queryKey: [QueryKeys.FETCH_BROKER_ACCOUNTS_OVERVIEW],
         queryFn: () => fetchFromApi(ApiRoutes.FETCH_BROKER_ACCOUNTS_OVERVIEW),
-        staleTime: 0,
+        staleTime: 2 * 60 * 1000,
+        ...options
     })
 }
 
-export function useFetchAccountsOverviewDetails(input: {
-    account_type: AccountTypeEnum;
-    start_date: string;
-    end_date: string;
-}) {
-    const { fetchFromApi } = useAuthenticatedApi<AccountsOverviewDetailsSchemaType>();
-    const queryParams = new URLSearchParams(input).toString();
+export function useFetchAccountsOverviewDetails(
+    params: {
+        account_type: AccountTypeEnum;
+        start_date: string;
+        end_date: string;
+    },
+    options?: Partial<UseQueryOptions<AccountsOverviewDetailsSchemaType, Error>>
+) {
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<AccountsOverviewDetailsSchemaType>();
+
+    const queryParams = new URLSearchParams({
+        account_type: params.account_type,
+        start_date: params.start_date,
+        end_date: params.end_date
+    }).toString();
+
     return useQuery<AccountsOverviewDetailsSchemaType>({
         queryKey: [`${QueryKeys.FETCH_ACCOUNTS_OVERVIEW_DETAILS}-${queryParams}`],
         queryFn: () => fetchFromApi(`${ApiRoutes.FETCH_ACCOUNTS_OVERVIEW_DETAILS}?${queryParams}`),
-        staleTime: 0,
+        enabled: isLoaded && isSignedIn && Boolean(params.account_type && params.start_date && params.end_date),
+        staleTime: 1 * 60 * 1000,//1 minute - chart data here should be relatively fresh..;
+        ...options
     })
 }
 

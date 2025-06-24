@@ -12,7 +12,6 @@ import OrderCard from "@/components/positions/OrderCard";
 import { tags } from "react-native-svg/lib/typescript/xmlTags";
 import HistoryCard from "@/components/positions/HistoryCard";
 import ScreenShotBottomSheet from "@/components/ScreenShotBottomsheet";
-import { set } from "date-fns";
 
 // Types
 interface Position {

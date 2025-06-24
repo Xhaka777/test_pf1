@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
 import { View, Text, Image, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import images from '@/constants/images';
@@ -13,12 +13,14 @@ import ChallengeAccounts from './ChallengeAccounts';
 import AccountBottomSheet from './AccountBottomSheet';
 import SearchInput from './SearchInput';
 import MenuAccounts from './MenuAccounts';
+import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './timeframe-selector';
+import { AccountTypeEnum } from '@/constants/enums';
 
-interface ActivityData {
-  time: string;
-  value: number;
-  isHourMark?: boolean;
-}
+// ✅ Use proper API hooks
+import { 
+  useFetchPropFirmAccountsOverview,
+  useFetchAccountsOverviewDetails 
+} from '@/api/hooks/accounts';
 
 interface NoPropFirmAccountsProps {
   showCart?: boolean;
@@ -41,22 +43,51 @@ const NoPropFirmAccounts = ({
 }: NoPropFirmAccountsProps) => {
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
+  
+  // ✅ Use proper React Query hooks for prop firm data
+  const {
+    data: propFirmOverviewData,
+    isLoading: overviewLoading,
+    error: overviewError
+  } = useFetchPropFirmAccountsOverview();
+
+  // State management
   const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
   const [selectedAccount, setSelectedAccount] = useState(null);
   const propFirmTabs = ['Challenge', 'Funded'];
   const tabs = propFirmTabs;
   const [activeTab, setActiveTab] = useState(tabs[0]);
 
-  const [loading, setLoading] = useState<boolean>(true);
-  const [activityData, setActivityData] = useState<ActivityData[]>([]);
-  const [selectedTimePeroid, setSelectedTimePeriod] = useState('1D');
-  const timePeriods = ['1D', '1W', '1M', 'All Time'];
+  // State for time period selection and chart data
+  const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
+  
+  // Use EVALUATION for Challenge tab, FUNDED for Funded tab
+  const currentAccountType = activeTab === 'Challenge' ? AccountTypeEnum.EVALUATION : AccountTypeEnum.FUNDED;
+
+  // Date range calculation for chart
+  const dateRange = useMemo(() => {
+    return getDateRangeFromTimeframe(timeframe);
+  }, [timeframe]);
+
+  // ✅ Fetch chart data for prop firm accounts
+  const { 
+    data: chartDetailsData, 
+    isLoading: chartLoading, 
+    error: chartError 
+  } = useFetchAccountsOverviewDetails({
+    account_type: currentAccountType,
+    ...dateRange,
+  }, {
+    enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    staleTime: 1 * 60 * 1000, // 1 minute for chart data
+  });
 
   const tabCounts = {
     'Challenge': 1,
     'Funded': 2
   }
 
+  // Sample data (you might want to replace this with real API data later)
   const challengeAccounts = [
     {
       id: 1,
@@ -77,6 +108,7 @@ const NoPropFirmAccounts = ({
       percentageChange: 1.23
     },
   ];
+  
   const fundedAccounts = [
     {
       id: 1,
@@ -102,7 +134,20 @@ const NoPropFirmAccounts = ({
   const [filteredFundedAccounts, setFilteredFundedAccounts] = useState(fundedAccounts);
   const [searchQuery, setSearchQuery] = useState("");
 
-  //Search function
+  // ✅ Calculate total metrics from prop firm overview data
+  const totalChallengeBalance = useMemo(() => {
+    if (!propFirmOverviewData) return '$0';
+    return `$${propFirmOverviewData.total_evaluation_balance?.toLocaleString() || '0'}`;
+  }, [propFirmOverviewData]);
+
+  const totalDailyPL = useMemo(() => {
+    if (!propFirmOverviewData) return '$0';
+    const daily = propFirmOverviewData.daily_pl || 0;
+    const sign = daily >= 0 ? '+' : '';
+    return `${sign}$${daily.toLocaleString()}`;
+  }, [propFirmOverviewData]);
+
+  // Search function
   const handleSearch = (text: string) => {
     setSearchQuery(text.toLowerCase());
 
@@ -125,7 +170,6 @@ const NoPropFirmAccounts = ({
     setFilteredChallengeAccounts(filteredChallenges);
     setFilteredFundedAccounts(filterFunded);
   }
-
 
   const renderTabContent = () => {
     if (isMenuScreen) {
@@ -174,6 +218,7 @@ const NoPropFirmAccounts = ({
       }
     }
   }
+
   const handleAccountPress = useCallback((account: any) => {
     setSelectedAccount({
       ...account,
@@ -183,7 +228,6 @@ const NoPropFirmAccounts = ({
   }, [activeTab])
 
   const renderNoAccountContent = () => {
-    // if ((evaluationAccounts.length === 0) || (fundedAccounts.length === 0)) {
     return (
       <View className='flex-1 justify-center items-center'>
         <View className='mb-4'>
@@ -197,7 +241,7 @@ const NoPropFirmAccounts = ({
           No Prop Firm Accounts
         </Text>
         <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
-          You don’t have any prop firm accounts yet. Please add a new account in order to start trading.
+          You don't have any prop firm accounts yet. Please add a new account in order to start trading.
         </Text>
 
         <LinearGradient
@@ -216,13 +260,35 @@ const NoPropFirmAccounts = ({
     )
   }
 
-  //Todo: Duhet me check kur evaluation/funded accounts jane zero, ma qitke ni error ne BrokerPLCard...
   return (
     <SafeAreaView className={`flex-1 ${isMenuScreen ? 'mt-1' : 'mt-10'}`}>
       {challengeAccounts.length === 0 && fundedAccounts.length === 0 ? (
         renderNoAccountContent()
       ) : (
         <View className='flex-1 p-2'>
+          {/* ✅ Chart Section */}
+          {!isMenuScreen && (
+            <View className='h-[150px] mb-4'>
+              {chartLoading ? (
+                <View className='flex-1 justify-center items-center'>
+                  <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
+                </View>
+              ) : chartError ? (
+                <View className='flex-1 justify-center items-center'>
+                  <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
+                </View>
+              ) : (
+                <TimeSeriesChart
+                  data={chartDetailsData}
+                  timeframe={timeframe}
+                  height={180}
+                  showLabels={true}
+                  accountType="propfirm" // ✅ Specify this is prop firm account data
+                />
+              )}
+            </View>
+          )}
+
           <View className='flex-row items-center justify-between'>
             <View className='flex-1 mr-2'>
               <TabBar
@@ -236,38 +302,30 @@ const NoPropFirmAccounts = ({
             </View>
             {showTimePeriods && (
               <View className='flex-row mt-3 mb-4'>
-                {timePeriods.map((period) => (
-                  <TouchableOpacity
-                    key={period}
-                    className={`px-3 py-2 rounded-lg mr-1 ${selectedTimePeroid === period ? 'bg-[#2F2C2D] border border-[#2F2C2D]' : 'bg-propfirmone-300 border border-[#4F494C]'}`}
-                    onPress={() => setSelectedTimePeriod(period)}
-                  >
-                    <Text className={`text-sm font-InterSemiBold ${selectedTimePeroid === period ? 'text-white' : 'text-gray-400'}`}>
-                      {period}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
               </View>
             )}
           </View>
+          
           {showSearchBar && (
             <SearchInput onSearch={handleSearch} />
-          )
-          }
+          )}
+          
           {showMetrics && (
             <View className='flex-row mb-1'>
               <MetricCard
-                title='Total Challange Balance'
-                value='$156,879'
+                title={activeTab === 'Challenge' ? 'Total Challenge Balance' : 'Total Funded Balance'}
+                value={overviewLoading ? "Loading..." : totalChallengeBalance}
                 iconType='balance'
               />
               <MetricCard
                 title='Daily P/L'
-                value='$100,00'
+                value={overviewLoading ? "Loading..." : totalDailyPL}
                 iconType='profit'
               />
             </View>
           )}
+          
           {renderTabContent()}
 
           <AccountBottomSheet
