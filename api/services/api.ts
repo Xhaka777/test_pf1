@@ -26,7 +26,6 @@ export function useAuthenticatedApi<T>() {
     }
 
     const clerkToken = await getToken();
-    console.log('clerkToken', clerkToken);
     if (!clerkToken) {
       throw new Error('Clerk token not available.');
     }

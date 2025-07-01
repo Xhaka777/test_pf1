@@ -62,7 +62,6 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   error = null,
 }) => {
 
-  // ✅ Color themes based on account type
   const colorTheme = useMemo(() => {
     switch (accountType) {
       case 'broker':
@@ -89,7 +88,6 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     }
   }, [accountType, lineColor, areaColor]);
 
-  // ✅ Transform API data to chart format with better error handling
   const chartData: ChartDataPoint[] = useMemo(() => {
     if (!data?.details?.length) return [];
 

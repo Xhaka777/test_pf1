@@ -8,7 +8,7 @@ import {
     ResolutionString,
     SearchSymbolResultItem,
     SubscribeBarsCallback
-} from 'charting_library';
+} from '../android/app/src/main/assets/';
 import { getWSSBaseUrl, useAuthenticatedApi } from '@/api/services/api';
 import { ApiRoutes, WssRoutes } from '@/api/types';
 import {
@@ -133,7 +133,7 @@ export class ChartApi implements IDatafeedChartApi {
     private configurationData: DatafeedConfiguration = {
         supported_resolutions: supportedResolutions,
         exchanges: [],
-        symbols_type: symbolTypes
+        symbols_types: symbolTypes
     };
     private lastBid: number | null = null;
     private lastAsk: number | null = null;

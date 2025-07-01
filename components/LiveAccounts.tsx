@@ -7,11 +7,21 @@ interface LiveAccountsProps {
     accounts: Array<{
         id: number;
         name: string;
-        balance: string;
-        dailyPL: string;
-        changePercentage: string;
+        balance: number;
+        dailyPL: number;
+        changePercentage: number;
+        type?: 'Live' | 'Demo';
+        currency?: string;
+        firm?: string | null;
+        exchange?: string;
+        server?: string;
+        status?: string;
+        totalPL?: number;
+        startingBalance?: number;
+        originalData?: any;
     }>,
-    onAccountPress: (account: any) => void;}
+    onAccountPress: (account: any) => void;
+}
 
 const LiveAccounts = ({
     accounts,
@@ -20,19 +30,19 @@ const LiveAccounts = ({
 
     return (
         <View className="mt-2">
-            {accounts.map((account: any) => (
+            {accounts.map((account) => (
                 <TouchableOpacity
                     key={account.id}
                     onPress={() => onAccountPress(account)}
                 >
                     <BrokerPLCard
-                        key={account.id}
                         account={account}
                         activeTab='Live'
                         tabImage={icons.red_wallet}
                         accountName={account.name}
-                        accountBalance={account.balance}
+                        accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
+
                     />
                 </TouchableOpacity>
             ))}

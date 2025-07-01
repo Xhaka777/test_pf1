@@ -30,15 +30,22 @@ interface NoBrokerAccountProps {
   showSearchBar?: boolean;
 }
 
-// BrokerAccount component format
+// Updated interface to match your BrokerPLCard component expectations
 interface DisplayAccount {
   id: number;
   name: string;
-  balance: string;
-  dailyPL: string;
-  changePercentage: string;
+  balance: number; // Keep as number for calculations
+  dailyPL: number; // Keep as number for calculations
+  changePercentage: number; // Keep as number for calculations
   type: 'Live' | 'Demo';
   originalData?: BrokerAccount;
+  currency?: string;
+  firm?: string | null;
+  exchange?: string;
+  server?: string;
+  status?: string;
+  totalPL?: number;
+  startingBalance?: number;
 }
 
 function NoBrokerAccount({
@@ -68,7 +75,11 @@ function NoBrokerAccount({
 
   // State for time period selection and chart data
   const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
-  const [tabState] = useState<AccountTypeEnum>(AccountTypeEnum.LIVE); // Default to LIVE for broker accounts
+  
+  const [activeTab, setActiveTab] = useState<'Live' | 'Demo'>('Live');
+  const currentAccountType = useMemo(() => {
+    return activeTab === 'Live' ? AccountTypeEnum.LIVE : AccountTypeEnum.DEMO;
+  }, [activeTab]);
 
   // Date range calculation for chart
   const dateRange = useMemo(() => {
@@ -80,7 +91,7 @@ function NoBrokerAccount({
     isLoading: chartLoading, 
     error: chartError 
   } = useFetchAccountsOverviewDetails({
-    account_type: tabState,
+    account_type: currentAccountType,
     ...dateRange,
   }, {
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
@@ -88,11 +99,7 @@ function NoBrokerAccount({
   });
 
   // Other state
-  const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
-  const ownBrokerTabs = ['Live', 'Demo'];
-  const tabs = ownBrokerTabs;
-  const [activeTab, setActiveTab] = useState(tabs[0]);
 
   // State for processed accounts
   const [liveAccounts, setLiveAccounts] = useState<DisplayAccount[]>([]);
@@ -101,37 +108,40 @@ function NoBrokerAccount({
   const [filteredDemoAccounts, setFilteredDemoAccounts] = useState<DisplayAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Process broker accounts data
   useEffect(() => {
     if (brokerAccountsData?.broker_accounts) {
+      console.log('[NoBrokerAccount] Processing broker accounts:', brokerAccountsData.broker_accounts.length);
+      
       const processedAccounts = brokerAccountsData.broker_accounts.map((account: BrokerAccount): DisplayAccount => {
-        const formattedBalance = `${account.currency} ${account.balance.toLocaleString()}`;
-        const dailyPLFormatted = account.daily_pl >= 0
-          ? `+${account.currency} ${account.daily_pl.toLocaleString()}`
-          : `${account.currency} ${account.daily_pl.toLocaleString()}`;
-
+        // Calculate total performance percentage
         const totalGainLoss = account.balance - account.starting_balance;
         const totalPerformancePercentage = account.starting_balance > 0
           ? (totalGainLoss / account.starting_balance) * 100
           : 0;
 
-        const changePercentageFormatted = totalPerformancePercentage >= 0
-          ? `+${totalPerformancePercentage.toFixed(4)}%`
-          : `${totalPerformancePercentage.toFixed(4)}%`;
-
         return {
           id: account.id,
           name: account.name,
-          balance: formattedBalance,
-          dailyPL: dailyPLFormatted,
-          changePercentage: changePercentageFormatted,
-          type: account.account_type === 'demo' ? 'Demo' : 'Live',
-          originalData: account
+          balance: account.balance, // Keep as number
+          dailyPL: account.daily_pl, // Keep as number
+          changePercentage: totalPerformancePercentage, // Keep as number
+          type: account.account_type.toLowerCase() === 'demo' ? 'Demo' : 'Live',
+          originalData: account,
+          currency: account.currency,
+          firm: account.firm,
+          exchange: account.exchange,
+          server: account.server,
+          status: account.status,
+          totalPL: account.total_pl,
+          startingBalance: account.starting_balance
         };
       });
 
+      // Separate by account type
       const live = processedAccounts.filter(acc => acc.type === 'Live');
       const demo = processedAccounts.filter(acc => acc.type === 'Demo');
+
+      console.log('[NoBrokerAccount] Processed accounts:', { live: live.length, demo: demo.length });
 
       setLiveAccounts(live);
       setDemoAccounts(demo);
@@ -140,36 +150,40 @@ function NoBrokerAccount({
     }
   }, [brokerAccountsData]);
 
-  const tabCounts = {
+  // Tab counts for display
+  const tabCounts = useMemo(() => ({
     'Live': liveAccounts.length,
     'Demo': demoAccounts.length
-  }
+  }), [liveAccounts.length, demoAccounts.length]);
 
-  // Search function
-  const handleSearch = (text: string) => {
-    setSearchQuery(text.toLowerCase());
+  const handleSearch = useCallback((text: string) => {
+    const query = text.toLowerCase();
+    setSearchQuery(query);
 
-    if (text === '') {
+    if (query === '') {
       setFilteredLiveAccounts(liveAccounts);
       setFilteredDemoAccounts(demoAccounts);
       return;
     }
 
     const filteredLive = liveAccounts.filter(account =>
-      account.name.toLowerCase().includes(text) ||
-      account.balance.toString().toLowerCase().includes(text)
+      account.name.toLowerCase().includes(query) ||
+      account.id.toString().includes(query) ||
+      account.currency?.toLowerCase().includes(query) ||
+      account.firm?.toLowerCase().includes(query)
     );
 
     const filteredDemo = demoAccounts.filter(account =>
-      account.name.toLowerCase().includes(text) ||
-      account.balance.toString().toLowerCase().includes(text)
+      account.name.toLowerCase().includes(query) ||
+      account.id.toString().includes(query) ||
+      account.currency?.toLowerCase().includes(query) ||
+      account.firm?.toLowerCase().includes(query)
     );
 
     setFilteredLiveAccounts(filteredLive);
     setFilteredDemoAccounts(filteredDemo);
-  }
+  }, [liveAccounts, demoAccounts]);
 
-  // ✅ Calculate total metrics from broker overview data
   const totalBalance = useMemo(() => {
     if (!brokerOverviewData) return '$0';
     return `$${brokerOverviewData.total_balances?.toLocaleString() || '0'}`;
@@ -182,6 +196,30 @@ function NoBrokerAccount({
     return `${sign}$${daily.toLocaleString()}`;
   }, [brokerOverviewData]);
 
+  const handleAccountPress = useCallback((account: DisplayAccount) => {
+    console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
+    
+    const enhancedAccountData = {
+      id: account.id,
+      name: account.name,
+      balance: `${account.currency || 'USD'} ${account.balance.toLocaleString()}`,
+      dailyPL: `${account.dailyPL >= 0 ? '+' : ''}${account.currency || 'USD'} ${account.dailyPL.toLocaleString()}`,
+      changePercentage: `${account.changePercentage >= 0 ? '+' : ''}${account.changePercentage.toFixed(2)}%`,
+      type: account.type,
+      originalData: account.originalData,
+      currency: account.currency,
+      firm: account.firm,
+      exchange: account.exchange,
+      server: account.server,
+      status: account.status,
+      totalPL: account.totalPL,
+      startingBalance: account.startingBalance
+    };
+    
+    setSelectedAccount(enhancedAccountData);
+    demoBottomSheetRef.current?.present();
+  }, []);
+
   const renderTabContent = () => {
     // Show loading state while fetching data
     if (brokerAccountsLoading) {
@@ -189,7 +227,7 @@ function NoBrokerAccount({
         <View className='flex-1 items-center justify-center'>
           <Text className='text-gray-400 text-base font-Inter'>Loading accounts...</Text>
         </View>
-      )
+      );
     }
 
     // Error state
@@ -200,25 +238,28 @@ function NoBrokerAccount({
             Error loading accounts: {brokerAccountsError.message}
           </Text>
           <TouchableOpacity
-            onPress={refetchBrokerAccounts}
+            onPress={() => refetchBrokerAccounts()}
             className='bg-blue-500 px-4 py-2 rounded'>
             <Text className='text-white'>Retry</Text>
           </TouchableOpacity>
         </View>
-      )
+      );
     }
 
-    if (isMenuScreen) {
-      const accountsToShow = activeTab === 'Live'
-        ? filteredLiveAccounts
-        : filteredDemoAccounts;
+    // Get accounts to show based on active tab
+    const accountsToShow = activeTab === 'Live' ? filteredLiveAccounts : filteredDemoAccounts;
+    const hasSearchQuery = searchQuery.trim().length > 0;
 
+    // Menu screen layout
+    if (isMenuScreen) {
       return accountsToShow.length === 0 ? (
         <View className='flex-1 justify-center items-center'>
-          <FileText size={20} color='#9Ca3Af' className='mb-4' />
+          <FileText size={20} color='#9CA3AF' className='mb-4' />
           <Text className='text-gray-400 text-base font-Inter'>
-            {searchQuery ? 'No matching accounts found' :
-              activeTab === 'Live' ? 'No live accounts found' : 'No demo accounts found'}
+            {hasSearchQuery 
+              ? 'No matching accounts found' 
+              : `No ${activeTab.toLowerCase()} accounts found`
+            }
           </Text>
         </View>
       ) : (
@@ -226,93 +267,82 @@ function NoBrokerAccount({
           accounts={accountsToShow}
           onAccountPress={handleAccountPress}
         />
-      )
-    } else {
-      if (activeTab === 'Live') {
-        return filteredLiveAccounts.length === 0 ? (
-          <View className='flex-1 items-center justify-center'>
-            <FileText size={20} color='#9CA3AF' className='mb-4' />
-            <Text className='text-gray-400 text-base font-Inter'>
-              {searchQuery ? 'No matching accounts found' : 'No live accounts found'}
-            </Text>
-          </View>
-        ) : (
-          <LiveAccounts accounts={filteredLiveAccounts} onAccountPress={handleAccountPress} />
-        )
-      } else if (activeTab === 'Demo') {
-        return filteredDemoAccounts.length === 0 ? (
-          <View className='flex-1 items-center justify-center'>
-            <FileText size={20} color='#9CA3AF' className='mb-4' />
-            <Text className='text-gray-400 text-base font-Inter'>
-              {searchQuery ? 'No matching accounts found' : 'No demo accounts found'}
-            </Text>
-          </View>
-        ) : (
-          <DemoAccounts accounts={filteredDemoAccounts} onAccountPress={handleAccountPress} />
-        )
-      }
+      );
     }
-  }
 
-  const handleAccountPress = useCallback((account: DisplayAccount) => {
-    const enhancedAccountData = {
-      id: account.id,
-      name: account.name,
-      balance: account.balance,
-      dailyPL: account.dailyPL,
-      changePercentage: account.changePercentage,
-      type: account.type,
-      originalData: account.originalData,
-      currency: account.originalData?.currency || 'USD',
-      firm: account.originalData?.firm,
-      exchange: account.originalData?.exchange,
-      server: account.originalData?.server,
-      status: account.originalData?.status,
-      totalPL: account.originalData?.total_pl,
-      startingBalance: account.originalData?.starting_balance
+    // Regular screen layout
+    if (activeTab === 'Live') {
+      return filteredLiveAccounts.length === 0 ? (
+        <View className='flex-1 items-center justify-center'>
+          <FileText size={20} color='#9CA3AF' className='mb-4' />
+          <Text className='text-gray-400 text-base font-Inter'>
+            {hasSearchQuery ? 'No matching live accounts found' : 'No live accounts found'}
+          </Text>
+        </View>
+      ) : (
+        <LiveAccounts 
+          accounts={filteredLiveAccounts} 
+          onAccountPress={handleAccountPress} 
+        />
+      );
+    } else {
+      return filteredDemoAccounts.length === 0 ? (
+        <View className='flex-1 items-center justify-center'>
+          <FileText size={20} color='#9CA3AF' className='mb-4' />
+          <Text className='text-gray-400 text-base font-Inter'>
+            {hasSearchQuery ? 'No matching demo accounts found' : 'No demo accounts found'}
+          </Text>
+        </View>
+      ) : (
+        <DemoAccounts 
+          accounts={filteredDemoAccounts} 
+          onAccountPress={handleAccountPress} 
+        />
+      );
     }
-    setSelectedAccount(enhancedAccountData);
-    demoBottomSheetRef.current?.present();
-  }, [activeTab]);
+  };
 
   return (
-    <SafeAreaView className={`flex-1 `}>
+    <SafeAreaView className={`flex-1 ${isMenuScreen ? 'mt-1' : ''}`}>
       <StatusBar barStyle="light-content" />
       
-      {/* ✅ Chart Section */}
-      <View className='h-[150px] mb-4'>
-        {chartLoading ? (
-          <View className='flex-1 justify-center items-center'>
-            <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
-          </View>
-        ) : chartError ? (
-          <View className='flex-1 justify-center items-center'>
-            <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
-          </View>
-        ) : (
-          <TimeSeriesChart
-            data={chartDetailsData}
-            timeframe={timeframe}
-            height={180}
-            showLabels={true}
-            accountType="broker" // ✅ Specify this is broker account data
-          />
-        )}
-      </View>
+      {!isMenuScreen && (
+        <View className='h-[150px] mb-4'>
+          {chartLoading ? (
+            <View className='flex-1 justify-center items-center'>
+              <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
+            </View>
+          ) : chartError ? (
+            <View className='flex-1 justify-center items-center'>
+              <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
+            </View>
+          ) : (
+            <TimeSeriesChart
+              data={chartDetailsData}
+              timeframe={timeframe}
+              height={180}
+              showLabels={true}
+              accountType="broker"
+              loading={chartLoading}
+              error={chartError?.message || null}
+            />
+          )}
+        </View>
+      )}
 
       <View className='flex-1 p-2 mt-10'>
         <View className='flex-row items-center justify-between'>
           <View className='flex-1 mr-2'>
             <TabBar
-              tabs={tabs}
+              tabs={['Live', 'Demo']}
               activeTab={activeTab}
-              onTabPress={setActiveTab}
-              selectedAccountType={selectedAccountType}
+              onTabPress={(tab) => setActiveTab(tab as 'Live' | 'Demo')}
+              selectedAccountType="ownBroker"
               showCounts={true}
               tabCounts={tabCounts}
             />
           </View>
-          {showTimePeriods && (
+          {showTimePeriods && !isMenuScreen && (
             <View className='flex-row mt-3 mb-4'>
               <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
             </View>
@@ -323,7 +353,7 @@ function NoBrokerAccount({
           <SearchInput onSearch={handleSearch} />
         )}
         
-        {showMetrics && (
+        {showMetrics && !isMenuScreen && (
           <View className='flex-row mb-1'>
             <MetricCard
               title="Total Balance (AUM)"
@@ -344,7 +374,7 @@ function NoBrokerAccount({
           bottomSheetRef={demoBottomSheetRef}
           accountData={selectedAccount || {
             id: 1,
-            name: ` ${activeTab} Account`,
+            name: `${activeTab} Account`,
             balance: '$0',
             dailyPL: '$0',
             changePercentage: '0%',

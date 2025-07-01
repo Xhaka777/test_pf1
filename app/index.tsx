@@ -9,23 +9,24 @@ const Page = () => {
 
     // if (isSignedIn) return <Redirect href='/(tabs)/overview' />
     // return <Redirect href='/(auth)/login' />
-    const { isLoaded, isSignedIn } = useAuth();
+    // const { isLoaded, isSignedIn } = useAuth();
 
     useEffect(() => {
     // Only navigate once everything is loaded
-    if (!isLoaded) return;
+    // if (!isLoaded) return;
 
     // Slight delay ensures layout and navigation system is ready
     const timeout = setTimeout(() => {
-      if (isSignedIn) {
+      // if (isSignedIn) {
         router.replace("/(tabs)/overview");
-      } else {
-        router.replace("/(auth)/login");
-      }
+      // } else {
+        // router.replace("/(auth)/login");
+      // }
     }, 10); // 10–50ms is enough
 
     return () => clearTimeout(timeout);
-  }, [isLoaded, isSignedIn]);
+  }, []);
+  // }, [isLoaded, isSignedIn]);
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size='large' color='#ff13' />
