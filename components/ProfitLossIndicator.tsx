@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text } from 'react-native';
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 interface ProfitLossIndicatorProps {
@@ -45,110 +44,110 @@ const ProfitLossIndicator = ({
         return 0;
     }, [percentageChange, dailyPL, startingBalance, totalValue]);
 
-    // Calculate position of the indicator (translate -10% to +10% to 0-100%)
-    const indicatorPosition = Math.min(Math.max(((calculatedPercentageChange + 10) / 20) * 100, 0), 100);
+    // Clamp percentage to reasonable range for display (-10% to +10%)
+    const clampedPercentage = Math.min(Math.max(calculatedPercentageChange, -10), 10);
+    
+    // Calculate indicator position (0% to 100% across the bar)
+    const indicatorPosition = ((clampedPercentage + 10) / 20) * 100;
     
     // Determine if we're in profit or loss
     const isProfit = calculatedPercentageChange >= 0;
-    
-    // Calculate overlay percentage (limit to reasonable range)
-    const overlayPercentage = Math.min(Math.abs(calculatedPercentageChange) * 5, 50); // 10% max change = 50% max width
-
-    // Format currency values
-    const formatCurrency = (value: number) => {
-        const sign = value >= 0 ? '+' : '';
-        return `${sign}${currency} ${Math.abs(value).toLocaleString()}`;
-    };
-
-    // Format percentage
-    const formatPercentage = (value: number) => {
-        const sign = value >= 0 ? '+' : '';
-        return `${sign}${value.toFixed(2)}%`;
-    };
 
     return (
-        <View className="mt-2">
+        <View style={{ marginTop: 8 }}>
             {/* Performance Summary */}
             {showLabels && (
-                <View className="flex-row justify-between items-center mb-2">
-                    <View>
-                        <Text className="text-gray-400 text-xs font-Inter">Performance</Text>
-                    </View>
+                <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: 8 
+                }}>
+                    <Text style={{ 
+                        color: '#9CA3AF', 
+                        fontSize: 12, 
+                        fontWeight: '400' 
+                    }}>
+                        Performance
+                    </Text>
                 </View>
             )}
 
-            {/* Progress Track */}
-            <View className="relative h-2 rounded-sm overflow-hidden">
-                {/* Base gradient background with opacity */}
-                <View className="absolute inset-0 w-full h-full opacity-65">
-                    <LinearGradient
-                        colors={['#EF4444', '#EF4444', '#F59E0B', '#10B981', '#10B981']}
-                        locations={[0, 0.3, 0.5, 0.7, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        className="w-full h-full"
-                    />
-                </View>
-
-                {/* Dynamic color overlay based on performance */}
-                <View 
-                    className="absolute top-0 bottom-0 h-full" 
+            {/* Progress Track Container */}
+            <View style={{ position: 'relative', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                {/* Background Gradient */}
+                <LinearGradient
+                    colors={['#EF4444', '#F59E0B', '#10B981']}
+                    locations={[0, 0.5, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
                     style={{
-                        left: '50%',
-                        width: `${overlayPercentage}%`,
-                        overflow: 'hidden',
-                        transform: [
-                            { translateX: isProfit ? 0 : -overlayPercentage }
-                        ],
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0.6
                     }}
-                >
-                    <LinearGradient
-                        colors={isProfit ? ['#F59E0B', '#10B981'] : ['#EF4444', '#F59E0B']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                        }}
-                    />
-                </View>
+                />
 
-                {/* Center indicator with dynamic positioning */}
+                {/* Indicator - White dot */}
                 <View
-                    className="absolute top-1/2 w-2 h-6 bg-white rounded-sm z-10"
                     style={{
+                        position: 'absolute',
+                        top: -4,
                         left: `${indicatorPosition}%`,
-                        transform: [
-                            { translateX: -4 },
-                            { translateY: -12 }
-                        ],
-                        shadowColor: '#000',
+                        width: 16,
+                        height: 16,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 8,
+                        transform: [{ translateX: -8 }],
+                        shadowColor: '#000000',
                         shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 2,
-                        elevation: 3,
+                        shadowOpacity: 0.25,
+                        shadowRadius: 3.84,
+                        elevation: 5,
                     }}
                 />
             </View>
 
             {/* Percentage scale labels */}
-            <View className="flex-row justify-between mt-1">
-                <Text className="text-xs text-gray-500 font-Inter">-10%</Text>
-                <Text className="text-xs text-gray-500 font-Inter">0%</Text>
-                <Text className="text-xs text-gray-500 font-Inter">+10%</Text>
+            <View style={{ 
+                flexDirection: 'row', 
+                justifyContent: 'space-between', 
+                marginTop: 4 
+            }}>
+                <Text style={{ 
+                    fontSize: 10, 
+                    color: '#6B7280', 
+                    fontWeight: '400' 
+                }}>
+                    -10%
+                </Text>
+                <Text style={{ 
+                    fontSize: 10, 
+                    color: '#6B7280', 
+                    fontWeight: '400' 
+                }}>
+                    0%
+                </Text>
+                <Text style={{ 
+                    fontSize: 10, 
+                    color: '#6B7280', 
+                    fontWeight: '400' 
+                }}>
+                    +10%
+                </Text>
             </View>
 
-            {/* Additional info for extreme values */}
+            {/* Extreme values indicator */}
             {Math.abs(calculatedPercentageChange) > 10 && (
-                <View className="mt-1 items-center">
+                <View style={{ marginTop: 4, alignItems: 'center' }}>
                     <Text 
-                        className="text-xs font-Inter"
-                        style={{ color: isProfit ? '#10B981' : '#EF4444' }}
+                        style={{ 
+                            fontSize: 10, 
+                            fontWeight: '500',
+                            color: isProfit ? '#10B981' : '#EF4444'
+                        }}
                     >
-                        {Math.abs(calculatedPercentageChange) > 10 ? 
-                            `Extreme ${isProfit ? 'Gain' : 'Loss'}: ${formatPercentage(calculatedPercentageChange)}` : 
-                            ''
-                        }
+                        Extreme {isProfit ? 'Gain' : 'Loss'}: {calculatedPercentageChange >= 0 ? '+' : ''}{calculatedPercentageChange.toFixed(2)}%
                     </Text>
                 </View>
             )}

@@ -1,10 +1,10 @@
 import React, { useCallback, useRef, useMemo, useEffect, useState } from "react";
 import Header from "@/components/Header/header";
 import { useAccounts, useBrokerAccounts } from "@/hooks";
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Edit, Pencil, X } from "lucide-react-native";
 import images from "@/constants/images";
-import BottomSheet from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetModal } from "@gorhom/bottom-sheet";
 import EditPositionBottomSheet from "@/components/EditPositionBottomSheet";
 import ClosePositionBottomSheet from "@/components/ClosePositionBottomSheet";
 import PositionCard from "@/components/positions/PositionCard";
@@ -12,6 +12,7 @@ import OrderCard from "@/components/positions/OrderCard";
 import { tags } from "react-native-svg/lib/typescript/xmlTags";
 import HistoryCard from "@/components/positions/HistoryCard";
 import ScreenShotBottomSheet from "@/components/ScreenShotBottomsheet";
+import { useFocusEffect } from "expo-router";
 
 // Types
 interface Position {
@@ -34,22 +35,39 @@ interface TabData {
   orderHistory: any[];
 }
 
+type AlertType = 'sync' | 'closeProfits' | 'closeLosses' | 'closeAll' | null;
 
 const Positions = () => {
+
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>('positions');
   const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  const [selectedHistory, setSelectedHistory] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string>('');
+  const [currentAlert, setCurrentAlert] = useState<AlertType>(null);
+  const [alertTimeoutId, setAlertTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
   const [showSyncAlert, setShowSyncAlert] = useState(false);
   const [showCloseProfitsAlert, setShowCloseProfitsAlert] = useState(false);
   const [showCloseLossesAlert, setShowCloseLossesAlert] = useState(false);
   const [showCloseAllAlert, setShowCloseAllAlert] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingAction, setLoadingAction] = useState<string>('');
 
-  const editBottomSheetRef = useRef<BottomSheet>(null);
-  const closeBottomSheetRef = useRef<BottomSheet>(null);
-  const screenShotBottomSheetRef = useRef<BottomSheet>(null);
 
+  const editBottomSheetRef = useRef<BottomSheetModal>(null);
+  const closeBottomSheetRef = useRef<BottomSheetModal>(null);
+  const screenShotBottomSheetRef = useRef<BottomSheetModal>(null);
+
+  // Debug state to track bottom sheet operations
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+    // Add debug logging
+    const logDebug = useCallback((message: string) => {
+      console.log(`[BottomSheet Debug] ${message}`);
+      setDebugInfo(message);
+      // Clear debug info after 3 seconds
+      setTimeout(() => setDebugInfo(''), 3000);
+    }, []);
 
   // Sample data
   const tabData: TabData = {
@@ -155,117 +173,251 @@ const Positions = () => {
 
   };
 
-  const openEditModal = (position: Position) => {
+  //Cleanup function for alerts
+  const clearAlertTimeout = useCallback(() => {
+    if (alertTimeoutId) {
+      clearTimeout(alertTimeoutId);
+      setAlertTimeoutId(null);
+    }
+  }, [alertTimeoutId]);
+
+  const showAlert = useCallback((type: AlertType, duration: number = 3000) => {
+    clearAlertTimeout();
+    setCurrentAlert(type);
+
+    const timeoutId = setTimeout(() => {
+      setCurrentAlert(null);
+      setAlertTimeoutId(null);
+    }, duration);
+
+    setAlertTimeoutId(timeoutId);
+  }, [clearAlertTimeout]);
+
+  //Handle Android back button
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        //Close any open botton sheets first
+        if (editBottomSheetRef.current) {
+          editBottomSheetRef.current.close();
+          return true;
+        }
+        if (closeBottomSheetRef.current) {
+          closeBottomSheetRef.current.close();
+          return true;
+        }
+        if (screenShotBottomSheetRef.current) {
+          screenShotBottomSheetRef.current.close();
+          return true;
+        }
+        return false;
+      }
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [])
+  )
+
+  //Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearAlertTimeout();
+    };
+  }, [clearAlertTimeout]);
+
+  const openEditModal = useCallback((position: Position) => {
+    logDebug(`Opening edit modal for position: ${position.symbol}`);
     setSelectedPosition(position);
-    editBottomSheetRef.current?.snapToIndex(1);
-  };
+    
+    // Use setTimeout to ensure state is set before opening
+    setTimeout(() => {
+      try {
+        editBottomSheetRef.current?.present();
+        logDebug('Edit modal presented successfully');
+      } catch (error) {
+        logDebug(`Error opening edit modal: ${error}`);
+        console.error('Error opening edit modal:', error);
+      }
+    }, 100);
+  }, [logDebug]);
 
-  const openCloseModal = (position: Position) => {
+  const openCloseModal = useCallback((position: Position) => {
+    logDebug(`Opening close modal for position: ${position.symbol}`);
     setSelectedPosition(position);
-    closeBottomSheetRef.current?.snapToIndex(1);
-  };
+    
+    setTimeout(() => {
+      try {
+        closeBottomSheetRef.current?.present();
+        logDebug('Close modal presented successfully');
+      } catch (error) {
+        logDebug(`Error opening close modal: ${error}`);
+        console.error('Error opening close modal:', error);
+      }
+    }, 100);
+  }, [logDebug]);
 
-  const openScreenShotModal = (position: Position) => {
-    setSelectedPosition(position);
-    screenShotBottomSheetRef.current?.snapToIndex(1);
-  }
 
-  const closeEditModal = () => {
-    setSelectedPosition(null);
-    editBottomSheetRef.current?.close();
-  };
+  const openScreenShotModal = useCallback((history: any) => {
+    logDebug(`Opening screenshot modal for: ${history.symbol || history.id}`);
+    setSelectedHistory(history);
+    
+    setTimeout(() => {
+      try {
+        screenShotBottomSheetRef.current?.present();
+        logDebug('Screenshot modal presented successfully');
+      } catch (error) {
+        logDebug(`Error opening screenshot modal: ${error}`);
+        console.error('Error opening screenshot modal:', error);
+      }
+    }, 100);
+  }, [logDebug]);
 
-  const closeCloseModal = () => {
-    setSelectedPosition(null);
-    closeBottomSheetRef.current?.close();
-  };
+  const closeEditModal = useCallback(() => {
+    logDebug('Closing edit modal');
+    try {
+      editBottomSheetRef.current?.dismiss();
+      setSelectedPosition(null);
+    } catch (error) {
+      logDebug(`Error closing edit modal: ${error}`);
+      console.error('Error closing edit modal:', error);
+    }
+  }, [logDebug]);
 
-  const closeScreenShotModal = () => {
-    setSelectedPosition(null);
-    screenShotBottomSheetRef.current?.close();
-  }
+  const closeCloseModal = useCallback(() => {
+    logDebug('Closing close modal');
+    try {
+      closeBottomSheetRef.current?.dismiss();
+      setSelectedPosition(null);
+    } catch (error) {
+      logDebug(`Error closing close modal: ${error}`);
+      console.error('Error closing close modal:', error);
+    }
+  }, [logDebug]);
 
-  const handleSavePosition = (formData: any) => {
+  const closeScreenShotModal = useCallback(() => {
+    logDebug('Closing screenshot modal');
+    try {
+      screenShotBottomSheetRef.current?.dismiss();
+      setSelectedHistory(null);
+    } catch (error) {
+      logDebug(`Error closing screenshot modal: ${error}`);
+      console.error('Error closing screenshot modal:', error);
+    }
+  }, [logDebug]);
+
+  const handleSavePosition = useCallback((formData: any) => {
     // Handle save logic here
     console.log('Saving position changes:', formData);
     console.log('For position:', selectedPosition);
     closeEditModal();
-  };
+  }, [selectedPosition, closeEditModal]);
 
-  const handleClosePosition = (percentage: number, customAmount?: string) => {
+  const handleClosePosition = useCallback((percentage: number, customAmount?: string) => {
     // Handle close position logic here
-    console.log('Closing position:', selectedPosition);
-    console.log('Percentage:', percentage);
-    console.log('Custom amount:', customAmount);
     closeCloseModal();
-  };
+  }, [selectedPosition, closeCloseModal]);
+
+  const handleScreenShot = useCallback((history: any) => {
+    closeScreenShotModal();
+  }, [closeScreenShotModal])
 
   //Sync Trades handler
-  const handleSyncTrades = () => {
-    setIsLoading(true);
-    setLoadingAction('syncing');
-    // Simulate API call
-    // setShowSyncAlert(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setLoadingAction('');
-      setShowSyncAlert(true);
-      // Auto hide after 5 seconds
-      setTimeout(() => {
-        setShowSyncAlert(false);
-      }, 5000);
-      // Reset expanded positions
-    }, 3000);
-  }
+  const handleSyncTrades = useCallback(async () => {
+    if (isLoading) return;
 
-  const handleCloseProfits = () => {
     setIsLoading(true);
     setLoadingAction('syncing');
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      showAlert('sync', 5000);
+      setExpandedPositions(new Set());
+    } catch (error) {
+      console.log('Error syncing trades:', error);
+      Alert.alert('Error', 'Failed to sync trades. Please try again.')
+    } finally {
       setIsLoading(false);
       setLoadingAction('');
-      setShowCloseProfitsAlert(true);
-      // Auto hide after 3 seconds
-      setTimeout(() => {
-        setShowCloseProfitsAlert(false);
-      }, 3000);
-    }, 2000);
-  };
+    }
 
-  const handleCloseLosses = () => {
+    // setTimeout(() => {
+    //   setIsLoading(false);
+    //   setLoadingAction('');
+    //   setShowSyncAlert(true);
+    //   // Auto hide after 5 seconds
+    //   setTimeout(() => {
+    //     setShowSyncAlert(false);
+    //   }, 5000);
+    //   // Reset expanded positions
+    // }, 3000);
+  }, [isLoading, showAlert])
+
+  const handleCloseProfits = useCallback(async () => {
+    if (isLoading) return;
+
     setIsLoading(true);
-    setLoadingAction('syncing');
-    // Simulate API call
-    setTimeout(() => {
+    setLoadingAction('closing_profits');
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      showAlert('closeProfits');
+    } catch (error) {
+      console.error('Error closing profits:', error);
+      Alert.alert('Error', 'Failed to close profitable trades. Please try again.')
+    } finally {
       setIsLoading(false);
       setLoadingAction('');
-      setShowCloseLossesAlert(true);
-      // Auto hide after 3 seconds
-      setTimeout(() => {
-        setShowCloseLossesAlert(false);
-      }, 3000);
-    }, 2000)
+    }
+  }, [isLoading, showAlert]);
+
+  const handleCloseLosses = useCallback(async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setLoadingAction('closing_losses');
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      showAlert('closeLosses');
+    } catch (error) {
+      console.error('Error closing losses:', error);
+      Alert.alert('Error', 'Failed to close losing trades. Please try again.')
+    } finally {
+      setIsLoading(false);
+      setLoadingAction('');
+    }
     // Auto hide after 3 seconds
-  };
+  }, [isLoading, showAlert]);
 
-  const handleCloseAll = () => {
+  const handleCloseAll = useCallback(async () => {
+    if (isLoading) return;
+
     setIsLoading(true);
-    setLoadingAction('syncing');
-    // Simulate API call
-    setTimeout(() => {
+    setLoadingAction('closing_all');
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      showAlert('closeAll');
+    } catch (error) {
+      console.error('Error closing all trades:', error);
+      Alert.alert('Error', 'Failed to close to all trades. Please try again.')
+    } finally {
       setIsLoading(false);
       setLoadingAction('');
-      setShowCloseAllAlert(true);
-      // Auto hide after 3 seconds
-      setTimeout(() => {
-        setShowCloseAllAlert(false);
-      }, 3000);
-    }, 2000);
-  };
+    }
+    // Simulate API call
+    // setTimeout(() => {
+    //   setIsLoading(false);
+    //   setLoadingAction('');
+    //   setShowCloseAllAlert(true);
+    //   // Auto hide after 3 seconds
+    //   setTimeout(() => {
+    //     setShowCloseAllAlert(false);
+    //   }, 3000);
+    // }, 2000);
+  }, [isLoading, showAlert]);
 
 
-  const toggleExpansion = (positionId: string) => {
+  const toggleExpansion = useCallback((positionId: string) => {
     setExpandedPositions(prev => {
       const newSet = new Set(prev);
       if (newSet.has(positionId)) {
@@ -275,9 +427,9 @@ const Positions = () => {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const renderTabs = () => (
+  const renderTabs = useMemo(() => (
     <View className="flex-row bg-[#100E0F] border-b border-gray-700">
       <TouchableOpacity
         className={`flex-1 py-4 ${activeTab === 'positions' ? 'border-b-2 border-pink-500' : ''}`}
@@ -307,43 +459,54 @@ const Positions = () => {
       </TouchableOpacity>
 
     </View>
-  );
+  ), [activeTab, tabData]);
 
-  const renderActionButtons = () => (
+  const renderActionButtons = useMemo(() => (
     <View className="flex-row px-1 py-1 mt-1 bg-[#100E0F]">
       <TouchableOpacity
         className="flex-1 py-1 px-1 mr-1 rounded-md border border-green-500"
         onPress={handleSyncTrades}
+        disabled={isLoading}
       >
-        <Text className="text-success-400 text-center text-sm font-InterSemiBold">Sync Trades</Text>
+        <Text className="text-success-400 text-center text-sm font-InterSemiBold">
+          {loadingAction === 'syncing' ? 'Syncing...' : 'Sync Trades'}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         className="flex-1 py-1 px-1 mr-1 rounded-md border border-green-500"
         onPress={handleCloseProfits}
+        disabled={isLoading}
       >
-        <Text className="text-success-400 text-center text-sm font-InterSemiBold">Close Profits</Text>
+        <Text className="text-success-400 text-center text-sm font-InterSemiBold">
+          {loadingAction === 'closing_profits' ? 'Closing...' : 'Close Profits'}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         className="flex-1 py-1 px-1 mr-1 rounded-md border border-red-500"
         onPress={handleCloseLosses}
+        disabled={isLoading}
       >
-        <Text className="text-danger-500 text-center text-sm font-InterSemiBold">Close Losses</Text>
+        <Text className="text-danger-500 text-center text-sm font-InterSemiBold">
+          {loadingAction === 'closing_losses' ? 'Closing...' : 'Close Losses'}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         className="flex-1 py-1 px-1 mr-1 rounded-md border border-red-500"
         onPress={handleCloseAll}
+        disabled={isLoading}
       >
-        <Text className="text-danger-500 text-center text-sm font-InterSemiBold">Close All</Text>
+        <Text className="text-danger-500 text-center text-sm font-InterSemiBold">
+          {loadingAction === 'closing_all' ? 'Closing...' : 'Close All'}
+        </Text>
       </TouchableOpacity>
     </View>
+  ), [isLoading, loadingAction, handleSyncTrades, handleCloseProfits, handleCloseLosses, handleCloseAll]);
 
-  );
 
-
-  const renderContent = () => {
+  const renderContent = useCallback(() => {
     switch (activeTab) {
       case 'positions':
         return (
@@ -403,15 +566,38 @@ const Positions = () => {
       default:
         return null;
     }
-  };
+  }, [activeTab, expandedPositions, toggleExpansion, openEditModal, openCloseModal, openScreenShotModal, tabData]);
+
+  //Alert component
+  const renderAlert = useCallback((type: AlertType, title: string, message: string) => {
+    if (currentAlert !== type) return null;
+
+    return (
+      <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
+        <View className="flex-row items-center justify-between p-5">
+          <View className="flex-1">
+            <Text className="text-white font-InterSemiBold text-base mb-1">{title}</Text>
+            <Text className="text-gray-300 font-InterRegular text-base">{message}</Text>
+          </View>
+          <TouchableOpacity
+            className="ml-4 p-2"
+            onPress={() => setCurrentAlert(null)}
+          >
+            <X size={16} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }, [currentAlert])
 
   return (
     <SafeAreaView className="flex-1 bg-[#100E0F]">
       <Header />
-      {renderTabs()}
-      {activeTab === 'positions' && renderActionButtons()}
+      {renderTabs}
+      {activeTab === 'positions' && renderActionButtons}
       {/* <View className="w-full h-0.5 bg-gray-800 mt-1" /> */}
       {renderContent()}
+
       <EditPositionBottomSheet
         ref={editBottomSheetRef}
         position={selectedPosition}
@@ -428,13 +614,9 @@ const Positions = () => {
 
       <ScreenShotBottomSheet
         ref={screenShotBottomSheetRef}
-        history={selectedPosition}
+        history={selectedHistory}
         onClose={closeScreenShotModal}
-        onScreenShot={(history) => {
-          console.log('Taking screenshot for history:', history);
-          closeScreenShotModal();
-        }
-        }
+        onScreenShot={handleScreenShot}
       />
 
       {showSyncAlert && (
@@ -514,14 +696,20 @@ const Positions = () => {
       {isLoading && (
         <View className="absolute inset-0 bg-black bg-opacity-50 flex-1 items-center justify-center">
           <View className="bg-gray-900 rounded-2xl p-8 items-center shadow-2xl border border-gray-700">
-            {/* Animated Loader */}
             <View className="relative mb-4">
               <ActivityIndicator size="large" color="#8B5CF6" />
-              <View className="absolute inset-0 rounded-full border-2 border-purple-500 opacity-30 animate-pulse" />
+              <View className="absolute inset-0 rounded-full border-2 border-purple-500 opacity-30" />
             </View>
+            <Text className="text-white text-lg font-InterSemiBold">
+              {loadingAction === 'syncing' && 'Syncing trades...'}
+              {loadingAction === 'closing_profits' && 'Closing profitable trades...'}
+              {loadingAction === 'closing_losses' && 'Closing losing trades...'}
+              {loadingAction === 'closing_all' && 'Closing all trades...'}
+            </Text>
           </View>
         </View>
       )}
+
 
     </SafeAreaView>
   );

@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -37,28 +37,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1C3942892E13C0FE00CDA36C /* charting_library */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = charting_library;
-			sourceTree = "<group>";
-		};
-		1C3945A52E13C0FE00CDA36C /* datafeeds */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = datafeeds;
-			sourceTree = "<group>";
-		};
+		1C3942892E13C0FE00CDA36C /* charting_library */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = charting_library; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,7 +87,6 @@
 			isa = PBXGroup;
 			children = (
 				1C3942892E13C0FE00CDA36C /* charting_library */,
-				1C3945A52E13C0FE00CDA36C /* datafeeds */,
 				1C3945A62E13C0FE00CDA36C /* index.html */,
 				13B07FAE1A68108700A75B9A /* tradingapp */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
@@ -186,7 +164,6 @@
 			);
 			fileSystemSynchronizedGroups = (
 				1C3942892E13C0FE00CDA36C /* charting_library */,
-				1C3945A52E13C0FE00CDA36C /* datafeeds */,
 			);
 			name = tradingapp;
 			productName = tradingapp;
@@ -497,10 +474,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -555,10 +529,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;

@@ -1,64 +1,207 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
-	<head>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>TradingView Chart</title>
+    <script type="text/javascript" src="./charting_library/charting_library.standalone.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        #tv_chart_container {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="tv_chart_container"></div>
 
-		<title>TradingView Advanced Charts demo</title>
+    <script type="text/javascript">
+        // Built-in minimal datafeed (no external bundle.js needed)
+        const testDatafeed = {
+            onReady: function(callback) {
+                setTimeout(() => callback({
+                    supported_resolutions: ['1', '5', '15', '30', '60', '1D'],
+                    supports_group_request: false,
+                    supports_marks: false,
+                    supports_search: true,
+                    supports_timescale_marks: false
+                }), 0);
+            },
+            
+            searchSymbols: function(userInput, exchange, symbolType, onResult) {
+                const symbols = [
+                    {
+                        symbol: 'AAPL',
+                        full_name: 'NASDAQ:AAPL',
+                        description: 'Apple Inc',
+                        type: 'stock',
+                        ticker: 'AAPL'
+                    },
+                    {
+                        symbol: 'GOOGL',
+                        full_name: 'NASDAQ:GOOGL',
+                        description: 'Alphabet Inc',
+                        type: 'stock',
+                        ticker: 'GOOGL'
+                    },
+                    {
+                        symbol: 'TSLA',
+                        full_name: 'NASDAQ:TSLA',
+                        description: 'Tesla Inc',
+                        type: 'stock',
+                        ticker: 'TSLA'
+                    }
+                ];
+                
+                const filteredSymbols = symbols.filter(s => 
+                    s.symbol.toLowerCase().includes(userInput.toLowerCase()) ||
+                    s.description.toLowerCase().includes(userInput.toLowerCase())
+                );
+                
+                onResult(filteredSymbols);
+            },
+            
+            resolveSymbol: function(symbolName, onResolve, onError) {
+                const symbolInfo = {
+                    name: symbolName,
+                    description: symbolName + ' Stock',
+                    type: 'stock',
+                    session: '0930-1600',
+                    timezone: 'America/New_York',
+                    ticker: symbolName,
+                    minmov: 1,
+                    pricescale: 100,
+                    has_intraday: true,
+                    intraday_multipliers: ['1', '5', '15', '30', '60'],
+                    supported_resolution: ['1', '5', '15', '30', '60', '1D'],
+                    volume_precision: 0,
+                    data_status: 'streaming'
+                };
+                setTimeout(() => onResolve(symbolInfo), 0);
+            },
+            
+            getBars: function(symbolInfo, resolution, from, to, onResult, onError, firstDataRequest) {
+                // Generate realistic test data
+                const bars = [];
+                const interval = resolution === '1D' ? 24 * 60 * 60 * 1000 : parseInt(resolution) * 60 * 1000;
+                
+                // Start with a base price based on symbol
+                let basePrice = 100;
+                if (symbolInfo.name === 'AAPL') basePrice = 150;
+                if (symbolInfo.name === 'GOOGL') basePrice = 2500;
+                if (symbolInfo.name === 'TSLA') basePrice = 200;
+                
+                for (let time = from * 1000; time <= to * 1000; time += interval) {
+                    // Create some realistic price movement
+                    const daysSinceStart = (time - from * 1000) / (24 * 60 * 60 * 1000);
+                    const trend = Math.sin(daysSinceStart * 0.1) * 0.02; // Long-term trend
+                    const volatility = (Math.random() - 0.5) * 0.04; // Daily volatility
+                    
+                    const priceMultiplier = 1 + trend + volatility;
+                    const price = basePrice * priceMultiplier;
+                    
+                    const high = price * (1 + Math.random() * 0.02);
+                    const low = price * (1 - Math.random() * 0.02);
+                    const open = low + Math.random() * (high - low);
+                    const close = low + Math.random() * (high - low);
+                    
+                    bars.push({
+                        time: time,
+                        low: Math.round(low * 100) / 100,
+                        high: Math.round(high * 100) / 100,
+                        open: Math.round(open * 100) / 100,
+                        close: Math.round(close * 100) / 100,
+                        volume: Math.floor(Math.random() * 10000000)
+                    });
+                }
+                
+                setTimeout(() => onResult(bars, { noData: bars.length === 0 }), 100);
+            },
+            
+            subscribeBars: function(symbolInfo, resolution, onRealtimeCallback, subscriberUID, onResetCacheNeededCallback) {
+                // For real-time updates (optional)
+                console.log('Subscribed to real-time data for', symbolInfo.name);
+            },
+            
+            unsubscribeBars: function(subscriberUID) {
+                console.log('Unsubscribed from real-time data');
+            }
+        };
 
-		<!-- Fix for iOS Safari zooming bug -->
-		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
+        function initChart() {
+            // Send debug message
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'debug',
+                    message: 'HTML loaded, TradingView library available: ' + (typeof TradingView !== 'undefined')
+                }));
+            }
 
-		<script type="text/javascript" src="./charting_library/charting_library.standalone.js"></script>
-		<script type="text/javascript" src="./datafeeds/udf/dist/bundle.js"></script>
+            if (typeof TradingView === 'undefined') {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'error',
+                        message: 'TradingView library not loaded - check charting_library.standalone.js path'
+                    }));
+                }
+                return;
+            }
 
-		<script type="text/javascript">
+            try {
+                const widget = new TradingView.widget({
+                    fullscreen: true,
+                    symbol: 'AAPL',
+                    interval: '1D',
+                    container: 'tv_chart_container',
+                    datafeed: testDatafeed,
+                    library_path: './charting_library/',
+                    locale: 'en',
+                    debug: false,
+                    theme: 'light',
+                    timezone: 'America/New_York',
+                    toolbar_bg: '#f1f3f6',
+                    enable_publishing: false,
+                    allow_symbol_change: true,
+                    studies_overrides: {},
+                    overrides: {
+                        "paneProperties.background": "#ffffff",
+                        "paneProperties.backgroundType": "solid"
+                    }
+                });
 
-			function getParameterByName(name) {
-				name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-				var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-					results = regex.exec(location.search);
-				return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
-			}
+                // Chart loaded successfully
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'chartReady',
+                        message: 'TradingView chart initialized with test data!'
+                    }));
+                }
 
-			function initOnReady() {
-				var datafeedUrl = "https://demo-feed-data.tradingview.com";
-				var customDataUrl = getParameterByName('dataUrl');
-				if (customDataUrl !== "") {
-					datafeedUrl = customDataUrl.startsWith('https://') ? customDataUrl : `https://${customDataUrl}`;
-				}
+            } catch (error) {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'error',
+                        message: 'Chart initialization failed: ' + error.message
+                    }));
+                }
+            }
+        }
 
-				var widget = window.tvWidget = new TradingView.widget({
-					// debug: true, // uncomment this line to see Library errors and warnings in the console
-					fullscreen: true,
-					symbol: 'AAPL',
-					interval: '1D',
-					container: "tv_chart_container",
-
-					//	BEWARE: no trailing slash is expected in feed URL
-					datafeed: new Datafeeds.UDFCompatibleDatafeed(datafeedUrl, undefined, {
-						maxResponseLength: 1000,
-						expectedOrder: 'latestFirst',
-					}),
-					library_path: "charting_library/",
-					locale: getParameterByName('lang') || "en",
-
-					disabled_features: ["use_localstorage_for_settings"],
-					enabled_features: ["study_templates"],
-					charts_storage_url: 'https://saveload.tradingview.com',
-					charts_storage_api_version: "1.1",
-					client_id: 'tradingview.com',
-					user_id: 'public_user_id',
-					theme: getParameterByName('theme'),
-				});
-				window.frames[0].focus();
-			};
-
-			window.addEventListener('DOMContentLoaded', initOnReady, false);
-		</script>
-
-	</head>
-
-	<body style="margin:0px;">
-		<div id="tv_chart_container"></div>
-	</body>
-
+        // Initialize when TradingView library is ready
+        if (typeof TradingView !== 'undefined' && TradingView.onready) {
+            TradingView.onready(initChart);
+        } else {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(initChart, 100); // Small delay to ensure library loads
+            });
+        }
+    </script>
+</body>
 </html>

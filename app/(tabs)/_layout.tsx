@@ -12,47 +12,25 @@ interface TabIconProps {
   focused: boolean;
 }
 
-
 const TabIcon = ({ icon, color, name, focused }: TabIconProps) => {
   return (
     <View className="flex flex-row items-center justify-center rounded-full">
       <View className="rounded-full w-15 h-12 items-center justify-center">
         {/* Icon section */}
         <View style={{ height: 24, marginBottom: 4, justifyContent: 'center', alignItems: 'center' }}>
-          {focused ? (
-            <MaskedView
-              maskElement={
-                <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-                  <Image
-                    source={icon}
-                    resizeMode='contain'
-                    style={{ width: 24, height: 24, tintColor: 'black' }}
-                  />
-                </View>
-              }
-            >
-              <LinearGradient
-                colors={['#9061F9', '#7EDCE2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ width: 24, height: 24 }}
-              />
-            </MaskedView>
-          ) : (
-            <Image
-              source={icon}
-              resizeMode='contain'
-              tintColor={color}
-              style={{ width: 24, height: 24 }}
-            />
-          )}
+          <Image
+            source={icon}
+            resizeMode='contain'
+            tintColor={focused ? '#E74694' : '#898587'}
+            style={{ width: 24, height: 24 }}
+          />
         </View>
 
-        {/* Text section - consistent positioning */}
+        {/* Text section - always gray */}
         <Text
-          className={`${focused ? 'font-psemibold' : 'font-pregular'} text-xs`}
+          className={`font-InterRegular text-xs`}
           style={{
-            color: focused ? '#9061F9' : color,
+            color: '#898587', // Always gray for labels
             textAlign: 'center',
             width: '100%'
           }}
@@ -65,8 +43,6 @@ const TabIcon = ({ icon, color, name, focused }: TabIconProps) => {
     </View>
   );
 }
-
-
 
 export default function TabLayout() {
   return (
@@ -86,8 +62,8 @@ export default function TabLayout() {
           flexDirection: 'row',
           paddingHorizontal: 4,
         },
-        tabBarActiveTintColor: '#9061F9',
-        tabBarInactiveTintColor: '#898587'
+        tabBarActiveTintColor: '#E74694',   // Your new active color
+        tabBarInactiveTintColor: '#898587'  // Keep gray for inactive
       }}
     >
       <Tabs.Screen

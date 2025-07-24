@@ -1,7 +1,9 @@
+import BottomSheet from "@gorhom/bottom-sheet";
 import { Check, Minus, Plus, X, ChevronDown } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Animated, Easing } from "react-native";
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import TPBottomSheet from "./TPBottomSheet";
 
 const TradingButtons = () => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -13,6 +15,14 @@ const TradingButtons = () => {
     const [stopLossValue, setStopLossValue] = useState(0.00);
     const [constracts] = useState(1);
     const [animatedHeight] = useState(new Animated.Value(40));
+    const [takeProfitType, setTakeProfitType] = useState('Price');
+    const [stopLossType, setStopLossType] = useState('Price');
+    const [limitPrice, setLimitPrice] = useState(999);
+    const [stopPrice, setStopPrice] = useState(999);
+   
+
+    const takeProfitBottomSheetRef = useRef<BottomSheet>(null);
+    const stopLossBottomSheetRef = useRef<BottomSheet>(null);
 
     const handleActionSelect = (action: any) => {
         setSelectedAction(action);
@@ -60,15 +70,38 @@ const TradingButtons = () => {
             }).start();
         }
     }
-
     const openTakeProfitBottomSheet = () => {
-        // TODO: Implement bottom sheet for Take Profit
-        console.log('Open Take Profit bottom sheet');
+        takeProfitBottomSheetRef.current?.snapToIndex(0);
     }
 
     const openStopLossBottomSheet = () => {
-        // TODO: Implement bottom sheet for Stop Loss
-        console.log('Open Stop Loss bottom sheet');
+        stopLossBottomSheetRef.current?.snapToIndex(0);
+    }
+
+    const closeTakeProfitBottomSheet = () => {
+        takeProfitBottomSheetRef.current?.close();
+    }
+
+    const closeStopLossBottomSheet = () => {
+        stopLossBottomSheetRef.current?.close();
+    }
+
+    const handleTakeProfitTypeSelect = (type: 'Price' | 'Pips') => {
+        setTakeProfitType(type);
+        closeTakeProfitBottomSheet();
+    }
+
+    const handleStopLossTypeSelect = (type: 'Price' | 'Pips') => {
+        setStopLossType(type);
+        closeStopLossBottomSheet();
+    }
+
+    const handleLimitPriceChange = (increment: number) => {
+        setLimitPrice(prev => Math.max(0, prev + increment));
+    }
+
+    const handleStopPriceChange = (increment: number) => {
+        setStopPrice(prev => Math.max(0, prev + increment));
     }
 
     const currentPrice = 0.8893;
@@ -188,36 +221,109 @@ const TradingButtons = () => {
                         ))}
                     </View>
 
-                    {/* Contracts and Quantity info */}
+                    {/* Contracts and Quantity info - dynamic based on order type */}
                     <View className="flex-row justify-between items-center mt-3">
-                        <Text className="text-gray-400 text-sm font-Inter">Contracts: <Text className="text-white font-Inter">{constracts}</Text></Text>
-                        <Text className="text-white text-sm font-Inter">Quantity (lots)</Text>
+                        {orderType === 'Market' ? (
+                            // Market: Show both labels for full-width quantity input
+                            <>
+                                <Text className="text-gray-400 text-sm font-Inter">Contracts: <Text className="text-white font-Inter">{constracts}</Text></Text>
+                                <Text className="text-white text-sm font-Inter">Quantity (lots)</Text>
+                            </>
+                        ) : (
+                            // Limit/Stop: Show labels for both inputs
+                            <>
+                                <Text className="text-gray-400 text-sm font-Inter">
+                                    {orderType === 'Limit' ? 'Limit Price' : 'Stop Price'}
+                                </Text>
+                                <View className="flex-row gap-4">
+                                    <Text className="text-gray-400 text-sm font-Inter">Contracts: <Text className="text-white font-Inter">{constracts}</Text></Text>
+                                    <Text className="text-white text-sm font-Inter">Quantity (lots)</Text>
+                                </View>
+                            </>
+                        )}
                     </View>
 
-                    {/* Quantity input with +/- buttons */}
-                    <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-500/50">
-                        <TouchableOpacity
-                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                            onPress={() => handleQuantityChange(-0.01)}
-                            activeOpacity={0.8}
-                        >
-                            <Minus size={16} strokeWidth={3} color='#898587' />
-                        </TouchableOpacity>
+                    {/* Input section - dynamic based on order type */}
+                    {orderType === 'Market' ? (
+                        // Market: Full-width quantity input only
+                        <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-500/50">
+                            <TouchableOpacity
+                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                onPress={() => handleQuantityChange(-0.01)}
+                                activeOpacity={0.8}
+                            >
+                                <Minus size={16} strokeWidth={3} color='#898587' />
+                            </TouchableOpacity>
 
-                        <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
-                            <Text className="text-[#898587] text-base font-Inter">
-                                {quantity.toFixed(2)}
-                            </Text>
+                            <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                <Text className="text-[#898587] text-base font-Inter">
+                                    {quantity.toFixed(2)}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                onPress={() => handleQuantityChange(0.01)}
+                                activeOpacity={0.8}
+                            >
+                                <Plus size={16} strokeWidth={3} color='#898587' />
+                            </TouchableOpacity>
                         </View>
+                    ) : (
+                        // Limit/Stop: Two inputs side by side
+                        <View className="flex-row gap-2 mt-3">
+                            {/* Price Input (Limit or Stop) */}
+                            <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
+                                <TouchableOpacity
+                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                    onPress={() => orderType === 'Limit' ? handleLimitPriceChange(-1) : handleStopPriceChange(-1)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Minus size={16} strokeWidth={3} color='#898587' />
+                                </TouchableOpacity>
 
-                        <TouchableOpacity
-                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                            onPress={() => handleQuantityChange(0.01)}
-                            activeOpacity={0.8}
-                        >
-                            <Plus size={16} strokeWidth={3} color='#898587' />
-                        </TouchableOpacity>
-                    </View>
+                                <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                    <Text className="text-[#898587] text-base font-Inter">
+                                        {orderType === 'Limit' ? limitPrice : stopPrice}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                    onPress={() => orderType === 'Limit' ? handleLimitPriceChange(1) : handleStopPriceChange(1)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Plus size={16} strokeWidth={3} color='#898587' />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Quantity Input */}
+                            <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
+                                <TouchableOpacity
+                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                    onPress={() => handleQuantityChange(-0.01)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Minus size={16} strokeWidth={3} color='#898587' />
+                                </TouchableOpacity>
+
+                                <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                    <Text className="text-[#898587] text-base font-Inter">
+                                        {quantity.toFixed(2)}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                    onPress={() => handleQuantityChange(0.01)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Plus size={16} strokeWidth={3} color='#898587' />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
 
                     {/* TP/SL inputs - only show when checkbox is checked */}
                     {tpSlEnabled && (
@@ -229,7 +335,7 @@ const TradingButtons = () => {
                                     <View className="flex-row items-center justify-between px-3 py-3">
                                         <Text className="text-[#898587] text-sm font-Inter">{takeProfitValue.toFixed(2)}</Text>
                                         <View className="w-px h-5 bg-gray-600" />
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             className="flex-row items-center gap-1"
                                             onPress={openTakeProfitBottomSheet}
                                             activeOpacity={0.8}
@@ -273,6 +379,22 @@ const TradingButtons = () => {
                     </TouchableOpacity>
                 </>
             )}
+            <TPBottomSheet
+                bottomSheetRef={takeProfitBottomSheetRef}
+                onClose={closeTakeProfitBottomSheet}
+                selectedType={takeProfitType}
+                onTypeSelect={handleTakeProfitTypeSelect}
+                title="Take Profit (TP)"
+            />
+
+            {/* Stop Loss BottomSheet */}
+            <TPBottomSheet
+                bottomSheetRef={stopLossBottomSheetRef}
+                onClose={closeStopLossBottomSheet}
+                selectedType={stopLossType}
+                onTypeSelect={handleStopLossTypeSelect}
+                title="Stop Loss (SL)"
+            />
         </Animated.View>
     );
 };

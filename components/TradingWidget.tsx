@@ -4,7 +4,6 @@ import React, { useMemo } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 import { TradingPrices } from './TradingPrices';
 import { useTranslation } from 'react-i18next';
-// import { ChevronDown } from 'react-native-feather' // or your preferred icon library
 
 //Skeleton component for loading states
 const Skeleton = ({ width = 80, height = 20 }: { width?: number; height?: number }) => (
@@ -12,7 +11,7 @@ const Skeleton = ({ width = 80, height = 20 }: { width?: number; height?: number
         style={{
             width,
             height,
-            backgroundColor: '#E5E7EB',
+            backgroundColor: '#2F2C2D',
             borderRadius: 4
         }}
     />
@@ -24,7 +23,7 @@ const Separator = () => (
         style={{
             width: 1,
             height: 40,
-            backgroundColor: '#E5E7EB',
+            backgroundColor: '#2F2C2D',
             marginHorizontal: 8
         }}
     />
@@ -103,8 +102,8 @@ const styles = {
         alignItems: 'center' as const,
         padding: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-        backgroundColor: '#fff',
+        borderBottomColor: '#2F2C2D',
+        backgroundColor: '#100E0F',
     },
     tradingPricesContainer: {
         // No specific styling needed, just a container

@@ -5,33 +5,33 @@ import { ActivityIndicator, View } from "react-native";
 import 'react-native-gesture-handler';
 
 const Page = () => {
-    // const { isSignedIn } = useAuth();
+  // const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
 
-    // if (isSignedIn) return <Redirect href='/(tabs)/overview' />
-    // return <Redirect href='/(auth)/login' />
-    // const { isLoaded, isSignedIn } = useAuth();
+  if (isSignedIn) return <Redirect href='/(tabs)/overview' />
+  // return <Redirect href='/(auth)/login' />
 
-    useEffect(() => {
+  useEffect(() => {
     // Only navigate once everything is loaded
-    // if (!isLoaded) return;
+    if (!isLoaded) return;
 
     // Slight delay ensures layout and navigation system is ready
     const timeout = setTimeout(() => {
-      // if (isSignedIn) {
+      if (isSignedIn) {
         router.replace("/(tabs)/overview");
-      // } else {
-        // router.replace("/(auth)/login");
-      // }
+      } else {
+        router.replace("/(auth)/login");
+      }
     }, 10); // 10–50ms is enough
 
     return () => clearTimeout(timeout);
-  }, []);
-  // }, [isLoaded, isSignedIn]);
-    return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size='large' color='#ff13' />
-        </View>
-    )
+    // }, []);
+  }, [isLoaded, isSignedIn]);
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size='large' color='#ff13' />
+    </View>
+  )
 }
 
 export default Page;

@@ -2,6 +2,8 @@ import React from "react";
 import { TouchableOpacity, View } from "react-native";
 import BrokerPLCard from "./BokerPLCard";
 import icons from "@/constants/icons";
+import BrokeragePracticePLCard from "./BokerPLCard";
+import { PracticeIcon } from "./icons/PracticeIcon";
 
 interface DemoAccountsProps {
     accounts: Array<{
@@ -33,13 +35,13 @@ const DemoAccounts = ({ accounts, onAccountPress }: DemoAccountsProps) => {
                     key={account.id}
                     onPress={() => onAccountPress(account)}
                 >
-                    <BrokerPLCard
+                    <BrokeragePracticePLCard
                         account={account}
                         activeTab="Demo"
-                        tabImage={icons.wallet}
                         accountName={account.name}
                         accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
+                        icon={PracticeIcon}
                     />
                 </TouchableOpacity>
             ))}

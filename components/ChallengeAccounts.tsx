@@ -2,6 +2,9 @@ import { TouchableOpacity, View } from "react-native";
 import React from "react";
 import BrokerPLCard from "./BokerPLCard";
 import images from "@/constants/images";
+import PropFirmPLCard from "./PropFirmPLCard";
+import { FundedAccountIcon } from "./icons/FundedAccountIcon";
+import { EvaluatedAccountIcon } from "./icons/EvaluatedAccountIcon";
 
 interface ChallengeAccountsProps {
     accounts: Array<{
@@ -26,14 +29,13 @@ const ChallengeAccounts = ({
                     key={account.id}
                     onPress={() => onAccountPress(account)}
                 >
-                    <BrokerPLCard
-                        key={account.id}
+                   <PropFirmPLCard
                         account={account}
-                        activeTab="Challenge"
-                        tabImage={images.alpha_capital}
+                        activeTab="Evaluation"
                         accountName={account.name}
-                        accountBalance={account.balance}
+                        accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
+                        icon={EvaluatedAccountIcon}
                     />
                 </TouchableOpacity>
             ))}

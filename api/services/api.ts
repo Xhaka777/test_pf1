@@ -41,7 +41,6 @@ export function useAuthenticatedApi<T>() {
       method: axiosOptions.method || (axiosOptions.data ? 'POST' : 'GET'),
       headers,
       data: formData || axiosOptions.data,
-      // baseURL: 'https://staging-server.propfirmone.com',
       baseURL: process.env.PUBLIC_SERVER_URL,
       url: endpoint,
       responseType: returnMethod === 'blob' ? 'blob' : 'json',
@@ -55,12 +54,12 @@ export function useAuthenticatedApi<T>() {
     } catch (error) {
       console.error(`API call failed (${endpoint}):`, error);
 
-      // Better error handling with axios
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-        const status = error.response?.status || 0;
-        throw new Error(`API Error (${status}): ${errorMessage}`);
-      }
+      // // Better error handling with axios
+      // if (axios.isAxiosError(error)) {
+      //   const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      //   const status = error.response?.status || 0;
+      //   throw new Error(`API Error (${status}): ${errorMessage}`);
+      // }
 
       throw error;
     }

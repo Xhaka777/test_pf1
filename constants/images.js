@@ -9,6 +9,10 @@ import funding_pips from '../assets/images/funding_pips.png';
 import mini_funding_logo from '../assets/images/mini_funding_logo.png';
 import usa_png from '../assets/images/usa.png';
 import pl_frame from '../assets/images/pl_frame.png';
+import evaluation from '../assets/images/evaluation.svg';
+import brokerage from '../assets/images/brokerage.png';
+import practice from '../assets/images/practice.svg';
+
 
 export default {
     logo,
@@ -21,5 +25,8 @@ export default {
     funding_pips,
     mini_funding_logo,
     usa_png,
-    pl_frame
+    pl_frame,
+    evaluation,
+    brokerage,
+    practice,
 }

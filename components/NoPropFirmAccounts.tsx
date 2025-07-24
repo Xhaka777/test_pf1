@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { View, Text, Image, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import images from '@/constants/images';
@@ -30,6 +30,8 @@ interface NoPropFirmAccountsProps {
   showSearchBar?: boolean;
   chartData?: any;
   isMenuScreen?: boolean;
+  presetActiveTab?: 'Challenge' | 'Funded'; // New prop to preset the active tab
+  hideTabBar?: boolean; // New prop to hide the TabBar
 }
 
 const NoPropFirmAccounts = ({
@@ -39,7 +41,9 @@ const NoPropFirmAccounts = ({
   showTabs = true,
   showSearchBar = true,
   chartData = null,
-  isMenuScreen = false
+  isMenuScreen = false,
+  presetActiveTab = null, // New prop
+  hideTabBar = false // New prop
 }: NoPropFirmAccountsProps) => {
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -56,7 +60,16 @@ const NoPropFirmAccounts = ({
   const [selectedAccount, setSelectedAccount] = useState(null);
   const propFirmTabs = ['Challenge', 'Funded'];
   const tabs = propFirmTabs;
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  
+  // Use presetActiveTab if provided, otherwise default to first tab
+  const [activeTab, setActiveTab] = useState(presetActiveTab || tabs[0]);
+
+  // Update activeTab when presetActiveTab changes
+  useEffect(() => {
+    if (presetActiveTab) {
+      setActiveTab(presetActiveTab);
+    }
+  }, [presetActiveTab]);
 
   // State for time period selection and chart data
   const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
@@ -190,6 +203,8 @@ const NoPropFirmAccounts = ({
         <MenuAccounts
           accounts={accountsToShow}
           onAccountPress={handleAccountPress}
+          accountType="propFirm"
+          activeTab={activeTab}
         />
       )
     } else {
@@ -218,6 +233,11 @@ const NoPropFirmAccounts = ({
       }
     }
   }
+
+  // Get current account count based on active tab
+  const currentAccountCount = useMemo(() => {
+    return activeTab === 'Challenge' ? challengeAccounts.length : fundedAccounts.length;
+  }, [activeTab, challengeAccounts.length, fundedAccounts.length]);
 
   const handleAccountPress = useCallback((account: any) => {
     setSelectedAccount({
@@ -266,66 +286,35 @@ const NoPropFirmAccounts = ({
         renderNoAccountContent()
       ) : (
         <View className='flex-1 p-2'>
-          {/* ✅ Chart Section */}
-          {!isMenuScreen && (
-            <View className='h-[150px] mb-4'>
-              {chartLoading ? (
-                <View className='flex-1 justify-center items-center'>
-                  <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
-                </View>
-              ) : chartError ? (
-                <View className='flex-1 justify-center items-center'>
-                  <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
-                </View>
-              ) : (
-                <TimeSeriesChart
-                  data={chartDetailsData}
-                  timeframe={timeframe}
-                  height={180}
-                  showLabels={true}
-                  accountType="propfirm" // ✅ Specify this is prop firm account data
+          {/* Conditionally render TabBar only if hideTabBar is false */}
+          {!hideTabBar && (
+            <View className='flex-row items-center justify-between'>
+              <View className='flex-1 mr-2'>
+                <TabBar
+                  tabs={tabs}
+                  activeTab={activeTab}
+                  onTabPress={setActiveTab}
+                  selectedAccountType={selectedAccountType}
+                  showCounts={true}
+                  tabCounts={tabCounts}
                 />
-              )}
+              </View>
             </View>
           )}
 
-          <View className='flex-row items-center justify-between'>
-            <View className='flex-1 mr-2'>
-              <TabBar
-                tabs={tabs}
-                activeTab={activeTab}
-                onTabPress={setActiveTab}
-                selectedAccountType={selectedAccountType}
-                showCounts={true}
-                tabCounts={tabCounts}
-              />
+          {/* Accounts Section with Count - only show when hideTabBar is true (from overview) */}
+          {hideTabBar && (
+            <View className='px-6 mb-4'>
+              <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
+                Accounts <Text style={{ color: '#E74694' }}>{currentAccountCount}</Text>
+              </Text>
             </View>
-            {showTimePeriods && (
-              <View className='flex-row mt-3 mb-4'>
-                <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
-              </View>
-            )}
-          </View>
+          )}
           
           {showSearchBar && (
             <SearchInput onSearch={handleSearch} />
           )}
-          
-          {showMetrics && (
-            <View className='flex-row mb-1'>
-              <MetricCard
-                title={activeTab === 'Challenge' ? 'Total Challenge Balance' : 'Total Funded Balance'}
-                value={overviewLoading ? "Loading..." : totalChallengeBalance}
-                iconType='balance'
-              />
-              <MetricCard
-                title='Daily P/L'
-                value={overviewLoading ? "Loading..." : totalDailyPL}
-                iconType='profit'
-              />
-            </View>
-          )}
-          
+                    
           {renderTabContent()}
 
           <AccountBottomSheet

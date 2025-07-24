@@ -12,13 +12,90 @@ import SearchInput from './SearchInput';
 import { BrokerAccount } from '@/types';
 import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './timeframe-selector';
 import { AccountTypeEnum } from '@/constants/enums';
-
-import { 
-  useGetBrokerAccounts, 
-  useFetchBrokerAccountsOverview,
-  useFetchAccountsOverviewDetails 
-} from '@/api/hooks/accounts';
 import TimeSeriesChart from './TimeSeriesChart';
+import BrokerBottomSheet from './overview/BrokerBottomSheet';
+
+// ✅ Mock data for broker accounts
+const mockBrokerAccountsData = {
+  broker_accounts: [
+    {
+      id: 1,
+      name: "Trading Account Pro",
+      balance: 15750.25,
+      daily_pl: 342.50,
+      total_pl: 1750.25,
+      starting_balance: 14000.00,
+      currency: "USD",
+      account_type: "live",
+      firm: "Interactive Brokers",
+      exchange: "MT5",
+      server: "Live-01",
+      status: "active",
+      api_key: "abc123",
+      secret_key: "xyz789"
+    },
+    {
+      id: 2,
+      name: "Scalping Account",
+      balance: 8925.80,
+      daily_pl: -125.75,
+      total_pl: 925.80,
+      starting_balance: 8000.00,
+      currency: "USD",
+      account_type: "live",
+      firm: "FXCM",
+      exchange: "MT5",
+      server: "Live-02",
+      status: "active",
+      api_key: "def456",
+      secret_key: "uvw012"
+    },
+    {
+      id: 3,
+      name: "Demo Practice",
+      balance: 50250.00,
+      daily_pl: 850.00,
+      total_pl: 250.00,
+      starting_balance: 50000.00,
+      currency: "USD",
+      account_type: "demo",
+      firm: "MetaQuotes",
+      exchange: "MT5",
+      server: "Demo-01",
+      status: "active",
+      api_key: "ghi789",
+      secret_key: "rst345"
+    },
+    {
+      id: 4,
+      name: "Demo Learning",
+      balance: 9750.50,
+      daily_pl: -45.25,
+      total_pl: -249.50,
+      starting_balance: 10000.00,
+      currency: "EUR",
+      account_type: "demo",
+      firm: "Admiral Markets",
+      exchange: "CTrader",
+      server: "Demo-02",
+      status: "active",
+      api_key: "jkl012",
+      secret_key: "opq678"
+    }
+  ],
+  status: "success"
+};
+
+// ✅ Mock data for broker overview
+const mockBrokerOverviewData = {
+  daily_pl: 1021.50,
+  monthly_pl: 12750.25,
+  status: "success",
+  total_balance_pl: 2676.55,
+  total_balances: 84676.55,
+  total_net_pl: 2676.55,
+  weekly_pl: 3250.75
+};
 
 interface NoBrokerAccountProps {
   showCart?: boolean;
@@ -28,6 +105,9 @@ interface NoBrokerAccountProps {
   chartData?: any;
   isMenuScreen?: boolean;
   showSearchBar?: boolean;
+  presetActiveTab?: 'Live' | 'Demo'; // New prop to preset the active tab
+  hideTabBar?: boolean; // New prop to hide the TabBar
+  showOnlyPresetTab?: boolean; // New prop to show only the preset tab
 }
 
 // Updated interface to match your BrokerPLCard component expectations
@@ -56,27 +136,36 @@ function NoBrokerAccount({
   chartData = null,
   isMenuScreen = false,
   showSearchBar = true,
+  presetActiveTab = null, // New prop
+  hideTabBar = false, // New prop
+  showOnlyPresetTab = false // New prop to show only the preset tab
 }: NoBrokerAccountProps) {
 
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
 
-  const {
-    data: brokerAccountsData,
-    isLoading: brokerAccountsLoading,
-    error: brokerAccountsError,
-    refetch: refetchBrokerAccounts
-  } = useGetBrokerAccounts();
+  // ✅ Using mock data instead of API calls
+  const brokerAccountsData = mockBrokerAccountsData;
+  const brokerAccountsLoading = false;
+  const brokerAccountsError = null;
+  const refetchBrokerAccounts = () => console.log('Refetch broker accounts (mock)');
 
-  const {
-    data: brokerOverviewData,
-    isLoading: overviewLoading,
-    error: overviewError
-  } = useFetchBrokerAccountsOverview();
+  const brokerOverviewData = mockBrokerOverviewData;
+  const overviewLoading = false;
+  const overviewError = null;
 
   // State for time period selection and chart data
   const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
-  
-  const [activeTab, setActiveTab] = useState<'Live' | 'Demo'>('Live');
+
+  // Use presetActiveTab if provided, otherwise default to 'Live'
+  const [activeTab, setActiveTab] = useState<'Live' | 'Demo'>(presetActiveTab || 'Live');
+
+  // Update activeTab when presetActiveTab changes
+  useEffect(() => {
+    if (presetActiveTab) {
+      setActiveTab(presetActiveTab);
+    }
+  }, [presetActiveTab]);
+
   const currentAccountType = useMemo(() => {
     return activeTab === 'Live' ? AccountTypeEnum.LIVE : AccountTypeEnum.DEMO;
   }, [activeTab]);
@@ -85,18 +174,6 @@ function NoBrokerAccount({
   const dateRange = useMemo(() => {
     return getDateRangeFromTimeframe(timeframe);
   }, [timeframe]);
-
-  const { 
-    data: chartDetailsData, 
-    isLoading: chartLoading, 
-    error: chartError 
-  } = useFetchAccountsOverviewDetails({
-    account_type: currentAccountType,
-    ...dateRange,
-  }, {
-    enabled: Boolean(dateRange.start_date && dateRange.end_date),
-    staleTime: 1 * 60 * 1000, // 1 minute for chart data
-  });
 
   // Other state
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
@@ -108,11 +185,12 @@ function NoBrokerAccount({
   const [filteredDemoAccounts, setFilteredDemoAccounts] = useState<DisplayAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // ✅ Process mock broker accounts data
   useEffect(() => {
     if (brokerAccountsData?.broker_accounts) {
-      console.log('[NoBrokerAccount] Processing broker accounts:', brokerAccountsData.broker_accounts.length);
-      
-      const processedAccounts = brokerAccountsData.broker_accounts.map((account: BrokerAccount): DisplayAccount => {
+      console.log('[NoBrokerAccount] Processing mock broker accounts:', brokerAccountsData.broker_accounts.length);
+
+      const processedAccounts = brokerAccountsData.broker_accounts.map((account: any): DisplayAccount => {
         // Calculate total performance percentage
         const totalGainLoss = account.balance - account.starting_balance;
         const totalPerformancePercentage = account.starting_balance > 0
@@ -141,7 +219,7 @@ function NoBrokerAccount({
       const live = processedAccounts.filter(acc => acc.type === 'Live');
       const demo = processedAccounts.filter(acc => acc.type === 'Demo');
 
-      console.log('[NoBrokerAccount] Processed accounts:', { live: live.length, demo: demo.length });
+      console.log('[NoBrokerAccount] Processed mock accounts:', { live: live.length, demo: demo.length });
 
       setLiveAccounts(live);
       setDemoAccounts(demo);
@@ -155,6 +233,11 @@ function NoBrokerAccount({
     'Live': liveAccounts.length,
     'Demo': demoAccounts.length
   }), [liveAccounts.length, demoAccounts.length]);
+
+  // Get current account count based on active tab
+  const currentAccountCount = useMemo(() => {
+    return activeTab === 'Live' ? liveAccounts.length : demoAccounts.length;
+  }, [activeTab, liveAccounts.length, demoAccounts.length]);
 
   const handleSearch = useCallback((text: string) => {
     const query = text.toLowerCase();
@@ -184,6 +267,7 @@ function NoBrokerAccount({
     setFilteredDemoAccounts(filteredDemo);
   }, [liveAccounts, demoAccounts]);
 
+  // ✅ Using mock data with proper null checks
   const totalBalance = useMemo(() => {
     if (!brokerOverviewData) return '$0';
     return `$${brokerOverviewData.total_balances?.toLocaleString() || '0'}`;
@@ -198,7 +282,7 @@ function NoBrokerAccount({
 
   const handleAccountPress = useCallback((account: DisplayAccount) => {
     console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
-    
+
     const enhancedAccountData = {
       id: account.id,
       name: account.name,
@@ -215,13 +299,13 @@ function NoBrokerAccount({
       totalPL: account.totalPL,
       startingBalance: account.startingBalance
     };
-    
+
     setSelectedAccount(enhancedAccountData);
     demoBottomSheetRef.current?.present();
   }, []);
 
   const renderTabContent = () => {
-    // Show loading state while fetching data
+    // Show loading state while fetching data (always false for mock data)
     if (brokerAccountsLoading) {
       return (
         <View className='flex-1 items-center justify-center'>
@@ -230,7 +314,7 @@ function NoBrokerAccount({
       );
     }
 
-    // Error state
+    // Error state (always null for mock data)
     if (brokerAccountsError) {
       return (
         <View className='flex-1 items-center justify-center'>
@@ -256,8 +340,8 @@ function NoBrokerAccount({
         <View className='flex-1 justify-center items-center'>
           <FileText size={20} color='#9CA3AF' className='mb-4' />
           <Text className='text-gray-400 text-base font-Inter'>
-            {hasSearchQuery 
-              ? 'No matching accounts found' 
+            {hasSearchQuery
+              ? 'No matching accounts found'
               : `No ${activeTab.toLowerCase()} accounts found`
             }
           </Text>
@@ -266,6 +350,8 @@ function NoBrokerAccount({
         <MenuAccounts
           accounts={accountsToShow}
           onAccountPress={handleAccountPress}
+          accountType={presetActiveTab === 'Live' ? 'brokerage' : 'practice'}
+          activeTab={activeTab}
         />
       );
     }
@@ -280,9 +366,9 @@ function NoBrokerAccount({
           </Text>
         </View>
       ) : (
-        <LiveAccounts 
-          accounts={filteredLiveAccounts} 
-          onAccountPress={handleAccountPress} 
+        <LiveAccounts
+          accounts={filteredLiveAccounts}
+          onAccountPress={handleAccountPress}
         />
       );
     } else {
@@ -294,9 +380,9 @@ function NoBrokerAccount({
           </Text>
         </View>
       ) : (
-        <DemoAccounts 
-          accounts={filteredDemoAccounts} 
-          onAccountPress={handleAccountPress} 
+        <DemoAccounts
+          accounts={filteredDemoAccounts}
+          onAccountPress={handleAccountPress}
         />
       );
     }
@@ -305,72 +391,41 @@ function NoBrokerAccount({
   return (
     <SafeAreaView className={`flex-1 ${isMenuScreen ? 'mt-1' : ''}`}>
       <StatusBar barStyle="light-content" />
-      
-      {!isMenuScreen && (
-        <View className='h-[150px] mb-4'>
-          {chartLoading ? (
-            <View className='flex-1 justify-center items-center'>
-              <Text className='text-gray-400 text-sm'>Loading chart data...</Text>
-            </View>
-          ) : chartError ? (
-            <View className='flex-1 justify-center items-center'>
-              <Text className='text-red-400 text-xs'>Chart error: {chartError.message}</Text>
-            </View>
-          ) : (
-            <TimeSeriesChart
-              data={chartDetailsData}
-              timeframe={timeframe}
-              height={180}
-              showLabels={true}
-              accountType="broker"
-              loading={chartLoading}
-              error={chartError?.message || null}
-            />
-          )}
-        </View>
-      )}
 
-      <View className='flex-1 p-2 mt-10'>
-        <View className='flex-row items-center justify-between'>
-          <View className='flex-1 mr-2'>
-            <TabBar
-              tabs={['Live', 'Demo']}
-              activeTab={activeTab}
-              onTabPress={(tab) => setActiveTab(tab as 'Live' | 'Demo')}
-              selectedAccountType="ownBroker"
-              showCounts={true}
-              tabCounts={tabCounts}
-            />
-          </View>
-          {showTimePeriods && !isMenuScreen && (
-            <View className='flex-row mt-3 mb-4'>
-              <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
+      <View className='flex-1 p-2'>
+
+        {/* Conditionally render TabBar only if hideTabBar is false */}
+        {!hideTabBar && showTabs && (
+          <View className='flex-row items-center justify-between mb-4'>
+            <View className='flex-1 mr-2'>
+              <TabBar
+                tabs={showOnlyPresetTab && presetActiveTab ? [presetActiveTab] : ['Live', 'Demo']}
+                activeTab={activeTab}
+                onTabPress={showOnlyPresetTab ? () => { } : setActiveTab} // Disable tab switching if showing only one tab
+                selectedAccountType="ownBroker"
+                showCounts={true}
+                tabCounts={tabCounts}
+              />
             </View>
-          )}
-        </View>
-        
+          </View>
+        )}
+
+        {/* Accounts Section with Count - only show when hideTabBar is true AND not in menu screen */}
+        {hideTabBar && !isMenuScreen && (
+          <View className='px-6 mb-4'>
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
+              Accounts <Text style={{ color: '#E74694' }}>{currentAccountCount}</Text>
+            </Text>
+          </View>
+        )}
+
         {showSearchBar && (
           <SearchInput onSearch={handleSearch} />
         )}
-        
-        {showMetrics && !isMenuScreen && (
-          <View className='flex-row mb-1'>
-            <MetricCard
-              title="Total Balance (AUM)"
-              value={overviewLoading ? "Loading..." : totalBalance}
-              iconType="balance"
-            />
-            <MetricCard
-              title="Daily P/L"
-              value={overviewLoading ? "Loading..." : totalDailyPL}
-              iconType="profit"
-            />
-          </View>
-        )}
-        
+
         {renderTabContent()}
 
-        <AccountBottomSheet
+        <BrokerBottomSheet
           bottomSheetRef={demoBottomSheetRef}
           accountData={selectedAccount || {
             id: 1,
