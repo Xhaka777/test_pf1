@@ -6,6 +6,8 @@ import { View, Text, TouchableOpacity, Image } from "react-native";
 import { BrokerAccount } from "@/types";
 import { WinLossStats } from "./WinLossStats";
 import AdditionalStats from "./AdditionalStats";
+import { PracticeIcon } from "../icons/PracticeIcon";
+import AccountIcon from "../icons/AccountIcon";
 
 interface BrokerAccountData {
     id: number;
@@ -37,25 +39,19 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
     // Configuration for broker account types
     const accountTypeConfig = {
         Live: {
-            bgColor: '#DC2626', // Red
-            textColor: 'text-white',
-            icon: require('@/assets/icons/red_wallet.png'),
-            labelColor: 'bg-red-900',
+            bgColor: '', // Not used directly here
+            textColor: '#F98080', // white
+            icon: AccountIcon,
+            labelColor: '#771D1D', // Tailwind's red-700/900-ish
         },
         Demo: {
-            bgColor: '#059669', // Green
-            textColor: 'text-white',
-            icon: require('@/assets/icons/wallet.png'),
-            labelColor: 'bg-green-900',
+            bgColor: '', 
+            textColor: '#FACA15', 
+            icon: PracticeIcon,
+            labelColor: '#633112',
         },
     };
-
     const currentConfig = accountData?.type ? accountTypeConfig[accountData.type] : accountTypeConfig.Demo;
-
-    // Get profit/loss color
-    const getPLColor = (value: number) => {
-        return value >= 0 ? '#10B981' : '#EF4444';
-    };
 
     // Extract numeric values from string formats
     const getNumericValue = (stringValue: string): number => {
@@ -115,11 +111,7 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
                             className="border border-gray-800 w-12 h-12 items-center justify-center rounded-lg mr-4"
                             style={{ backgroundColor: currentConfig.bgColor }}
                         >
-                            <Image
-                                source={currentConfig.icon}
-                                resizeMode='contain'
-                                className="w-6 h-6"
-                            />
+                            <currentConfig.icon size={40} />
                         </View>
 
                         <View className="flex-1">
@@ -133,8 +125,14 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
                     </View>
 
                     <View className="flex-row items-center">
-                        <View className={`rounded-md px-2.5 py-0.5 ${currentConfig.labelColor}`}>
-                            <Text className={`font-Inter text-base ${currentConfig.textColor}`}>
+                        <View
+                            className="rounded-md px-2.5 py-0.5"
+                            style={{ backgroundColor: currentConfig.labelColor }}
+                        >
+                            <Text
+                                className="font-Inter text-base"
+                                style={{ color: currentConfig.textColor }}
+                            >
                                 {accountData?.type || 'Demo'}
                             </Text>
                         </View>

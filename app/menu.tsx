@@ -9,8 +9,9 @@ import Profile from '@/components/Profile';
 import BottomSheet, { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import ProfileBottomSheet from '@/components/ProfileBottomSheet';
 import ConfirmBottomSheet from '@/components/ConfirmBottomSheet';
+// Updated AccountBottomSheet component alias for clarity
 import DemoAccBottomSheet from '@/components/AccountBottomSheet';
-import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet'; // Import the dynamic bottom sheet
+import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet';
 import SeachInput from '@/components/SearchInput';
 import NoPropFirmAccounts from '@/components/NoPropFirmAccounts';
 import NoBrokerAccount from '@/components/NoBrokerAccount';
@@ -32,8 +33,9 @@ const Menu = () => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const confirmSignOutSheetRef = useRef<BottomSheet>(null);
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
-  const accountBottomSheetRef = useRef<BottomSheetModal>(null); // New ref for account details
+  const accountBottomSheetRef = useRef<BottomSheetModal>(null);
 
+  // ✅ FIXED: Get prop firm accounts data from API
   const {
     data: propFirmAccountsData,
     isLoading: propFirmAccountsLoading,
@@ -41,7 +43,7 @@ const Menu = () => {
     refetch: refetchPropFirmAccounts
   } = useGetPropFirmAccounts({
     enabled: selectedAccountType === 'propFirm',
-  })
+  });
 
   const {
     data: propFirmOverviewData,
@@ -49,7 +51,7 @@ const Menu = () => {
     error: propFirmOverviewError
   } = useFetchPropFirmAccountsOverview({
     enabled: selectedAccountType === 'propFirm',
-  })
+  });
 
   const {
     data: brokerAccountsData,
@@ -58,6 +60,7 @@ const Menu = () => {
     refetch: refetchBrokerAccounts
   } = useGetBrokerAccounts();
 
+  // ✅ FIXED: Process prop firm accounts similar to broker accounts
   const processedPropFirmAccounts = useMemo(() => {
     if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
 
@@ -97,15 +100,6 @@ const Menu = () => {
 
     return { evaluation, funded };
   }, [propFirmAccountsData]);
-
-
-  // Mock account data - replace with your actual data source
-  const AccountData = {
-    propFirm: {
-      evaluation: processedPropFirmAccounts.evaluation,
-      funded: processedPropFirmAccounts.funded,
-    }
-  };
 
   // Get account configuration for bottom sheet
   const getAccountConfig = (accountType: string) => {
@@ -225,16 +219,25 @@ const Menu = () => {
 
   // Handle account press - opens account details bottom sheet
   const handleAccountPress = useCallback((account: any) => {
+    console.log('[Menu] Account pressed:', account.id, account.name, account.type);
     setSelectedAccount(account);
-    accountBottomSheetRef.current?.present();
+    
+    // ✅ FIXED: Use appropriate bottom sheet based on account type
+    if (account.type === 'Challenge' || account.type === 'Funded') {
+      // Use AccountBottomSheet for prop firm accounts
+      demoBottomSheetRef.current?.present();
+    } else if (account.type === 'Live' || account.type === 'Demo') {
+      // Use BrokerBottomSheet for broker accounts
+      accountBottomSheetRef.current?.present();
+    } else {
+      // Fallback to AccountBottomSheet
+      demoBottomSheetRef.current?.present();
+    }
   }, []);
 
   // Handle trade press from bottom sheet
   const handleTradePress = useCallback((accountData: any) => {
-    // console.log('Trade pressed for account:', accountData?.name);
     accountBottomSheetRef.current?.dismiss();
-    // Navigate to trading screen
-    // navigation.navigate('TradingScreen', { accountData });
   }, []);
 
   // Render account content based on selected account type
@@ -247,16 +250,16 @@ const Menu = () => {
             showMetrics={false}
             isMenuScreen={true}
             hideTabBar={false} 
+            // ✅ FIXED: Pass real API data instead of using internal mock data
             accountData={{
-              evaluation: AccountData.propFirm.evaluation,
-              funded: AccountData.propFirm.funded,
+              evaluation: processedPropFirmAccounts.evaluation,
+              funded: processedPropFirmAccounts.funded,
             }}
             isLoading={propFirmAccountsLoading}
             error={propFirmAccountsError}
             onAccountPress={handleAccountPress}
             onRefresh={refetchPropFirmAccounts}
           />
-
         );
 
       case 'brokerage':
@@ -265,11 +268,11 @@ const Menu = () => {
             showCart={false}
             showTimePeriods={false}
             showMetrics={false}
-            showTabs={true} // Show tabs
+            showTabs={true}
             isMenuScreen={true}
             presetActiveTab="Live"
-            hideTabBar={false} // Show tab bar
-            showOnlyPresetTab={true} // Show only Live tab
+            hideTabBar={false}
+            showOnlyPresetTab={true}
             brokerAccountsData={brokerAccountsData}
             brokerAccountsLoading={brokerAccountsLoading}
             brokerAccountsError={brokerAccountsError}
@@ -283,11 +286,11 @@ const Menu = () => {
             showCart={false}
             showTimePeriods={false}
             showMetrics={false}
-            showTabs={true} // Show tabs
+            showTabs={true}
             isMenuScreen={true}
             presetActiveTab="Demo"
-            hideTabBar={false} // Show tab bar
-            showOnlyPresetTab={true} // Show only Demo tab
+            hideTabBar={false}
+            showOnlyPresetTab={true}
             brokerAccountsData={brokerAccountsData}
             brokerAccountsLoading={brokerAccountsLoading}
             brokerAccountsError={brokerAccountsError}
@@ -301,6 +304,15 @@ const Menu = () => {
             showTimePeriods={false}
             showMetrics={false}
             isMenuScreen={true}
+            // ✅ FIXED: Pass real API data as fallback too
+            accountData={{
+              evaluation: processedPropFirmAccounts.evaluation,
+              funded: processedPropFirmAccounts.funded,
+            }}
+            isLoading={propFirmAccountsLoading}
+            error={propFirmAccountsError}
+            onAccountPress={handleAccountPress}
+            onRefresh={refetchPropFirmAccounts}
           />
         );
     }
@@ -371,23 +383,48 @@ const Menu = () => {
           confirmSignOutSheetRef={confirmSignOutSheetRef}
         />
 
+        {/* ✅ FIXED: AccountBottomSheet for Prop Firm accounts (Challenge/Funded) */}
         <DemoAccBottomSheet
           bottomSheetRef={demoBottomSheetRef}
+          accountData={selectedAccount && (selectedAccount.type === 'Challenge' || selectedAccount.type === 'Funded') ? {
+            id: selectedAccount.id,
+            name: selectedAccount.name,
+            balance: `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
+            dailyPL: `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
+            changePercentage: `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
+            type: selectedAccount.type,
+            originalData: selectedAccount.originalData,
+            currency: selectedAccount.currency,
+            firm: selectedAccount.firm,
+            program: selectedAccount.program,
+            totalPL: selectedAccount.totalPL,
+            netPL: selectedAccount.netPL,
+            startingBalance: selectedAccount.startingBalance,
+            maxTotalDD: selectedAccount.maxTotalDD,
+            profitTarget: selectedAccount.profitTarget,
+          } : undefined}
         />
 
-        {/* Dynamic Account Details Bottom Sheet */}
-        {selectedAccount && (
+        {/* ✅ FIXED: BrokerBottomSheet for Broker accounts (Live/Demo) */}
+        {selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') && (
           <BrokerBottomSheet
             bottomSheetRef={accountBottomSheetRef}
             accountData={{
-              ...selectedAccount,
+              id: selectedAccount.id,
+              name: selectedAccount.name,
               balance: `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
               dailyPL: `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
               changePercentage: `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
+              type: selectedAccount.type,
+              originalData: selectedAccount.originalData,
+              currency: selectedAccount.currency,
+              firm: selectedAccount.firm,
+              exchange: selectedAccount.exchange,
+              server: selectedAccount.server,
+              status: selectedAccount.status,
+              totalPL: selectedAccount.totalPL,
+              startingBalance: selectedAccount.startingBalance,
             }}
-            accountTypeConfig={getAccountConfig(selectedAccount.type)}
-            onTradePress={handleTradePress}
-            statsData={getStatsData(selectedAccount.type)}
           />
         )}
 
