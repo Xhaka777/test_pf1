@@ -101,86 +101,6 @@ const Menu = () => {
     return { evaluation, funded };
   }, [propFirmAccountsData]);
 
-  // Get account configuration for bottom sheet
-  const getAccountConfig = (accountType: string) => {
-    const configs = {
-      Evaluation: {
-        bgColor: '#4A1D96',
-        textColor: 'text-white',
-        labelColor: 'bg-purple-900',
-        borderColor: 'border-purple-500',
-        icon: EvaluatedAccountIcon,
-        iconSize: 32,
-      },
-      Funded: {
-        bgColor: '#014737',
-        textColor: 'text-white',
-        labelColor: 'bg-green-900',
-        borderColor: 'border-green-500',
-        icon: FundedAccountIcon,
-        iconSize: 32,
-      },
-      Live: {
-        bgColor: '#633112',
-        textColor: 'text-white',
-        labelColor: 'bg-red-900',
-        borderColor: 'border-red-500',
-        icon: AccountIcon,
-        iconSize: 40,
-      },
-      Demo: {
-        bgColor: '#7744AA',
-        textColor: 'text-white',
-        labelColor: 'bg-yellow-900',
-        borderColor: 'border-yellow-500',
-        icon: PracticeIcon,
-        iconSize: 40,
-      },
-    };
-
-    return configs[accountType] || configs.Demo;
-  };
-
-  // Get stats data for bottom sheet
-  const getStatsData = (accountType: string) => {
-    const statsConfigs = {
-      Evaluation: {
-        winPercentage: 72.5,
-        lossPercentage: 27.5,
-        avgWinAmount: '$245',
-        avgLossAmount: '-$89',
-        winRate: '18.5%',
-        profitFactor: '1.85',
-      },
-      Funded: {
-        winPercentage: 68.8,
-        lossPercentage: 31.2,
-        avgWinAmount: '$520',
-        avgLossAmount: '-$180',
-        winRate: '22.3%',
-        profitFactor: '2.15',
-      },
-      Live: {
-        winPercentage: 58.2,
-        lossPercentage: 41.8,
-        avgWinAmount: '$180',
-        avgLossAmount: '-$120',
-        winRate: '15.2%',
-        profitFactor: '1.25',
-      },
-      Demo: {
-        winPercentage: 62.5,
-        lossPercentage: 37.5,
-        avgWinAmount: '$85',
-        avgLossAmount: '-$45',
-        winRate: '12.8%',
-        profitFactor: '1.45',
-      },
-    };
-
-    return statsConfigs[accountType] || statsConfigs.Demo;
-  };
-
   // Handle sign out
   const handleSignOut = () => {
     Alert.alert(
@@ -383,7 +303,6 @@ const Menu = () => {
           confirmSignOutSheetRef={confirmSignOutSheetRef}
         />
 
-        {/* ✅ FIXED: AccountBottomSheet for Prop Firm accounts (Challenge/Funded) */}
         <DemoAccBottomSheet
           bottomSheetRef={demoBottomSheetRef}
           accountData={selectedAccount && (selectedAccount.type === 'Challenge' || selectedAccount.type === 'Funded') ? {

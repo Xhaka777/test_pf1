@@ -13,13 +13,14 @@ interface AccountBalanceCardProps {
 
 const AccountBalanceCard = ({
   accountType,
-  balance,
-  totalPL,
-  totalPLPercentage,
-  dailyPL,
-  dailyPLPercentage
+  balance = '0.00',
+  totalPL = '0.00',
+  totalPLPercentage = '0.00%',
+  dailyPL = '0.00',
+  dailyPLPercentage = '0.00%',
 }: AccountBalanceCardProps) => {
-  
+
+
   // Format account type for display
   const getFormattedAccountType = (type: string) => {
     switch (type) {
@@ -56,7 +57,7 @@ const AccountBalanceCard = ({
         }}
       >
         {/* Inner container with dark background */}
-        <View 
+        <View
           style={{
             backgroundColor: '#1E1E2E', // Dark background
             borderRadius: 8, // Slightly smaller to show gradient border
@@ -64,7 +65,7 @@ const AccountBalanceCard = ({
           }}
         >
           {/* Title */}
-          <Text 
+          <Text
             style={{
               color: '#9CA3AF',
               fontSize: 13,
@@ -76,7 +77,7 @@ const AccountBalanceCard = ({
           </Text>
 
           {/* Balance Amount */}
-          <Text 
+          <Text
             style={{
               color: '#FFFFFF',
               fontSize: 26,
@@ -88,7 +89,7 @@ const AccountBalanceCard = ({
           </Text>
 
           {/* Bottom Row - Total P/L and Daily P/L */}
-          <View 
+          <View
             style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
@@ -97,7 +98,7 @@ const AccountBalanceCard = ({
           >
             {/* Total P/L Section */}
             <View style={{ flex: 1 }}>
-              <Text 
+              <Text
                 style={{
                   color: '#9CA3AF',
                   fontSize: 13,
@@ -107,19 +108,20 @@ const AccountBalanceCard = ({
               >
                 Total P&L
               </Text>
-              <Text 
+              <Text
                 style={{
-                  color: totalPL.startsWith('-') ? '#EF4444' : '#10B981',
+                  color: (totalPL ?? '').toString().startsWith('-') ? '#EF4444' : '#10B981',
                   fontSize: 13,
                   fontWeight: '600',
                 }}
               >
-                {totalPLPercentage}
+                {totalPLPercentage ?? '0.00%'}
               </Text>
+
             </View>
 
             {/* Vertical Separator */}
-            <View 
+            <View
               style={{
                 width: 1,
                 height: 44, // Height to match the content height
@@ -130,7 +132,7 @@ const AccountBalanceCard = ({
 
             {/* Daily P/L Section */}
             <View style={{ flex: 1, alignItems: 'flex-start' }}>
-              <Text 
+              <Text
                 style={{
                   color: '#9CA3AF',
                   fontSize: 13,
@@ -140,7 +142,7 @@ const AccountBalanceCard = ({
               >
                 Daily P&L
               </Text>
-              <Text 
+              <Text
                 style={{
                   color: dailyPL.startsWith('-') ? '#EF4444' : '#10B981',
                   fontSize: 13,

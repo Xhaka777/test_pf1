@@ -16,7 +16,7 @@ import MenuAccounts from './MenuAccounts';
 import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './timeframe-selector';
 import { AccountTypeEnum } from '@/constants/enums';
 
-// ✅ Use proper API hooks
+// ✅ Import API hooks but use them conditionally
 import {
   useFetchPropFirmAccountsOverview,
   useFetchAccountsOverviewDetails
@@ -38,7 +38,7 @@ interface NoPropFirmAccountsProps {
   isMenuScreen?: boolean;
   presetActiveTab?: 'Challenge' | 'Funded';
   hideTabBar?: boolean;
-  // ✅ FIXED: Required props when used from menu
+  // ✅ Props for external data (from overview.tsx)
   accountData?: MockAccounts;
   isLoading?: boolean;
   error?: Error | null;
@@ -56,7 +56,7 @@ const NoPropFirmAccounts = ({
   isMenuScreen = false,
   presetActiveTab = null,
   hideTabBar = false,
-  // ✅ FIXED: Accept passed data from parent
+  // ✅ External data props
   accountData,
   isLoading: externalLoading = false,
   error: externalError = null,
@@ -66,13 +66,15 @@ const NoPropFirmAccounts = ({
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
 
-  // ✅ FIXED: Only fetch data when not provided by parent (menu screen case)
+  // ✅ Only fetch data when not provided by parent
+  const shouldFetchData = !accountData;
+
   const {
     data: propFirmOverviewData,
     isLoading: overviewLoading,
     error: overviewError
   } = useFetchPropFirmAccountsOverview({
-    enabled: !accountData, // Only fetch when no data is passed from parent
+    enabled: shouldFetchData, // Only fetch when no external data is provided
   });
 
   // State management
@@ -109,68 +111,34 @@ const NoPropFirmAccounts = ({
     account_type: currentAccountType,
     ...dateRange
   }, {
-    enabled: Boolean(dateRange.start_date && dateRange.end_date) && !accountData, // Only fetch when no data is passed
+    enabled: Boolean(dateRange.start_date && dateRange.end_date) && shouldFetchData,
     staleTime: 1 * 60 * 1000,
   });
 
-  // ✅ FIXED: Use passed data or fetch data based on context
+  // ✅ Use passed data or empty arrays if no API data is available
   const challengeAccounts = useMemo(() => {
     if (accountData?.evaluation) {
+      console.log('[NoPropFirmAccounts] Using external evaluation data:', accountData.evaluation.length);
       return accountData.evaluation;
     }
     
-    // Fallback to default mock data only if no API data is available
-    return [
-      {
-        id: 1,
-        name: 'Account A',
-        balance: 3321,
-        dailyPL: 120,
-        changePercentage: -2.33,
-        type: 'Challenge' as const,
-        currency: 'USD',
-      },
-      {
-        id: 2,
-        name: 'Test B',
-        balance: 5123,
-        dailyPL: 200,
-        changePercentage: 1.23,
-        type: 'Challenge' as const,
-        currency: 'USD',
-      },
-    ];
+    // Return empty array if no data
+    console.log('[NoPropFirmAccounts] No evaluation data available');
+    return [];
   }, [accountData]);
 
   const fundedAccounts = useMemo(() => {
     if (accountData?.funded) {
+      console.log('[NoPropFirmAccounts] Using external funded data:', accountData.funded.length);
       return accountData.funded;
     }
 
-    // Fallback to default mock data only if no API data is available
-    return [
-      {
-        id: 1,
-        name: 'Account C',
-        balance: 10000,
-        dailyPL: 500,
-        changePercentage: 5.00,
-        type: 'Funded' as const,
-        currency: 'USD',
-      },
-      {
-        id: 2,
-        name: 'Account D',
-        balance: 8000,
-        dailyPL: -300,
-        changePercentage: -3.75,
-        type: 'Funded' as const,
-        currency: 'USD',
-      },
-    ];
+    // Return empty array if no data
+    console.log('[NoPropFirmAccounts] No funded data available');
+    return [];
   }, [accountData]);
 
-  // ✅ FIXED: Tab counts from actual data
+  // ✅ Tab counts from actual data
   const tabCounts = useMemo(() => ({
     'Challenge': challengeAccounts.length,
     'Funded': fundedAccounts.length
@@ -185,17 +153,20 @@ const NoPropFirmAccounts = ({
     setFilteredFundedAccounts(fundedAccounts);
   }, [challengeAccounts, fundedAccounts]);
 
+  // ✅ Use external overview data if available, otherwise use fetched data
+  const overviewDataToUse = propFirmOverviewData;
+
   const totalChallengeBalance = useMemo(() => {
-    if (!propFirmOverviewData) return '$0';
-    return `$${propFirmOverviewData.total_evaluation_balance?.toLocaleString() || '0'}`;
-  }, [propFirmOverviewData]);
+    if (!overviewDataToUse) return '$0';
+    return `$${overviewDataToUse.total_evaluation_balance?.toLocaleString() || '0'}`;
+  }, [overviewDataToUse]);
 
   const totalDailyPL = useMemo(() => {
-    if (!propFirmOverviewData) return '$0';
-    const daily = propFirmOverviewData.daily_pl || 0;
+    if (!overviewDataToUse) return '$0';
+    const daily = overviewDataToUse.daily_pl || 0;
     const sign = daily >= 0 ? '+' : '';
     return `${sign}$${daily.toLocaleString()}`;
-  }, [propFirmOverviewData]);
+  }, [overviewDataToUse]);
 
   // Search function
   const handleSearch = (text: string) => {
@@ -221,7 +192,7 @@ const NoPropFirmAccounts = ({
     setFilteredFundedAccounts(filterFunded);
   };
 
-  // ✅ FIXED: Use external loading/error states when provided
+  // ✅ Use external loading/error states when provided
   const isLoading = externalLoading || overviewLoading;
   const error = externalError || overviewError;
 
@@ -357,14 +328,20 @@ const NoPropFirmAccounts = ({
     );
   };
 
+  // ✅ Check if we should show the "No Accounts" view
+  const shouldShowNoAccountsView = !isMenuScreen && 
+    challengeAccounts.length === 0 && 
+    fundedAccounts.length === 0 && 
+    !isLoading && 
+    !error;
+
   return (
     <SafeAreaView className={`flex-1 ${isMenuScreen ? 'mt-1' : 'mt-10'}`}>
-      {/* ✅ FIXED: Only show "No Prop Firm Accounts" view if NOT from menu AND no accounts exist */}
-      {!isMenuScreen && challengeAccounts.length === 0 && fundedAccounts.length === 0 ? (
+      {shouldShowNoAccountsView ? (
         renderNoAccountContent()
       ) : (
         <View className='flex-1 p-2'>
-          {/* ✅ FIXED: Always show TabBar in menu screen, conditionally in other screens */}
+          {/* ✅ Always show TabBar in menu screen, conditionally in other screens */}
           {(isMenuScreen || !hideTabBar) && (
             <View className='flex-row items-center justify-between'>
               <View className='flex-1 mr-2'>
@@ -389,7 +366,7 @@ const NoPropFirmAccounts = ({
             </View>
           )}
 
-          {/* ✅ FIXED: Always show search bar in menu screen, conditionally in other screens */}
+          {/* ✅ Always show search bar in menu screen, conditionally in other screens */}
           {(isMenuScreen || showSearchBar) && (
             <SearchInput onSearch={handleSearch} />
           )}

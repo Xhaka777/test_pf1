@@ -15,18 +15,6 @@ import { AccountTypeEnum } from '@/constants/enums';
 import TimeSeriesChart from './TimeSeriesChart';
 import BrokerBottomSheet from './overview/BrokerBottomSheet';
 
-
-// ✅ Mock data for broker overview
-const mockBrokerOverviewData = {
-  daily_pl: 1021.50,
-  monthly_pl: 12750.25,
-  status: "success",
-  total_balance_pl: 2676.55,
-  total_balances: 84676.55,
-  total_net_pl: 2676.55,
-  weekly_pl: 3250.75
-};
-
 interface NoBrokerAccountProps {
   showCart?: boolean;
   showTimePeriods?: boolean;
@@ -38,13 +26,12 @@ interface NoBrokerAccountProps {
   presetActiveTab?: 'Live' | 'Demo' | null;
   hideTabBar?: boolean;
   showOnlyPresetTab?: boolean;
-  // New props for real API data
+  // ✅ Props for external data (from overview.tsx)
   brokerAccountsData?: any;
   brokerAccountsLoading?: boolean;
   brokerAccountsError?: any;
   refetchBrokerAccounts?: () => void;
 }
-
 
 // Updated interface to match your BrokerPLCard component expectations
 interface DisplayAccount {
@@ -75,20 +62,14 @@ function NoBrokerAccount({
   presetActiveTab = null,
   hideTabBar = false,
   showOnlyPresetTab = false,
-  // New props
+  // ✅ External data props
   brokerAccountsData,
-  brokerAccountsLoading,
-  brokerAccountsError,
+  brokerAccountsLoading = false,
+  brokerAccountsError = null,
   refetchBrokerAccounts
 }: NoBrokerAccountProps) {
 
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
-  const brokerOverviewData = mockBrokerOverviewData;
-  const overviewLoading = false;
-  const overviewError = null;
-
-  // State for time period selection and chart data
-  const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
 
   // Use presetActiveTab if provided, otherwise default to 'Live'
   const [activeTab, setActiveTab] = useState<'Live' | 'Demo'>(presetActiveTab || 'Live');
@@ -104,11 +85,6 @@ function NoBrokerAccount({
     return activeTab === 'Live' ? AccountTypeEnum.LIVE : AccountTypeEnum.DEMO;
   }, [activeTab]);
 
-  // Date range calculation for chart
-  const dateRange = useMemo(() => {
-    return getDateRangeFromTimeframe(timeframe);
-  }, [timeframe]);
-
   // Other state
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
 
@@ -119,10 +95,10 @@ function NoBrokerAccount({
   const [filteredDemoAccounts, setFilteredDemoAccounts] = useState<DisplayAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ✅ Process mock broker accounts data
+  // ✅ Process broker accounts data when available
   useEffect(() => {
     if (brokerAccountsData?.broker_accounts) {
-      // console.log('[NoBrokerAccount] Processing mock broker accounts:', brokerAccountsData.broker_accounts.length);
+      console.log('[NoBrokerAccount] Processing broker accounts:', brokerAccountsData.broker_accounts.length);
 
       const processedAccounts = brokerAccountsData.broker_accounts.map((account: any): DisplayAccount => {
         // Calculate total performance percentage
@@ -153,12 +129,18 @@ function NoBrokerAccount({
       const live = processedAccounts.filter(acc => acc.type === 'Live');
       const demo = processedAccounts.filter(acc => acc.type === 'Demo');
 
-      // console.log('[NoBrokerAccount] Processed mock accounts:', { live: live.length, demo: demo.length });
+      console.log('[NoBrokerAccount] Processed accounts:', { live: live.length, demo: demo.length });
 
       setLiveAccounts(live);
       setDemoAccounts(demo);
       setFilteredLiveAccounts(live);
       setFilteredDemoAccounts(demo);
+    } else {
+      // Reset when no data
+      setLiveAccounts([]);
+      setDemoAccounts([]);
+      setFilteredLiveAccounts([]);
+      setFilteredDemoAccounts([]);
     }
   }, [brokerAccountsData]);
 
@@ -201,21 +183,8 @@ function NoBrokerAccount({
     setFilteredDemoAccounts(filteredDemo);
   }, [liveAccounts, demoAccounts]);
 
-  // ✅ Using mock data with proper null checks
-  const totalBalance = useMemo(() => {
-    if (!brokerOverviewData) return '$0';
-    return `$${brokerOverviewData.total_balances?.toLocaleString() || '0'}`;
-  }, [brokerOverviewData]);
-
-  const totalDailyPL = useMemo(() => {
-    if (!brokerOverviewData) return '$0';
-    const daily = brokerOverviewData.daily_pl || 0;
-    const sign = daily >= 0 ? '+' : '';
-    return `${sign}$${daily.toLocaleString()}`;
-  }, [brokerOverviewData]);
-
   const handleAccountPress = useCallback((account: DisplayAccount) => {
-    // console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
+    console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
 
     const enhancedAccountData = {
       id: account.id,
@@ -239,7 +208,7 @@ function NoBrokerAccount({
   }, []);
 
   const renderTabContent = () => {
-    // Show loading state while fetching data (always false for mock data)
+    // Show loading state while fetching data
     if (brokerAccountsLoading) {
       return (
         <View className='flex-1 items-center justify-center'>
@@ -248,18 +217,20 @@ function NoBrokerAccount({
       );
     }
 
-    // Error state (always null for mock data)
+    // Error state
     if (brokerAccountsError) {
       return (
         <View className='flex-1 items-center justify-center'>
           <Text className='text-red-400 text-base font-Inter mb-4'>
             Error loading accounts: {brokerAccountsError.message}
           </Text>
-          <TouchableOpacity
-            onPress={() => refetchBrokerAccounts()}
-            className='bg-blue-500 px-4 py-2 rounded'>
-            <Text className='text-white'>Retry</Text>
-          </TouchableOpacity>
+          {refetchBrokerAccounts && (
+            <TouchableOpacity
+              onPress={() => refetchBrokerAccounts()}
+              className='bg-blue-500 px-4 py-2 rounded'>
+              <Text className='text-white'>Retry</Text>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
