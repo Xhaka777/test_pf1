@@ -1,21 +1,29 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import BrokerPLCard from './BokerPLCard';
-import icons from '@/constants/icons';
-import { useNavigation } from '@react-navigation/native';
-import images from '@/constants/images';
+import { View, TouchableOpacity } from 'react-native';
 import PropFirmPLCard from './PropFirmPLCard';
 import { FundedAccountIcon } from './icons/FundedAccountIcon';
 
+interface PropFirmAccount {
+    id: number;
+    name: string;
+    balance: number;
+    dailyPL: number;
+    changePercentage: number;
+    type?: 'Challenge' | 'Funded';
+    currency?: string;
+    firm?: string;
+    program?: string;
+    totalPL?: number;
+    netPL?: number;
+    startingBalance?: number;
+    maxTotalDD?: number;
+    profitTarget?: number;
+    originalData?: any;
+}
+
 interface FundedAccountsProps {
-    accounts: Array<{
-        id: number;
-        name: string;
-        balance: string;
-        dailyPL: string;
-        changePercentage: string;
-    }>,
-    onAccountPress: (account: any) => void;
+    accounts: PropFirmAccount[];
+    onAccountPress: (account: PropFirmAccount) => void;
 }
 
 const FundedAccounts = ({
@@ -25,7 +33,7 @@ const FundedAccounts = ({
 
     return (
         <View className="mt-2">
-            {accounts.map((account: any) => (
+            {accounts.map((account: PropFirmAccount) => (
                 <TouchableOpacity
                     key={account.id}
                     onPress={() => onAccountPress(account)}
@@ -38,7 +46,6 @@ const FundedAccounts = ({
                         dailyPL={account.dailyPL}
                         icon={FundedAccountIcon}
                     />
-
                 </TouchableOpacity>
             ))}
         </View>

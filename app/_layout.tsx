@@ -7,7 +7,6 @@ import 'react-native-reanimated';
 import 'react-native-gesture-handler'
 import '../global.css'
 import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo'
-// import { tokenCache } from '@clerk/clerk-expo/token-cache'
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SecureStore from "expo-secure-store";
@@ -18,7 +17,6 @@ import { AccountDetailsProvider } from '@/providers/account-details';
 import { AppState } from 'react-native';
 import { WebSocketManager } from '@/services/websocket-manager';
 import { OpenPositionsProvider } from '@/providers/open-positions';
-
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -36,13 +34,10 @@ const tokenCache = {
   },
 };
 
-
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-
-  {/* load the font here, font from Figma project... */ }
   const [loaded] = useFonts({
     "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
     "Inter-ExtraBold": require("../assets/fonts/Inter-ExtraBold.ttf"),
@@ -59,7 +54,7 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  //listener for WebSocket cleanup
+  // Listener for WebSocket cleanup
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
@@ -71,10 +66,10 @@ export default function RootLayout() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
-    //Cleanup function for app termination
+    // Cleanup function for app termination
     return () => {
       subscription?.remove();
-      //Cleanup WebSocket connections when app is terminated
+      // Cleanup WebSocket connections when app is terminated
       console.log('[App] App terminating, cleaning up WebSocket connections');
       WebSocketManager.cleanup();
     }
@@ -87,19 +82,16 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView className='flex-1'>
       <BottomSheetModalProvider>
-        <ClerkProvider publishableKey={publishableKey} tokenCache={
-          tokenCache
-        }
-        >
+        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
           <ClerkLoaded>
             <QueryProvider>
+              {/* ✅ FIXED: Better provider ordering - wait for auth before data providers */}
               <AccountsProvider>
                 <AccountDetailsProvider>
                   <CurrencySymbolProvider>
                     <OpenPositionsProvider>
                       <Stack>
                         <Stack.Screen name='index' options={{ headerShown: false }} />
-                        {/* <Stack.Screen name="(auth)" options={{ headerShown: false }} /> */}
                         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
                         <Stack.Screen name='menu'
                           options={{
@@ -110,7 +102,6 @@ export default function RootLayout() {
                         <Stack.Screen name='assets'
                           options={{
                             headerShown: false,
-                            // presentation: 'modal',
                             animationTypeForReplace: 'push'
                           }}
                         />
@@ -127,5 +118,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-

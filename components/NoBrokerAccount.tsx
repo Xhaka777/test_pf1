@@ -15,76 +15,6 @@ import { AccountTypeEnum } from '@/constants/enums';
 import TimeSeriesChart from './TimeSeriesChart';
 import BrokerBottomSheet from './overview/BrokerBottomSheet';
 
-// ✅ Mock data for broker accounts
-const mockBrokerAccountsData = {
-  broker_accounts: [
-    {
-      id: 1,
-      name: "Trading Account Pro",
-      balance: 15750.25,
-      daily_pl: 342.50,
-      total_pl: 1750.25,
-      starting_balance: 14000.00,
-      currency: "USD",
-      account_type: "live",
-      firm: "Interactive Brokers",
-      exchange: "MT5",
-      server: "Live-01",
-      status: "active",
-      api_key: "abc123",
-      secret_key: "xyz789"
-    },
-    {
-      id: 2,
-      name: "Scalping Account",
-      balance: 8925.80,
-      daily_pl: -125.75,
-      total_pl: 925.80,
-      starting_balance: 8000.00,
-      currency: "USD",
-      account_type: "live",
-      firm: "FXCM",
-      exchange: "MT5",
-      server: "Live-02",
-      status: "active",
-      api_key: "def456",
-      secret_key: "uvw012"
-    },
-    {
-      id: 3,
-      name: "Demo Practice",
-      balance: 50250.00,
-      daily_pl: 850.00,
-      total_pl: 250.00,
-      starting_balance: 50000.00,
-      currency: "USD",
-      account_type: "demo",
-      firm: "MetaQuotes",
-      exchange: "MT5",
-      server: "Demo-01",
-      status: "active",
-      api_key: "ghi789",
-      secret_key: "rst345"
-    },
-    {
-      id: 4,
-      name: "Demo Learning",
-      balance: 9750.50,
-      daily_pl: -45.25,
-      total_pl: -249.50,
-      starting_balance: 10000.00,
-      currency: "EUR",
-      account_type: "demo",
-      firm: "Admiral Markets",
-      exchange: "CTrader",
-      server: "Demo-02",
-      status: "active",
-      api_key: "jkl012",
-      secret_key: "opq678"
-    }
-  ],
-  status: "success"
-};
 
 // ✅ Mock data for broker overview
 const mockBrokerOverviewData = {
@@ -105,10 +35,16 @@ interface NoBrokerAccountProps {
   chartData?: any;
   isMenuScreen?: boolean;
   showSearchBar?: boolean;
-  presetActiveTab?: 'Live' | 'Demo'; // New prop to preset the active tab
-  hideTabBar?: boolean; // New prop to hide the TabBar
-  showOnlyPresetTab?: boolean; // New prop to show only the preset tab
+  presetActiveTab?: 'Live' | 'Demo' | null;
+  hideTabBar?: boolean;
+  showOnlyPresetTab?: boolean;
+  // New props for real API data
+  brokerAccountsData?: any;
+  brokerAccountsLoading?: boolean;
+  brokerAccountsError?: any;
+  refetchBrokerAccounts?: () => void;
 }
+
 
 // Updated interface to match your BrokerPLCard component expectations
 interface DisplayAccount {
@@ -136,19 +72,17 @@ function NoBrokerAccount({
   chartData = null,
   isMenuScreen = false,
   showSearchBar = true,
-  presetActiveTab = null, // New prop
-  hideTabBar = false, // New prop
-  showOnlyPresetTab = false // New prop to show only the preset tab
+  presetActiveTab = null,
+  hideTabBar = false,
+  showOnlyPresetTab = false,
+  // New props
+  brokerAccountsData,
+  brokerAccountsLoading,
+  brokerAccountsError,
+  refetchBrokerAccounts
 }: NoBrokerAccountProps) {
 
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
-
-  // ✅ Using mock data instead of API calls
-  const brokerAccountsData = mockBrokerAccountsData;
-  const brokerAccountsLoading = false;
-  const brokerAccountsError = null;
-  const refetchBrokerAccounts = () => console.log('Refetch broker accounts (mock)');
-
   const brokerOverviewData = mockBrokerOverviewData;
   const overviewLoading = false;
   const overviewError = null;
@@ -188,7 +122,7 @@ function NoBrokerAccount({
   // ✅ Process mock broker accounts data
   useEffect(() => {
     if (brokerAccountsData?.broker_accounts) {
-      console.log('[NoBrokerAccount] Processing mock broker accounts:', brokerAccountsData.broker_accounts.length);
+      // console.log('[NoBrokerAccount] Processing mock broker accounts:', brokerAccountsData.broker_accounts.length);
 
       const processedAccounts = brokerAccountsData.broker_accounts.map((account: any): DisplayAccount => {
         // Calculate total performance percentage
@@ -219,7 +153,7 @@ function NoBrokerAccount({
       const live = processedAccounts.filter(acc => acc.type === 'Live');
       const demo = processedAccounts.filter(acc => acc.type === 'Demo');
 
-      console.log('[NoBrokerAccount] Processed mock accounts:', { live: live.length, demo: demo.length });
+      // console.log('[NoBrokerAccount] Processed mock accounts:', { live: live.length, demo: demo.length });
 
       setLiveAccounts(live);
       setDemoAccounts(demo);
@@ -281,7 +215,7 @@ function NoBrokerAccount({
   }, [brokerOverviewData]);
 
   const handleAccountPress = useCallback((account: DisplayAccount) => {
-    console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
+    // console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
 
     const enhancedAccountData = {
       id: account.id,

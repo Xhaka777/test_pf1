@@ -14,6 +14,7 @@ import { Account } from '@/api/schema/account';
 import { CompetitionAccountSchemaType } from '@/api/schema/accounts';
 import { useAuth } from '@clerk/clerk-expo';
 import { useGetAccounts } from '@/api/hooks/accounts';
+
 const ACCOUNT_ID_KEY = 'selectedAccountId';
 
 interface AccountsContextType {
@@ -62,14 +63,14 @@ const AccountsContext = createContext<AccountsContextType>(defaultContextValue);
 export function AccountsProvider({ children }: PropsWithChildren) {
     const { isSignedIn, isLoaded } = useAuth();
 
-    // ✅ Use proper React Query hook - no manual loading states!
+    // ✅ FIXED: Only make API calls when user is properly authenticated
     const {
         data: accountsData,
         isLoading: isQueryLoading,
         error: queryError,
         refetch
     } = useGetAccounts({
-        // Additional options can be passed here
+        enabled: isLoaded && isSignedIn, // ✅ This is the key fix
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
     });
@@ -122,7 +123,8 @@ export function AccountsProvider({ children }: PropsWithChildren) {
 
     // Auto-select active account when data loads
     useEffect(() => {
-        if (!isSignedIn || !accountsData || !isInitialized) {
+        // ✅ FIXED: Wait for authentication AND initialization
+        if (!isSignedIn || !isLoaded || !accountsData || !isInitialized) {
             return;
         }
 
@@ -144,6 +146,7 @@ export function AccountsProvider({ children }: PropsWithChildren) {
         }
     }, [
         isSignedIn,
+        isLoaded, // ✅ Added this dependency
         accountsData,
         combinedAccounts,
         handleSetSelectedAccountId,
@@ -169,7 +172,7 @@ export function AccountsProvider({ children }: PropsWithChildren) {
         return getAccountById(selectedPreviewAccountId ?? selectedAccountId);
     }, [getAccountById, selectedAccountId, selectedPreviewAccountId]);
 
-    // ✅ Use React Query loading state directly
+    // ✅ FIXED: Better loading state logic
     const isLoading = !isLoaded || !isInitialized || (isSignedIn && isQueryLoading);
 
     // Prepare all account data

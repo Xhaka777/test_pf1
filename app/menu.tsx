@@ -20,81 +20,91 @@ import { EvaluatedAccountIcon } from '@/components/icons/EvaluatedAccountIcon';
 import { FundedAccountIcon } from '@/components/icons/FundedAccountIcon';
 import AccountIcon from '@/components/icons/AccountIcon';
 import { PracticeIcon } from '@/components/icons/PracticeIcon';
+import { useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
 
 const Menu = () => {
   const { user } = useUser();
-  
+
   // Updated state to use the three account types
   const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
   const [selectedAccount, setSelectedAccount] = useState(null); // For bottom sheet
-  
+
   const bottomSheetRef = useRef<BottomSheet>(null);
   const confirmSignOutSheetRef = useRef<BottomSheet>(null);
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
   const accountBottomSheetRef = useRef<BottomSheetModal>(null); // New ref for account details
 
+  const {
+    data: propFirmAccountsData,
+    isLoading: propFirmAccountsLoading,
+    error: propFirmAccountsError,
+    refetch: refetchPropFirmAccounts
+  } = useGetPropFirmAccounts({
+    enabled: selectedAccountType === 'propFirm',
+  })
+
+  const {
+    data: propFirmOverviewData,
+    isLoading: propFirmOverviewLoading,
+    error: propFirmOverviewError
+  } = useFetchPropFirmAccountsOverview({
+    enabled: selectedAccountType === 'propFirm',
+  })
+
+  const {
+    data: brokerAccountsData,
+    isLoading: brokerAccountsLoading,
+    error: brokerAccountsError,
+    refetch: refetchBrokerAccounts
+  } = useGetBrokerAccounts();
+
+  const processedPropFirmAccounts = useMemo(() => {
+    if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
+
+    console.log('[Menu] Processing prop firm accounts:', propFirmAccountsData.prop_firm_accounts.length);
+
+    const processedAccounts = propFirmAccountsData.prop_firm_accounts.map((account: any) => {
+      // Calculate performance percentage
+      const totalGainLoss = account.balance - account.starting_balance;
+      const totalPerformancePercentage = account.starting_balance > 0
+        ? (totalGainLoss / account.starting_balance) * 100
+        : 0;
+
+      return {
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        dailyPL: account.daily_pl,
+        changePercentage: totalPerformancePercentage,
+        type: account.account_type.toLowerCase() === 'funded' ? 'Funded' : 'Challenge',
+        currency: account.currency || 'USD',
+        firm: account.firm,
+        program: account.program,
+        totalPL: account.total_pl,
+        netPL: account.net_pl,
+        startingBalance: account.starting_balance,
+        maxTotalDD: account.max_total_dd,
+        profitTarget: account.profit_target,
+        originalData: account,
+      };
+    });
+
+    // Separate by account type
+    const evaluation = processedAccounts.filter(acc => acc.type === 'Challenge');
+    const funded = processedAccounts.filter(acc => acc.type === 'Funded');
+
+    console.log('[Menu] Processed prop firm accounts:', { evaluation: evaluation.length, funded: funded.length });
+
+    return { evaluation, funded };
+  }, [propFirmAccountsData]);
+
+
   // Mock account data - replace with your actual data source
-  const mockAccountData = {
-    propFirm: [
-      {
-        id: 1,
-        name: 'FTMO Challenge',
-        balance: 50000,
-        dailyPL: 1250,
-        changePercentage: 2.5,
-        type: 'Evaluation',
-        currency: 'USD',
-        firm: 'FTMO',
-        phase: 'Phase 1',
-        target: 5000,
-        daysRemaining: 25,
-        startingBalance: 50000,
-      },
-      {
-        id: 2,
-        name: 'FTMO Funded',
-        balance: 100000,
-        dailyPL: 2500,
-        changePercentage: 15.5,
-        type: 'Funded',
-        currency: 'USD',
-        firm: 'FTMO',
-        phase: 'Funded',
-        startingBalance: 100000,
-      }
-    ],
-    brokerage: [
-      {
-        id: 3,
-        name: 'IC Markets Live',
-        balance: 25000,
-        dailyPL: -150,
-        changePercentage: -0.6,
-        type: 'Live',
-        currency: 'USD',
-        broker: 'IC Markets',
-        leverage: '1:500',
-        server: 'ICMarkets-Live01',
-        totalPL: 1500,
-        startingBalance: 23500,
-      }
-    ],
-    practice: [
-      {
-        id: 4,
-        name: 'XM Demo',
-        balance: 10000,
-        dailyPL: 75,
-        changePercentage: 0.75,
-        type: 'Demo',
-        currency: 'USD',
-        broker: 'XM Global',
-        leverage: '1:100',
-        server: 'XM-Demo',
-        totalPL: 75,
-        startingBalance: 10000,
-      }
-    ]
+  const AccountData = {
+    propFirm: {
+      evaluation: processedPropFirmAccounts.evaluation,
+      funded: processedPropFirmAccounts.funded,
+    }
   };
 
   // Get account configuration for bottom sheet
@@ -133,7 +143,7 @@ const Menu = () => {
         iconSize: 40,
       },
     };
-    
+
     return configs[accountType] || configs.Demo;
   };
 
@@ -173,7 +183,7 @@ const Menu = () => {
         profitFactor: '1.45',
       },
     };
-    
+
     return statsConfigs[accountType] || statsConfigs.Demo;
   };
 
@@ -221,7 +231,7 @@ const Menu = () => {
 
   // Handle trade press from bottom sheet
   const handleTradePress = useCallback((accountData: any) => {
-    console.log('Trade pressed for account:', accountData?.name);
+    // console.log('Trade pressed for account:', accountData?.name);
     accountBottomSheetRef.current?.dismiss();
     // Navigate to trading screen
     // navigation.navigate('TradingScreen', { accountData });
@@ -236,12 +246,19 @@ const Menu = () => {
             showTimePeriods={false}
             showMetrics={false}
             isMenuScreen={true}
-            hideTabBar={false} // Show tab bar for Evaluation/Funded
-            // Pass mock data or actual data
-            mockAccounts={mockAccountData.propFirm}
+            hideTabBar={false} 
+            accountData={{
+              evaluation: AccountData.propFirm.evaluation,
+              funded: AccountData.propFirm.funded,
+            }}
+            isLoading={propFirmAccountsLoading}
+            error={propFirmAccountsError}
+            onAccountPress={handleAccountPress}
+            onRefresh={refetchPropFirmAccounts}
           />
+
         );
-      
+
       case 'brokerage':
         return (
           <NoBrokerAccount
@@ -253,11 +270,13 @@ const Menu = () => {
             presetActiveTab="Live"
             hideTabBar={false} // Show tab bar
             showOnlyPresetTab={true} // Show only Live tab
-            // Pass mock data or actual data
-            mockAccounts={mockAccountData.brokerage}
+            brokerAccountsData={brokerAccountsData}
+            brokerAccountsLoading={brokerAccountsLoading}
+            brokerAccountsError={brokerAccountsError}
+            refetchBrokerAccounts={refetchBrokerAccounts}
           />
         );
-      
+
       case 'practice':
         return (
           <NoBrokerAccount
@@ -269,11 +288,13 @@ const Menu = () => {
             presetActiveTab="Demo"
             hideTabBar={false} // Show tab bar
             showOnlyPresetTab={true} // Show only Demo tab
-            // Pass mock data or actual data
-            mockAccounts={mockAccountData.practice}
+            brokerAccountsData={brokerAccountsData}
+            brokerAccountsLoading={brokerAccountsLoading}
+            brokerAccountsError={brokerAccountsError}
+            refetchBrokerAccounts={refetchBrokerAccounts}
           />
         );
-      
+
       default:
         return (
           <NoPropFirmAccounts
@@ -297,7 +318,7 @@ const Menu = () => {
               Switch Account
             </Text>
           </View>
-          
+
           {/* Three Account Type Buttons */}
           <View className="flex-row px-3 py-2 space-x-2">
             <SelectableButton
@@ -325,7 +346,7 @@ const Menu = () => {
               additionalStyles="flex-1"
             />
           </View>
-          
+
           {/* Account Content */}
           <View className='flex-1'>
             {renderAccountContent()}

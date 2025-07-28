@@ -43,6 +43,10 @@ export function useGetUsers(options?: Partial<UseQueryOptions<Users, Error>>) {
 export function useGetAccounts(options?: Partial<UseQueryOptions<Accounts, Error>>) {
     const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<Accounts>();
 
+    console.log('fetchFromAPi', fetchFromApi)
+    console.log('isLoaded', isLoaded)
+    console.log('isSignedIn', isSignedIn)
+
     return useQuery<Accounts>({
         queryKey: [QueryKeys.GET_ACCOUNTS],
         queryFn: () => fetchFromApi(ApiRoutes.GET_ACCOUNTS),

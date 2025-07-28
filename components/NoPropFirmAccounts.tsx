@@ -17,10 +17,16 @@ import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './time
 import { AccountTypeEnum } from '@/constants/enums';
 
 // ✅ Use proper API hooks
-import { 
+import {
   useFetchPropFirmAccountsOverview,
-  useFetchAccountsOverviewDetails 
+  useFetchAccountsOverviewDetails
 } from '@/api/hooks/accounts';
+import { PropFirmAccount } from '@/types';
+
+interface MockAccounts {
+  evaluation: PropFirmAccount[];
+  funded: PropFirmAccount[];
+}
 
 interface NoPropFirmAccountsProps {
   showCart?: boolean;
@@ -30,8 +36,14 @@ interface NoPropFirmAccountsProps {
   showSearchBar?: boolean;
   chartData?: any;
   isMenuScreen?: boolean;
-  presetActiveTab?: 'Challenge' | 'Funded'; // New prop to preset the active tab
-  hideTabBar?: boolean; // New prop to hide the TabBar
+  presetActiveTab?: 'Challenge' | 'Funded';
+  hideTabBar?: boolean;
+  //
+  mockAccounts?: MockAccounts;
+  isLoading?: boolean;
+  error?: Error | null;
+  onAccountPress?: (account: PropFirmAccount) => void;
+  onRefresh?: () => void;
 }
 
 const NoPropFirmAccounts = ({
@@ -42,25 +54,31 @@ const NoPropFirmAccounts = ({
   showSearchBar = true,
   chartData = null,
   isMenuScreen = false,
-  presetActiveTab = null, // New prop
-  hideTabBar = false // New prop
+  presetActiveTab = null,
+  hideTabBar = false,
+  mockAccounts,
+  isLoading: externalLoading = false,
+  error: externalError = null,
+  onAccountPress,
+  onRefresh
 }: NoPropFirmAccountsProps) => {
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
-  
-  // ✅ Use proper React Query hooks for prop firm data
+
   const {
     data: propFirmOverviewData,
     isLoading: overviewLoading,
     error: overviewError
-  } = useFetchPropFirmAccountsOverview();
+  } = useFetchPropFirmAccountsOverview({
+    enabled: !mockAccounts,
+  })
 
   // State management
   const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
   const [selectedAccount, setSelectedAccount] = useState(null);
   const propFirmTabs = ['Challenge', 'Funded'];
   const tabs = propFirmTabs;
-  
+
   // Use presetActiveTab if provided, otherwise default to first tab
   const [activeTab, setActiveTab] = useState(presetActiveTab || tabs[0]);
 
@@ -73,81 +91,95 @@ const NoPropFirmAccounts = ({
 
   // State for time period selection and chart data
   const [timeframe, setTimeframe] = useState<(typeof timeframes)[number]>('1M');
-  
+
   // Use EVALUATION for Challenge tab, FUNDED for Funded tab
   const currentAccountType = activeTab === 'Challenge' ? AccountTypeEnum.EVALUATION : AccountTypeEnum.FUNDED;
 
-  // Date range calculation for chart
   const dateRange = useMemo(() => {
     return getDateRangeFromTimeframe(timeframe);
   }, [timeframe]);
 
-  // ✅ Fetch chart data for prop firm accounts
-  const { 
-    data: chartDetailsData, 
-    isLoading: chartLoading, 
-    error: chartError 
+  const {
+    data: chartDetailsData,
+    isLoading: chartLoading,
+    error: chartError
   } = useFetchAccountsOverviewDetails({
     account_type: currentAccountType,
-    ...dateRange,
+    ...dateRange
   }, {
-    enabled: Boolean(dateRange.start_date && dateRange.end_date),
-    staleTime: 1 * 60 * 1000, // 1 minute for chart data
-  });
+    enabled: Boolean(dateRange.start_date && dateRange.end_date) && !mockAccounts,
+    staleTime: 1 * 60 * 1000,
+  })
 
   const tabCounts = {
     'Challenge': 1,
     'Funded': 2
   }
 
-  // Sample data (you might want to replace this with real API data later)
-  const challengeAccounts = [
-    {
-      id: 1,
-      name: 'Account A',
-      balance: 3.321,
-      dailyPL: 120,
-      changePercentage: -2.33,
-      type: 'Challenge' as const,
-      percentageChange: -2.33,
-    },
-    {
-      id: 2,
-      name: 'Test B',
-      balance: 5.123,
-      dailyPL: 200,
-      changePercentage: 1.23,
-      type: 'Challenge' as const,
-      percentageChange: 1.23
-    },
-  ];
-  
-  const fundedAccounts = [
-    {
-      id: 1,
-      name: 'Account C',
-      balance: '$10,000',
-      dailyPL: '+500',
-      changePercentage: '+5.00%',
-      type: 'Funded' as const,
-      percentageChange: 5.00
-    },
-    {
-      id: 2,
-      name: 'Account D',
-      balance: '$8,000',
-      dailyPL: '-300',
-      changePercentage: '-3.75%',
-      type: 'Funded' as const,
-      percentageChange: -3.75
-    },
-  ];
+  const challengeAccounts = useMemo(() => {
+    if (mockAccounts?.evaluation) {
+      return mockAccounts.evaluation;
+    }
+    return [
+      {
+        id: 1,
+        name: 'Account A',
+        balance: 3321,
+        dailyPL: 120,
+        changePercentage: -2.33,
+        type: 'Challenge' as const,
+        currency: 'USD',
+      },
+      {
+        id: 2,
+        name: 'Test B',
+        balance: 5123,
+        dailyPL: 200,
+        changePercentage: 1.23,
+        type: 'Challenge' as const,
+        currency: 'USD',
+      },
+    ];
+  }, [mockAccounts]);
+
+  const fundedAccounts = useMemo(() => {
+    if (mockAccounts?.funded) {
+      return mockAccounts.funded;
+    }
+
+    // Fallback to default mock data
+    return [
+      {
+        id: 1,
+        name: 'Account C',
+        balance: 10000,
+        dailyPL: 500,
+        changePercentage: 5.00,
+        type: 'Funded' as const,
+        currency: 'USD',
+      },
+      {
+        id: 2,
+        name: 'Account D',
+        balance: 8000,
+        dailyPL: -300,
+        changePercentage: -3.75,
+        type: 'Funded' as const,
+        currency: 'USD',
+      },
+    ];
+  }, [mockAccounts]);
+
 
   const [filteredChallengeAccounts, setFilteredChallengeAccounts] = useState(challengeAccounts);
   const [filteredFundedAccounts, setFilteredFundedAccounts] = useState(fundedAccounts);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ✅ Calculate total metrics from prop firm overview data
+  useEffect(() => {
+    setFilteredChallengeAccounts(challengeAccounts);
+    setFilteredFundedAccounts(fundedAccounts);
+  }, [challengeAccounts, fundedAccounts]);
+
   const totalChallengeBalance = useMemo(() => {
     if (!propFirmOverviewData) return '$0';
     return `$${propFirmOverviewData.total_evaluation_balance?.toLocaleString() || '0'}`;
@@ -158,7 +190,7 @@ const NoPropFirmAccounts = ({
     const daily = propFirmOverviewData.daily_pl || 0;
     const sign = daily >= 0 ? '+' : '';
     return `${sign}$${daily.toLocaleString()}`;
-  }, [propFirmOverviewData]);
+  }, [propFirmOverviewData])
 
   // Search function
   const handleSearch = (text: string) => {
@@ -184,7 +216,40 @@ const NoPropFirmAccounts = ({
     setFilteredFundedAccounts(filterFunded);
   }
 
+  const isLoading = externalLoading || overviewLoading;
+  const error = externalError || overviewError;
+
+
   const renderTabContent = () => {
+    // Show loading state
+    if (isLoading) {
+      return (
+        <View className='flex-1 items-center justify-center'>
+          <Text className='text-gray-400 text-base font-Inter'>Loading accounts...</Text>
+        </View>
+      );
+    }
+
+    // Show error state with retry option
+    if (error) {
+      return (
+        <View className='flex-1 items-center justify-center px-4'>
+          <FileText size={48} color='#9CA3AF' className='mb-4' />
+          <Text className='text-red-400 text-base font-Inter mb-4 text-center'>
+            Error loading accounts: {error.message}
+          </Text>
+          {onRefresh && (
+            <TouchableOpacity
+              onPress={onRefresh}
+              className='bg-primary-100 px-4 py-2 rounded-lg'
+            >
+              <Text className='text-white font-Inter'>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+
     if (isMenuScreen) {
       const accountsToShow = activeTab === 'Challenge'
         ? filteredChallengeAccounts
@@ -202,7 +267,7 @@ const NoPropFirmAccounts = ({
       ) : (
         <MenuAccounts
           accounts={accountsToShow}
-          onAccountPress={handleAccountPress}
+          onAccountPress={onAccountPress || handleAccountPress}
           accountType="propFirm"
           activeTab={activeTab}
         />
@@ -217,7 +282,10 @@ const NoPropFirmAccounts = ({
             </Text>
           </View>
         ) : (
-          <ChallengeAccounts accounts={filteredChallengeAccounts} onAccountPress={handleAccountPress} />
+          <ChallengeAccounts
+            accounts={filteredChallengeAccounts}
+            onAccountPress={onAccountPress || handleAccountPress}
+          />
         )
       } else if (activeTab === 'Funded') {
         return filteredFundedAccounts.length === 0 ? (
@@ -228,7 +296,10 @@ const NoPropFirmAccounts = ({
             </Text>
           </View>
         ) : (
-          <FundedAccounts accounts={filteredFundedAccounts} onAccountPress={handleAccountPress} />
+          <FundedAccounts
+            accounts={filteredFundedAccounts}
+            onAccountPress={onAccountPress || handleAccountPress}
+          />
         )
       }
     }
@@ -310,11 +381,11 @@ const NoPropFirmAccounts = ({
               </Text>
             </View>
           )}
-          
+
           {showSearchBar && (
             <SearchInput onSearch={handleSearch} />
           )}
-                    
+
           {renderTabContent()}
 
           <AccountBottomSheet
