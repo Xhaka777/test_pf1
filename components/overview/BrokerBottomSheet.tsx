@@ -1,13 +1,18 @@
 import icons from "@/constants/icons";
 import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { X } from "lucide-react-native";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { BrokerAccount } from "@/types";
 import { WinLossStats } from "./WinLossStats";
 import AdditionalStats from "./AdditionalStats";
 import { PracticeIcon } from "../icons/PracticeIcon";
 import AccountIcon from "../icons/AccountIcon";
+import { useAccounts } from "@/providers/accounts";
+import { StatusEnum } from "@/api/services/api";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirmationDialog } from "@/hooks/use-confitmation-dialog";
+import { useActivateAccountMutation } from "@/api";
 
 interface BrokerAccountData {
     id: number;
@@ -34,7 +39,94 @@ interface BrokerBottomSheetProps {
 
 const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetProps) => {
 
+    const { selectedAccountId, setSelectedAccountId } = useAccounts();
+    const { mutate: activateAccount } = useActivateAccountMutation();
+    const { toast } = useToast();
+    const { question } = useConfirmationDialog();
+
+    const [openAccountInfo, setOpenAccountInfo] = useState(false);
+
     const snapPoints = useMemo(() => ['70%'], []);
+
+    // Use your teammate's logic exactly
+    const account = accountData; // Match their variable naming
+    const isSelected = account?.id === selectedAccountId;
+
+    // Your teammate's onSwitchAccount function (simple version without API call)
+    const onSwitchAccount = useCallback(async () => {
+        if (isSelected) {
+            return;
+        }
+        setOpenAccountInfo(false);
+        setSelectedAccountId(account.id);
+    }, [account?.id, isSelected, setSelectedAccountId]);
+
+    // Your teammate's onActivateAccount function (with API call)
+    const onActivateAccount = useCallback(async () => {
+        if (!account?.id) {
+            console.error('[BrokerBottomSheet] No account available');
+            return;
+        }
+
+        console.log('[BrokerBottomSheet] Starting activation for account:', account.id);
+
+        const answer = await question({});
+        if (!answer) return;
+
+        if (isSelected) {
+            console.log('[BrokerBottomSheet] Account already selected');
+            return;
+        }
+
+        setOpenAccountInfo(false);
+
+        console.log('[BrokerBottomSheet] Calling activateAccount with:', { account: account.id });
+
+        void activateAccount(
+            { account: account.id },
+            {
+                onSuccess: (response) => {
+                    console.log('[BrokerBottomSheet] Activation response:', response);
+                    console.log('[BrokerBottomSheet] Response status:', response.status);
+                    console.log('[BrokerBottomSheet] StatusEnum.SUCCESS:', StatusEnum.SUCCESS);
+
+                    if (response.status === StatusEnum.SUCCESS) {
+                        toast({
+                            title: 'Success',
+                            description: response.message
+                        });
+                        setSelectedAccountId(account.id);
+                        bottomSheetRef.current?.close();
+                    } else {
+                        toast({
+                            title: 'Error',
+                            description: response.message || 'Failed to activate account',
+                            variant: 'destructive',
+                        });
+                    }
+                },
+                onError: (err) => {
+                    console.error('[BrokerBottomSheet] Activation error:', err);
+                    toast({
+                        title: 'Error',
+                        description: err instanceof Error
+                            ? err.message
+                            : 'An error occurred while trying activate account. Please try again.',
+                        variant: 'destructive',
+                    });
+                },
+            },
+        );
+    }, [
+        question,
+        isSelected,
+        setSelectedAccountId,
+        account?.id,
+        activateAccount,
+        toast,
+        bottomSheetRef
+    ]);
+
 
     // Configuration for broker account types
     const accountTypeConfig = {
@@ -45,8 +137,8 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
             labelColor: '#771D1D', // Tailwind's red-700/900-ish
         },
         Demo: {
-            bgColor: '', 
-            textColor: '#FACA15', 
+            bgColor: '',
+            textColor: '#FACA15',
             icon: PracticeIcon,
             labelColor: '#633112',
         },
@@ -152,17 +244,19 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
 
                 {/* Action Button */}
                 <TouchableOpacity
-                    onPress={() => {
-                        console.log('Trade pressed for broker account:', accountData?.id);
-                        // Navigate to trading screen with broker account data
-                    }}
-                    className="border border-primary-100 px-4 py-3 rounded-lg flex-row items-center justify-center space-x-2 mt-4 mx-2"
-                >
-                    <Text className="text-primary-100 font-InterSemiBold text-lg">
-                        Switch Account
-                    </Text>
-                </TouchableOpacity>
-
+                        onPress={onActivateAccount}
+                        className={`flex-1 ml-2 px-4 py-3 rounded-lg ${
+                            isSelected 
+                                ? 'bg-green-600 border border-green-500' 
+                                : 'border border-primary-100'
+                        }`}
+                    >
+                        <Text className={`font-InterSemiBold text-center ${
+                            isSelected ? 'text-white' : 'text-primary-100'
+                        }`}>
+                            {isSelected ? 'Current Account' : 'Activate Account'}
+                        </Text>
+                    </TouchableOpacity>
             </BottomSheetView>
         </BottomSheetModal>
     );

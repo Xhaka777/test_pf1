@@ -310,24 +310,33 @@ export function useAddCTraderAccountMutation() {
     })
 }
 
-export function useActiveAccountMutation() {
+export function useActivateAccountMutation() {
     const { fetchFromApi } = useAuthenticatedApi<GenericResponse>();
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: function (varibles: { account: number }) {
+        mutationFn: function (variables: { account: number }) {
+            // Log what we're sending to debug
+            console.log('[ActivateAccount] Sending variables:', variables);
+            console.log('[ActivateAccount] API Route:', ApiRoutes.ACTIVATE_ACCOUNT);
+            const jsonBody = JSON.stringify(variables);
+            console.log('[ActivateAccount] JSON body:', jsonBody);
+        
+
             return fetchFromApi(ApiRoutes.ACTIVATE_ACCOUNT, {
                 method: 'POST',
-                body: JSON.stringify(varibles)
-            })
+                body: JSON.stringify(variables)
+            });
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({
                 queryKey: [QueryKeys.GET_ACCOUNTS]
-            })
+            });
         }
-    })
+    });
 }
+
+
 
 export function useArchiveAccountMutation() {
     const { fetchFromApi } = useAuthenticatedApi<GenericResponse>();
