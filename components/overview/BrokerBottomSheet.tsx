@@ -60,7 +60,6 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
         return parseFloat(cleaned) || 0;
     };
 
-    // Calculate performance percentage
     const getPerformancePercentage = (): number => {
         if (accountData?.originalData) {
             const { balance, starting_balance } = accountData.originalData;
@@ -71,9 +70,7 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
         return getNumericValue(accountData?.changePercentage || '0');
     };
 
-    // Mock data for stats - replace with real data based on accountData
     const getAccountStats = () => {
-        // This would come from your API or calculated from account data
         return {
             winPercentage: 64.68,
             lossPercentage: 33.32,
@@ -162,7 +159,7 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
                     className="border border-primary-100 px-4 py-3 rounded-lg flex-row items-center justify-center space-x-2 mt-4 mx-2"
                 >
                     <Text className="text-primary-100 font-InterSemiBold text-lg">
-                        Trade
+                        Switch Account
                     </Text>
                 </TouchableOpacity>
 
