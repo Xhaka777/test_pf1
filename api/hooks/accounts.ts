@@ -325,7 +325,10 @@ export function useActivateAccountMutation() {
 
             return fetchFromApi(ApiRoutes.ACTIVATE_ACCOUNT, {
                 method: 'POST',
-                body: JSON.stringify(variables)
+                data: variables, 
+                headers: {
+                    'Content-Type': 'application/json',
+                },
             });
         },
         onSuccess: () => {

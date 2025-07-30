@@ -80,22 +80,23 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
 
         setOpenAccountInfo(false);
 
-        console.log('[BrokerBottomSheet] Calling activateAccount with:', { account: account.id });
+        // Ensure we're passing a number, not a string
+        const accountId = typeof account.id === 'string' ? parseInt(account.id, 10) : account.id;
+
+        console.log('[BrokerBottomSheet] Calling activateAccount with:', { account: accountId });
 
         void activateAccount(
-            { account: account.id },
+            { account: accountId }, // Make sure this is a number
             {
                 onSuccess: (response) => {
                     console.log('[BrokerBottomSheet] Activation response:', response);
-                    console.log('[BrokerBottomSheet] Response status:', response.status);
-                    console.log('[BrokerBottomSheet] StatusEnum.SUCCESS:', StatusEnum.SUCCESS);
 
                     if (response.status === StatusEnum.SUCCESS) {
                         toast({
                             title: 'Success',
                             description: response.message
                         });
-                        setSelectedAccountId(account.id);
+                        setSelectedAccountId(accountId);
                         bottomSheetRef.current?.close();
                     } else {
                         toast({
@@ -244,19 +245,17 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData }: BrokerBottomSheetPro
 
                 {/* Action Button */}
                 <TouchableOpacity
-                        onPress={onActivateAccount}
-                        className={`flex-1 ml-2 px-4 py-3 rounded-lg ${
-                            isSelected 
-                                ? 'bg-green-600 border border-green-500' 
-                                : 'border border-primary-100'
+                    onPress={onActivateAccount}
+                    className={`flex-1 ml-2 px-4 py-3 rounded-lg ${isSelected
+                            ? 'bg-green-600 border border-green-500'
+                            : 'border border-primary-100'
                         }`}
-                    >
-                        <Text className={`font-InterSemiBold text-center ${
-                            isSelected ? 'text-white' : 'text-primary-100'
+                >
+                    <Text className={`font-InterSemiBold text-center ${isSelected ? 'text-white' : 'text-primary-100'
                         }`}>
-                            {isSelected ? 'Current Account' : 'Activate Account'}
-                        </Text>
-                    </TouchableOpacity>
+                        {isSelected ? 'Current Account' : 'Activate Account'}
+                    </Text>
+                </TouchableOpacity>
             </BottomSheetView>
         </BottomSheetModal>
     );

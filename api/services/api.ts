@@ -8,7 +8,15 @@ type FetchApiOptions = AxiosRequestConfig & {
 
 export function getWSSBaseUrl() {
   const baseUrl = process.env.EXPO_PUBLIC_SERVER_URL;
-  return baseUrl?.replace(/^http/, 'ws')
+  if (!baseUrl) {
+    throw new Error('EXPO_PUBLIC_SERVER_URL is not defined');
+  }
+  
+  let wsUrl = baseUrl.replace(/^https?/, 'ws');
+  wsUrl = wsUrl.replace(/\/$/, ''); // Remove trailing slash
+  
+  console.log('[API] WebSocket URL:', wsUrl);
+  return wsUrl;
 }
 
 export function useAuthenticatedApi<T>() {
@@ -18,7 +26,7 @@ export function useAuthenticatedApi<T>() {
     endpoint: string,
     options: FetchApiOptions = {},
   ): Promise<T> => {
-    const { formData, returnMethod, ...axiosOptions } = options;
+    const { formData, returnMethod, body, ...axiosOptions } = options;
 
     // ✅ FIXED: Better error handling and logging
     if (!isLoaded) {
@@ -55,7 +63,7 @@ export function useAuthenticatedApi<T>() {
       ...axiosOptions,
       method: axiosOptions.method || (axiosOptions.data ? 'POST' : 'GET'),
       headers,
-      data: formData || axiosOptions.data,
+      data: formData || body || axiosOptions.data, 
       baseURL: process.env.EXPO_PUBLIC_SERVER_URL,
       url: endpoint,
       responseType: returnMethod === 'blob' ? 'blob' : 'json',
@@ -73,7 +81,8 @@ export function useAuthenticatedApi<T>() {
       method: axiosConfig.method,
       url: `${axiosConfig.baseURL}${endpoint}`,
       hasAuth: !!clerkToken,
-      tokenPrefix: clerkToken?.substring(0, 10) + '...'
+      tokenPrefix: clerkToken?.substring(0, 10) + '...',
+      data: axiosConfig.data
     });
 
     try {
