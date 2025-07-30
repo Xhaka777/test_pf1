@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 // import { AreaChart, Grid, XAxis, YAxis } from 'react-native-svg-charts';
 import Svg, {
@@ -11,11 +11,69 @@ import Svg, {
     G
 } from 'react-native-svg';
 import * as d3 from 'd3';
-
+import { Metrics } from '@/api/schema/metrics';
+import { DashboardAccountType } from '@/app/(tabs)/account';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const AccountScreenChart = () => {
+interface AccountScreenChartProps {
+    metricsData: Metrics | undefined;
+    dashboardAccountType: DashboardAccountType | null;
+    startingBalance: number;
+    profitTarget: number;
+    maxTotalDd: number;
+}
+
+const AccountScreenChart = ({
+    metricsData,
+    dashboardAccountType,
+    startingBalance,
+    profitTarget,
+    maxTotalDd,
+}: AccountScreenChartProps) => {
+
+    const profitTargetValue = useMemo(() => {
+        if (!profitTarget || !startingBalance) {
+          return null;
+        }
+    
+        return startingBalance * (profitTarget / 100);
+      }, [profitTarget, startingBalance]);
+    
+      const maxLoss = useMemo(() => {
+        if (!startingBalance || !maxTotalDd) {
+          return null;
+        }
+    
+        return startingBalance * (maxTotalDd / 100);
+      }, [maxTotalDd, startingBalance]);
+    
+      const chartData = useMemo(() => {
+        if (!metricsData?.daily_summary) return [];
+        const trades = Object.values(metricsData.daily_summary).flatMap((summary) =>
+          summary.trades_summary.map((trade) => ({
+            balance: trade.balance,
+            ticket: trade.order_id,
+            pl: trade.pl,
+            tradeNumber: 0,
+          })),
+        );
+    
+        return [
+          {
+            balance: startingBalance ?? 0,
+            ticket: t('Starting Balance'),
+            pl: startingBalance ?? 0,
+            tradeNumber: 0,
+          },
+          ...trades,
+        ].map((trade, index) => ({
+          ...trade,
+          tradeNumber: index,
+        }));
+      }, [metricsData?.daily_summary, startingBalance, t]);
+
+
     // Sample data - replace with your actual trading data
     const data = [
         16000, 12000, 19000, 14000, 11500, 15800, 17200, 12800,
