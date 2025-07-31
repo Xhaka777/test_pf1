@@ -136,21 +136,6 @@ const ProfitLossIndicator = ({
                     +10%
                 </Text>
             </View>
-
-            {/* Extreme values indicator */}
-            {Math.abs(calculatedPercentageChange) > 10 && (
-                <View style={{ marginTop: 4, alignItems: 'center' }}>
-                    <Text 
-                        style={{ 
-                            fontSize: 10, 
-                            fontWeight: '500',
-                            color: isProfit ? '#10B981' : '#EF4444'
-                        }}
-                    >
-                        Extreme {isProfit ? 'Gain' : 'Loss'}: {calculatedPercentageChange >= 0 ? '+' : ''}{calculatedPercentageChange.toFixed(2)}%
-                    </Text>
-                </View>
-            )}
         </View>
     );
 }

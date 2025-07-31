@@ -4,7 +4,11 @@ import { useMemo } from "react";
 import { Text, View } from "react-native";
 import MetricCard from "./MetricCard";
 import { DirectionValue } from "./DirectionValue";
+import ProfitLossIndicator from "./ProfitLossIndicator";
+import { WinLossStats } from "./overview/WinLossStats";
 
+// Add translation function - replace with your actual implementation
+const t = (key: string) => key;
 
 interface AccountMetricsProps {
     maxDrawdown: number;
@@ -71,108 +75,102 @@ export function AccountMetrics({
         return dailyLoss <= 100 ? dailyLoss : 100;
     }, [dailyPL, maxDailyLoss]);
 
+    // Calculate win/loss percentages for the bar
+    const lossRate = useMemo(() => {
+        return 100 - winRate;
+    }, [winRate]);
+
     return (
-        <View className="flex flex-col gap-2 p-1">
-            <View className="flex-row flex-wrap gap-2">
-                {dashboardAccountType === DashboardAccountType.PROP_FIRM && (
-                    <>
-                        <MetricCard>
-                            <View className="flex items-center justify-center rounded-lg bg-card p-2">
-                                <View className="w-full">
-                                    <View className="flex-row items-center justify-between">
-                                        <Text className="text-[10px] text-foreground-tertiary font-normal">
-                                            {t('Daily Loss')}
-                                        </Text>
-                                        <View className="flex-row items-center">
-                                            <DirectionValue
-                                                className="text-[10px]"
-                                                value={dailyPL < 0 ? dailyPL : 0}
-                                                prefix="$"
-                                                colorized
-                                            />
-                                            {maxDailyLoss > 0 && (
-                                                <DirectionValue
-                                                    className="text-[10px] text-white"
-                                                    value={maxDailyLoss}
-                                                    prefix="/ -$"
-                                                />
-                                            )}
-                                        </View>
-                                    </View>
+        <View className="flex flex-col">
+            {/* Full Width Avg Win/Loss Bar */}
+            <WinLossStats
+                winPercentage={winRate}
+                lossPercentage={lossRate}
+                winAmount={Math.abs(averageProfit)}
+                lossAmount={Math.abs(averageLoss)}
+            />
 
-                                    <DailyLossBar
-                                        showMinimumLimit
-                                        value={convertedDailyLoss}
-                                        minimumLimit={-maxDailyDd}
-                                        maximumLimit={0}
-                                        valueLabel=""
-                                        valuePosition={ValuePositionEnum.Bottom}
-                                    />
-                                </View>
+            {/* Row of Cards Below */}
+            <View className="flex-row gap-2 px-2 mt-2">
+                {/* Daily Loss Card */}
+                <View className="flex-1">
+                    <View className="bg-propfirmone-300 rounded-lg p-2">
+                        <View className="flex-row items-center justify-between mb-2">
+                            <Text className="text-gray-400 text-xs font-medium">
+                                {t('Daily Loss')}
+                            </Text>
+                            <View className="flex-row items-center">
+                                <Text className="text-red-500 text-xs font-medium">
+                                    -5%
+                                </Text>
+                                <Text className="text-gray-400 text-xs ml-1">
+                                    0%
+                                </Text>
                             </View>
-                        </MetricCard>
+                        </View>
 
-                        <MetricCard>
-                            <View className="flex items-center rounded-lg p-2">
-                                <View className="w-full">
-                                    <View className="flex-row items-center justify-between">
-                                        <Text className="text-[10px] text-foreground-tertiary">
-                                            {t('Max Drawdown')}
-                                        </Text>
-                                        <Text className="text-[10px] text-foreground-tertiary">
-                                            {t('Profit Target')}
-                                        </Text>
-                                    </View>
-
-
-                                    {/* instead of the MaxDrawdownBar we need to call the ProfitLossIndicator   */}
-                                    <MaxDrawdownBar
-                                        showMinimumLimit
-                                        value={netPlInUnits}
-                                        minimumLimit={-maxDrawdownInUnits}
-                                        maximumLimit={profitTargetInUnits}
-                                        valueLabel=""
-                                        positiveValueLabel={
-                                            accountType === AccountTypeEnum.COMPETITION ? '∞' : null
-                                        }
-                                        valuePosition={ValuePositionEnum.Bottom}
-                                    />
-                                </View>
-                            </View>
-                        </MetricCard>
-                    </>
-                )}
-
-                {dashboardAccountType === DashboardAccountType.OWN_BROKER && (
-                    <>
-                        <MetricCard title={t('Avg Win/Loss')}>
-                        {/* here instead of AvgWinLossBar I need to call the WinLossStats component... */}
-                            <AvgWinLossBar avgLoss={averageLoss} avgWin={averageProfit} />
-                        </MetricCard>
-
-                        <MetricCard
-                            title={t('Win Rate')}
-                            value={winRate}
-                            valueSuffix="%"
-                            colorize
+                        <ProfitLossIndicator
+                            companyName=""
+                            totalValue={startingBalance}
+                            percentageChange={convertedDailyLoss}
+                            dailyPL={dailyPL}
+                            startingBalance={startingBalance}
+                            showLabels={false}
                         />
-                    </>
-                )}
+                    </View>
+                </View>
+
+                {/* Max Drawdown Card */}
+                <View className="flex-1">
+                    <View className="bg-propfirmone-300 rounded-lg p-2">
+                        <View className="flex-row items-center justify-between mb-2">
+                            <Text className="text-gray-400 text-xs font-medium">
+                                {t('Max Drawdown')}
+                            </Text>
+                            <View className="flex-row items-center">
+                                <Text className="text-red-500 text-xs font-medium">
+                                    -${Math.abs(netPlInUnits).toLocaleString()}
+                                </Text>
+                                <Text className="text-green-500 text-xs ml-1">
+                                    ${profitTargetInUnits.toLocaleString()}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <ProfitLossIndicator
+                            companyName=""
+                            totalValue={startingBalance}
+                            percentageChange={Math.abs(netPl)}
+                            dailyPL={netPlInUnits}
+                            startingBalance={startingBalance}
+                            showLabels={false}
+                        />
+                    </View>
+                </View>
             </View>
 
-            <View className="flex-row space-x-2">
-                <MetricCard
-                    title={t('Daily P/L')}
-                    value={dailyPL}
-                    valuePrefix="$"
-                    colorize
-                />
-                <MetricCard
-                    title={t('Total P/L')}
-                    value={totalPL}
-                    valuePrefix="$"
-                    colorize
-                />
+            {/* Daily P/L and Total P/L Row */}
+            <View className="flex-row gap-2 mt-2 px-2">
+                <View className="flex-1">
+                    <View className="bg-propfirmone-300 rounded-lg p-2">
+                        <Text className="text-gray-400 text-xs font-medium mb-1">
+                            {t('Daily P/L')}
+                        </Text>
+                        <Text className={`text-lg font-bold ${dailyPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {dailyPL >= 0 ? '' : '-'}${Math.abs(dailyPL).toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
+                <View className="flex-1">
+                    <View className="bg-propfirmone-300 rounded-lg p-2">
+                        <Text className="text-gray-400 text-xs font-medium mb-1">
+                            {t('Total P/L')}
+                        </Text>
+                        <Text className={`text-lg font-bold ${totalPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {totalPL >= 0 ? '' : '-'}${Math.abs(totalPL).toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
             </View>
         </View>
     );

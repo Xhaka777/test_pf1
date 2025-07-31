@@ -30,7 +30,7 @@ export function DirectionValue({
 
   return (
     <Text
-      className={`text-xs font-medium ${colorClass} ${className}`}
+      className={`text-xs text-white font-InterMedium ${colorClass} ${className}`}
     >
       {isNegative ? '-' : ''}
       {prefix}

@@ -22,7 +22,7 @@ export const WinLossStats = ({
   const diagonalOffset = 6;
   const radius = 5;
   // Add horizontal margins for the SVG bar
-  const svgMargin = 20; // 10px on each side
+  const svgMargin = 16; // 10px on each side
   const effectiveWidth = containerWidth - (2 * svgMargin);
 
   const totalPercentage = winPercentage + lossPercentage;
@@ -31,36 +31,39 @@ export const WinLossStats = ({
 
   return (
     <View
-      className="bg-[#1a1a1a] rounded-lg px-6 py-4 my-2 mx-2"
+      className="bg-propfirmone-300 rounded-lg px-5 py-3 mx-2"
       onLayout={(event) => {
         const { width } = event.nativeEvent.layout;
         setContainerWidth(width);
       }}
     >
-      <View className="flex-row justify-between mb-3">
-        <Text className="text-gray-400 text-sm font-medium">Avg Win/Loss</Text>
-        <Text className="text-sm font-semibold">
+      {/* Header with label and percentages */}
+      <View className="flex-row justify-between items-center mb-3">
+        <Text className="text-gray-400 text-xs font-medium">Avg Win/Loss</Text>
+        <Text className="text-xs font-semibold">
           <Text className="text-green-400">{winPercentage.toFixed(2)}%</Text>
           <Text className="text-gray-500"> / </Text>
           <Text className="text-red-500">{lossPercentage.toFixed(2)}%</Text>
         </Text>
       </View>
 
+      {/* SVG Bar */}
       {containerWidth > 0 && effectiveWidth > 0 && (
         <View className="items-center mb-3 w-full">
           <View style={{ marginHorizontal: svgMargin }}>
             <Svg width={effectiveWidth} height={barHeight} viewBox={`0 0 ${effectiveWidth} ${barHeight}`}>
               <Defs>
                 <LinearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#4ade80" />
-                  <Stop offset="100%" stopColor="#22c55e" />
+                  <Stop offset="0%" stopColor="#31C48D" />
+                  <Stop offset="100%" stopColor="#31C48D" />
                 </LinearGradient>
                 <LinearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#ef4444" />
-                  <Stop offset="100%" stopColor="#dc2626" />
+                  <Stop offset="0%" stopColor="#F05252" />
+                  <Stop offset="100%" stopColor="#F05252" />
                 </LinearGradient>
               </Defs>
-
+              
+              {/* Green (Win) section */}
               <Path
                 d={`
                   M ${radius} 0
@@ -74,6 +77,8 @@ export const WinLossStats = ({
                 `}
                 fill="url(#greenGrad)"
               />
+              
+              {/* Red (Loss) section */}
               <Path
                 d={`
                   M ${winWidth + diagonalGap + diagonalOffset} 0
@@ -92,9 +97,14 @@ export const WinLossStats = ({
         </View>
       )}
 
+      {/* Bottom amounts */}
       <View className="flex-row justify-between">
-        <Text className="text-green-400 font-bold">${winAmount}</Text>
-        <Text className="text-red-500 font-bold">-${lossAmount}</Text>
+        <Text className="text-green-400 font-bold text-sm">
+          ${winAmount.toLocaleString()}
+        </Text>
+        <Text className="text-red-500 font-bold text-sm">
+          -${lossAmount.toLocaleString()}
+        </Text>
       </View>
     </View>
   );

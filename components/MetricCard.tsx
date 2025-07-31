@@ -27,19 +27,18 @@ function MetricCard({
   const colorClass: PositionColorEnum = trendColor(value);
 
   return (
-    <View className="flex-1 flex flex-col justify-between p-2 rounded-lg bg-card">
+    <View className="flex-1 flex flex-col justify-between p-2 rounded-lg bg-propfirmone-300">
       {icon ? <View>{icon}</View> : null}
 
       <View className="flex flex-col gap-1">
         {title && (
-          <Text className="text-xs text-foreground-tertiary">{title}</Text>
+          <Text className="text-xs text-white text-foreground-tertiary">{title}</Text>
         )}
 
         {children ?? (
           <Text
-            className={`text-xs font-semibold ${valueClassName ?? ''} ${
-              colorize ? colorClass : ''
-            }`}
+            className={`text-xs font-semibold ${valueClassName ?? ''} ${colorize ? colorClass : ''
+              }`}
           >
             {typeof value === 'number' ? (value < 0 ? '-' : '') : ''}
             {valuePrefix}
