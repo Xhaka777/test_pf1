@@ -1,3 +1,4 @@
+// app/_layout.tsx - Updated without WebSocketManager
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -14,9 +15,8 @@ import { QueryProvider } from '@/providers/query';
 import { AccountsProvider } from '@/providers/accounts';
 import { CurrencySymbolProvider } from '@/providers/currency-symbols';
 import { AccountDetailsProvider } from '@/providers/account-details';
-import { AppState } from 'react-native';
-import { WebSocketManager } from '@/services/websocket-manager';
 import { OpenPositionsProvider } from '@/providers/open-positions';
+import { AppState } from 'react-native';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -54,7 +54,7 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  // Listener for WebSocket cleanup
+  // Simple app state listener (WebSocketManager no longer needed)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
@@ -66,12 +66,10 @@ export default function RootLayout() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
-    // Cleanup function for app termination
+    // Simple cleanup
     return () => {
       subscription?.remove();
-      // Cleanup WebSocket connections when app is terminated
-      console.log('[App] App terminating, cleaning up WebSocket connections');
-      WebSocketManager.cleanup();
+      console.log('[App] App terminating');
     }
   }, []);
 
@@ -85,13 +83,14 @@ export default function RootLayout() {
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
           <ClerkLoaded>
             <QueryProvider>
-              {/* ✅ FIXED: Better provider ordering - wait for auth before data providers */}
+              {/* Clean provider hierarchy - no more WebSocketManager! */}
               <AccountsProvider>
                 <AccountDetailsProvider>
                   <CurrencySymbolProvider>
                     <OpenPositionsProvider>
                       <Stack>
                         <Stack.Screen name='index' options={{ headerShown: false }} />
+                        <Stack.Screen name='(auth)' options={{ headerShown: false }} />
                         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
                         <Stack.Screen name='menu'
                           options={{

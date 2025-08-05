@@ -1,174 +1,197 @@
-import React, {
-    createContext,
-    PropsWithChildren,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
-    useMemo
-} from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
+import { useAccountDetails } from './account-details';
+import { MessageType, parseWebSocketMessage } from '@/api/services/web-socket-parser';
+import { TradingPair } from '@/api/schema/trading-service';
+import { getWsPriceRequest } from '@/utils/symbols';
+import { tokenManager } from '@/utils/websocket-token-manager';
 
-import { MessageType } from "@/api/services/web-socket-parser";
-import { WssRoutes } from "@/api/types";
-import { CurrencyPair } from "@/api/utils/currency-trade";
-import { TradingPair } from "@/api/schema/trading-service";
-import { useAccountDetails } from "@/providers/account-details";
-import { getWsPriceRequest } from "@/utils/symbols";
-import { useActiveSymbolAtom } from "../hooks/use-active-symbol";
-import { WebSocketManager, ConnectionStatus } from "@/services/websocket-manager";
-
-// Types
 interface CurrencySymbolContextType {
-    currencySymbols: TradingPair[];
-    findCurrencyPairBySymbol: (symbol: CurrencyPair | string) => TradingPair | undefined;
-    isConnected: boolean;
-    connectionStatus: ConnectionStatus;
-    reconnect: () => void;
-    error: string | null;
+  currencySymbols: TradingPair[];
+  isConnected: boolean;
+  error: string | null;
+  reconnect: () => void;
 }
 
-// Default context value
-const defaultContextValue: CurrencySymbolContextType = {
-    currencySymbols: [],
-    findCurrencyPairBySymbol: () => undefined,
-    isConnected: false,
-    connectionStatus: 'disconnected',
-    reconnect: () => {},
-    error: null
-};
+const CurrencySymbolContext = createContext<CurrencySymbolContextType>({
+  currencySymbols: [],
+  isConnected: false,
+  error: null,
+  reconnect: () => {}
+});
 
-const CurrencySymbolContext = createContext<CurrencySymbolContextType>(defaultContextValue);
+export function CurrencySymbolProvider({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+  const { accountDetails } = useAccountDetails();
+  
+  const [currencySymbols, setCurrencySymbols] = useState<TradingPair[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectingRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3; // ✅ Reduced from 5
 
-export const useCurrencySymbol = (): CurrencySymbolContextType => {
-    const context = useContext(CurrencySymbolContext);
+  const connectWebSocket = useCallback(async () => {
+    if (!isLoaded || !isSignedIn || !accountDetails || isConnectingRef.current) {
+      return;
+    }
+
+    const { exchange, server } = accountDetails;
+    if (!exchange || !server) return;
+
+    // ✅ Close existing connection gracefully
+    if (socketRef.current) {
+      socketRef.current.close(1000, 'Reconnecting');
+      socketRef.current = null;
+    }
+
+    isConnectingRef.current = true;
+
+    try {
+      console.log('[CurrencySymbols] Getting WebSocket token...');
+      const wsToken = await tokenManager.getToken(getToken);
+      
+      console.log('[CurrencySymbols] Connecting with new auth system...');
+      
+      const wsUrl = `wss://staging-server.propfirmone.com/all_prices?auth_key=${wsToken}`;
+      const origin = 'https://staging.propfirmone.com';
+      
+      socketRef.current = new WebSocket(wsUrl, undefined, {
+        headers: { 'Origin': origin }
+      });
+
+      socketRef.current.onopen = () => {
+        console.log('[CurrencySymbols] ✅ Connected with new auth!');
+        setIsConnected(true);
+        setError(null);
+        isConnectingRef.current = false;
+        reconnectAttemptsRef.current = 0; // ✅ Reset on success
+        
+        // Send subscription message
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          const subscriptionMessage = getWsPriceRequest(exchange, server);
+          console.log('[CurrencySymbols] Sending subscription:', subscriptionMessage);
+          socketRef.current.send(subscriptionMessage);
+        }
+      };
+
+      socketRef.current.onmessage = (event) => {
+        try {
+          const symbols = parseWebSocketMessage<TradingPair[]>(event.data, MessageType.ALL_PRICES);
+          if (Array.isArray(symbols) && symbols.length > 0) {
+            console.log(`[CurrencySymbols] Received ${symbols.length} symbols`);
+            setCurrencySymbols(symbols);
+          }
+        } catch (err) {
+          console.error('[CurrencySymbols] Parse error:', err);
+        }
+      };
+
+      socketRef.current.onerror = (error) => {
+        console.error('[CurrencySymbols] WebSocket error:', error);
+        setIsConnected(false);
+        setError(error.message || 'WebSocket connection failed');
+        isConnectingRef.current = false;
+      };
+
+      socketRef.current.onclose = (event) => {
+        console.log('[CurrencySymbols] WebSocket closed:', event.code, event.reason);
+        setIsConnected(false);
+        isConnectingRef.current = false;
+        
+        // ✅ Only reconnect on unexpected closure AND if we haven't exceeded attempts
+        if (!event.wasClean && 
+            isSignedIn && 
+            reconnectAttemptsRef.current < maxReconnectAttempts &&
+            event.code !== 1000) { // Don't reconnect on normal closure
+          
+          const delay = Math.min(5000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+          reconnectAttemptsRef.current++;
+          
+          console.log(`[CurrencySymbols] Scheduling reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms`);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connectWebSocket();
+          }, delay);
+        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          console.log('[CurrencySymbols] Max reconnection attempts reached');
+          setError('Connection failed. Please try manual reconnect.');
+        }
+      };
+
+    } catch (error) {
+      console.error('[CurrencySymbols] Connection setup failed:', error);
+      setError(error.message);
+      setIsConnected(false);
+      isConnectingRef.current = false;
+      
+      // ✅ Handle rate limiting with longer delay
+      if (error.message.includes('429') || error.message.includes('Rate limited')) {
+        console.log('[CurrencySymbols] Rate limited, waiting 60s before retry');
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 60000);
+      }
+    }
+  }, [isLoaded, isSignedIn, accountDetails, getToken]);
+
+  const reconnect = useCallback(() => {
+    console.log('[CurrencySymbols] Manual reconnection requested');
+    reconnectAttemptsRef.current = 0; // ✅ Reset attempts on manual reconnect
     
-    if (!context) {
-        console.warn('useCurrencySymbol used outside of provider, returning defaults');
-        return defaultContextValue;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    connectWebSocket();
+  }, [connectWebSocket]);
+
+  // ✅ Connect only once when ready
+  useEffect(() => {
+    if (isLoaded && isSignedIn && accountDetails) {
+      connectWebSocket();
     }
     
-    return context;
-};
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close(1000, 'Component cleanup');
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [isLoaded, isSignedIn, accountDetails?.id]); // ✅ Only reconnect if account ID changes
 
-export function CurrencySymbolProvider({ children }: PropsWithChildren) {
-    const { isSignedIn, isLoaded } = useAuth();
-    const { accountDetails } = useAccountDetails();
-    const [activeSymbol, setActiveSymbol] = useActiveSymbolAtom();
+  // Clear state on sign out
+  useEffect(() => {
+    if (!isSignedIn) {
+      setCurrencySymbols([]);
+      setIsConnected(false);
+      setError(null);
+      reconnectAttemptsRef.current = 0;
+      
+      if (socketRef.current) {
+        socketRef.current.close(1000, 'User signed out');
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    }
+  }, [isSignedIn]);
 
-    // State
-    const [currencySymbols, setCurrencySymbols] = useState<TradingPair[]>([]);
-    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
-    const [error, setError] = useState<string | null>(null);
+  const value = {
+    currencySymbols: isSignedIn ? currencySymbols : [],
+    isConnected,
+    error,
+    reconnect
+  };
 
-    // WebSocket manager instance
-    const wsManager = useMemo(() => WebSocketManager.getInstance(), []);
-    
-    // Connection ID for this provider
-    const connectionId = 'currency-symbols';
-
-    // Handle auth state changes - cleanup when user signs out
-    useEffect(() => {
-        if (!isSignedIn) {
-            console.log('[CurrencySymbols] User signed out, cleaning up WebSocket');
-            wsManager.closeConnection(connectionId);
-            setCurrencySymbols([]);
-            setError(null);
-            setConnectionStatus('disconnected');
-        }
-    }, [isSignedIn, wsManager]);
-
-    // Handle WebSocket connection based on account details
-    useEffect(() => {
-        if (!isLoaded || !isSignedIn || !accountDetails) {
-            return;
-        }
-
-        const { exchange, server } = accountDetails;
-        if (!exchange || !server) {
-            console.warn('[CurrencySymbols] Missing exchange or server information');
-            return;
-        }
-
-        const subscriptionMessage = getWsPriceRequest(exchange, server);
-
-        console.log('[CurrencySymbols] Setting up WebSocket connection:', { exchange, server });
-
-        // Create WebSocket connection using the manager
-        wsManager.createConnection({
-            id: connectionId,
-            endpoint: WssRoutes.GET_ALL_PRICES,
-            subscriptionMessage,
-            messageType: MessageType.ALL_PRICES,
-            onMessage: (symbols: TradingPair[]) => {
-                console.log(`[CurrencySymbols] Received ${symbols?.length || 0} symbols`);
-                setCurrencySymbols(symbols || []);
-                setError(null);
-            },
-            onOpen: () => {
-                console.log('[CurrencySymbols] WebSocket connection opened');
-                setConnectionStatus('connected');
-                setError(null);
-            },
-            onClose: () => {
-                console.log('[CurrencySymbols] WebSocket connection closed');
-                setConnectionStatus('disconnected');
-            },
-            onError: (errorMessage: string) => {
-                console.error('[CurrencySymbols] WebSocket error:', errorMessage);
-                setError(errorMessage);
-                setConnectionStatus('error');
-            },
-            maxReconnectAttempts: 5
-        });
-
-        // Update connection status periodically
-        const statusInterval = setInterval(() => {
-            const status = wsManager.getConnectionStatus(connectionId);
-            setConnectionStatus(status);
-        }, 2000);
-
-        return () => {
-            clearInterval(statusInterval);
-            wsManager.closeConnection(connectionId);
-        };
-    }, [isLoaded, isSignedIn, accountDetails, wsManager]);
-
-    // Set default active symbol when symbols are loaded
-    useEffect(() => {
-        if (currencySymbols.length > 0 && !activeSymbol) {
-            console.log('[CurrencySymbols] Setting default active symbol:', currencySymbols[0].symbol);
-            setActiveSymbol(currencySymbols[0].symbol);
-        }
-    }, [currencySymbols, activeSymbol, setActiveSymbol]);
-
-    // Find currency pair function
-    const findCurrencyPairBySymbol = useCallback(
-        (symbol: CurrencyPair | string): TradingPair | undefined => {
-            return currencySymbols.find((pair) => pair.symbol === symbol);
-        }, 
-        [currencySymbols]
-    );
-
-    // Manual reconnection function
-    const reconnect = useCallback(() => {
-        console.log('[CurrencySymbols] Manual reconnection requested');
-        wsManager.reconnectConnection(connectionId);
-    }, [wsManager]);
-
-    // Memoize context value to prevent unnecessary re-renders
-    const contextValue = useMemo(() => ({
-        currencySymbols: isSignedIn ? currencySymbols : [],
-        findCurrencyPairBySymbol,
-        isConnected: connectionStatus === 'connected',
-        connectionStatus,
-        reconnect,
-        error
-    }), [currencySymbols, isSignedIn, findCurrencyPairBySymbol, connectionStatus, reconnect, error]);
-
-    return (
-        <CurrencySymbolContext.Provider value={contextValue}>
-            {children}
-        </CurrencySymbolContext.Provider>
-    );
+  return (
+    <CurrencySymbolContext.Provider value={value}>
+      {children}
+    </CurrencySymbolContext.Provider>
+  );
 }
+
+export const useCurrencySymbol = () => useContext(CurrencySymbolContext);

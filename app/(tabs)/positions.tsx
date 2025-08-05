@@ -13,6 +13,14 @@ import { tags } from "react-native-svg/lib/typescript/xmlTags";
 import HistoryCard from "@/components/positions/HistoryCard";
 import ScreenShotBottomSheet from "@/components/ScreenShotBottomsheet";
 import { useFocusEffect } from "expo-router";
+import { useOpenPositionsWS } from "@/providers/open-positions";
+import { useCloseAllTradesMutation, useGetOpenTradesQuery, useSyncTradesMutation } from "@/api/hooks/trade-service";
+import { useGetTradeHistory } from "@/api/hooks/trade-history";
+import { CloseTypeEnum, OpenTradesData } from "@/api/schema";
+import { StatusEnum } from "@/api/services/api";
+import { parseOrdersArray, parseTradesArray } from "@/utils/data-parsing";
+import { oneClickTradingEnabledAtom } from "@/atoms";
+import { useOpenTradesManager } from "@/api/hooks/use-open-trades-manager";
 
 // Types
 interface Position {
@@ -35,11 +43,16 @@ interface TabData {
   orderHistory: any[];
 }
 
+enum TabId {
+  OpenPositions = 'open-positions',
+  OpenOrders = 'open-orders',
+  OrderHistory = 'order-history',
+}
+
 type AlertType = 'sync' | 'closeProfits' | 'closeLosses' | 'closeAll' | null;
 
 const Positions = () => {
-
-  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>('positions');
+  const [activeTab, setActiveTab] = useState<TabId>(TabId.OpenPositions);
   const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<any>(null);
@@ -47,133 +60,112 @@ const Positions = () => {
   const [loadingAction, setLoadingAction] = useState<string>('');
   const [currentAlert, setCurrentAlert] = useState<AlertType>(null);
   const [alertTimeoutId, setAlertTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [page, setPage] = useState(1);
 
-  const [showSyncAlert, setShowSyncAlert] = useState(false);
-  const [showCloseProfitsAlert, setShowCloseProfitsAlert] = useState(false);
-  const [showCloseLossesAlert, setShowCloseLossesAlert] = useState(false);
-  const [showCloseAllAlert, setShowCloseAllAlert] = useState(false);
+  const { selectedAccountId, selectedPreviewAccountId } = useAccounts();
+  const { data } = useOpenPositionsWS();
+  const prevCountsRef = useRef<{ trades: number; orders: number }>({
+    trades: 0,
+    orders: 0
+  })
 
+  const { data: openTrades, refetch: refetchTradeHistory } = useOpenTradesManager({
+    account: selectedPreviewAccountId ?? selectedAccountId,
+  })
 
+  const { data: tradeHistory, refetch: refetchTradeHistory } = useGetTradeHistory({
+    account: selectedPreviewAccountId ?? selectedAccountId,
+    page
+  })
+
+  const { mutateAsync: syncTrades } = useSyncTradesMutation();
+  const { mutateAsync: closeAllTrades } = useCloseAllTradesMutation();
+
+  //Bottom sheet refs
   const editBottomSheetRef = useRef<BottomSheetModal>(null);
   const closeBottomSheetRef = useRef<BottomSheetModal>(null);
   const screenShotBottomSheetRef = useRef<BottomSheetModal>(null);
 
-  // Debug state to track bottom sheet operations
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const tableData: OpenTradesData | null = useMemo(() => {
+    const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
-    // Add debug logging
-    const logDebug = useCallback((message: string) => {
-      console.log(`[BottomSheet Debug] ${message}`);
-      setDebugInfo(message);
-      // Clear debug info after 3 seconds
-      setTimeout(() => setDebugInfo(''), 3000);
-    }, []);
-
-  // Sample data
-  const tabData: TabData = {
-    openPositions: [
-      {
-        id: '1',
-        symbol: 'BTCUSDT',
-        type: 'LONG',
-        size: 0.12,
-        pnl: -366.43,
-        entry: 108888,
-        fees: 0,
-        roi: -0.73,
-        openTime: '2025/05/29 11:26:33'
-      },
-      {
-        id: '2',
-        symbol: 'BTCUSDT',
-        type: 'LONG',
-        size: 0.01,
-        pnl: 29.9,
-        entry: 3242.99,
-        fees: 0,
-        roi: -0.08,
-        openTime: '2025/05/29 10:36:32'
-      },
-      {
-        id: '3',
-        symbol: 'BTCUSDT',
-        type: 'SHORT',
-        size: 0.12,
-        pnl: 355.63,
-        entry: 3242.99,
-        fees: 1.59,
-        roi: 0.7,
-        openTime: '2025/05/29 11:36:32'
-      },
-      {
-        id: '4',
-        symbol: 'BTCUSDT',
-        type: 'LONG',
-        size: 10.00,
-        pnl: -64.02,
-        entry: 3242.99,
-        fees: 1.59,
-        roi: -0.03,
-        openTime: '2024/06/21 10:36:32'
+    if (!openTrades) {
+      if (
+        (data?.open_trades ?? data?.open_orders) &&
+        data?.account === currentAccountId
+      ) {
+        return {
+          account: currentAccountId || 0,
+          status: StatusEnum.SUCCESS,
+          open_trades: data.open_trades || [],
+          open_orders: data.open_orders || [],
+          other_open_trades: [],
+          other_open_orders: [],
+        }
       }
-    ],
-    openOrders: [
-      {
-        id: '5',
-        symbol: 'ETHUSDT',
-        type: 'LONG',
-        orderType: 'LIMIT',
-        size: 2.5,
-        price: 2450.00,
-        status: 'PENDING',
-        createdTime: '2025/05/29 12:30:15'
-      },
-      {
-        id: '6',
-        symbol: 'BTCUSDT',
-        type: 'SHORT',
-        orderType: 'STOP',
-        size: 0.05,
-        price: 107000.00,
-        triggerPrice: 107500.00,
-        status: 'PENDING',
-        createdTime: '2025/05/29 11:45:22'
-      }
-    ],
-    orderHistory: [
-      {
-        id: '1',
-        symbol: 'BTCUSDT',
-        type: 'SHORT',
-        size: 0.12,
-        pnl: 398.43,
-        entry: 108888,
-        openTime: '2025/05/29 11:26:33',
-        exit: 105477.95,
-        exitTime: '2025/06/04 11:30:00',
-        roi: 0.79,
-        fees: 0,
-        tags: ['Indigo', 'Purple', 'Gray', 'Violet', 'Blue']
-      },
-      {
-        id: '8',
-        symbol: 'BTCUSDT',
-        type: 'LONG',
-        size: 0.12,
-        pnl: -366.43,
-        entry: 108888,
-        openTime: '2025/05/29 11:26:33',
-        exit: 108500,
-        exitTime: '2025/05/29 11:30:00',
-        roi: -0.73,
-        fees: 0,
-        tags: ['Indigo', 'Purple', 'Gray', 'Violet', 'Blue']
-      }
-    ]
+      return null;
+    }
+    //
+    const isWebSocketStale = data?.account && data.account !== currentAccountId;
+    if (isWebSocketStale) {
+      console.log('WebSocket data account mismatch detected - using API only',
+        `WS: ${data?.account}, Current: ${currentAccountId}`
+      )
+      return openTrades;
+    }
 
-  };
+    if (data && data.account === currentAccountId) {
+      return {
+        account: openTrades.account,
+        status: openTrades.status,
+        //
+        open_trades: parseTradesArray(data.open_trades || []),
+        open_orders: parseOrdersArray(data.open_orders || []),
+        //
+        other_open_trades: parseTradesArray(openTrades.other_open_trades || []),
+        other_open_orders: parseOrdersArray(openTrades.other_open_orders || []),
+      }
+    }
 
-  //Cleanup function for alerts
+    if (openTrades) {
+      return {
+        ...openTrades,
+        open_trades: parseTradesArray(openTrades.open_trades || []),
+        open_orders: parseOrdersArray(openTrades.open_orders || []),
+        other_open_trades: parseTradesArray(openTrades.other_open_trades || []),
+        other_open_orders: parseOrdersArray(openTrades.other_open_orders || []),
+      }
+    }
+
+    return openTrades;
+  }, [data, openTrades, selectedAccountId, selectedPreviewAccountId]);
+
+  useEffect(() => {
+    const currentTrades = tableData?.open_trades?.length ?? 0;
+    const currentOrders = tableData?.open_orders?.length ?? 0;
+    const prevTrades = prevCountsRef.current.trades;
+    const prevOrders = prevCountsRef.current.orders;
+
+    if (
+      prevOrders > 0 &&
+      (currentOrders < prevOrders || currentTrades > prevTrades)
+    ) {
+      void refetchOpenTrades();
+      void refetchTradeHistory();
+    }
+
+    prevCountsRef.current = { trades: currentTrades, orders: currentOrders };
+  }, [
+    tableData?.open_trades?.length,
+    tableData?.open_orders?.length,
+    refetchOpenTrades,
+    refetchTradeHistory,
+  ])
+
+  useEffect(() => {
+    prevCountsRef.current = { trades: 0, orders: 0 };
+  }, [selectedAccountId])
+
   const clearAlertTimeout = useCallback(() => {
     if (alertTimeoutId) {
       clearTimeout(alertTimeoutId);
@@ -193,11 +185,110 @@ const Positions = () => {
     setAlertTimeoutId(timeoutId);
   }, [clearAlertTimeout]);
 
-  //Handle Android back button
+  const handleSyncTrades = useCallback(async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setLoadingAction('syncing');
+
+    try {
+      const response = await syncTrades({
+        account: selectedPreviewAccountId ?? selectedAccountId
+      })
+
+      if (response.status === StatusEnum.SUCCESS) {
+        showAlert('sync', 5000);
+        setExpandedPositions(new Set());
+      } else {
+        Alert.alert('Error syncing trades', response.message);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      Alert.alert('Error', errorMessage);
+    }
+  }, [isLoading, showAlert, syncTrades, selectedAccountId, selectedPreviewAccountId]);
+
+  const handleCloseTrades = useCallback(async (closeType: CloseTypeEnum) => {
+    if (isLoading) return;
+
+    // Show confirmation dialog before proceeding
+    const getConfirmationMessage = () => {
+      switch (closeType) {
+        case CloseTypeEnum.ALL:
+          return 'You are about to close ALL trades on this account and any copied accounts. This action cannot be undone.';
+        case CloseTypeEnum.PROFIT:
+          return 'You are about to close all PROFITABLE trades on this account and any copied accounts. This action cannot be undone.';
+        case CloseTypeEnum.LOSS:
+          return 'You are about to close all LOSING trades on this account and any copied accounts. This action cannot be undone.';
+        default:
+          return 'You are about to close trades on this account and any copied accounts. This action cannot be undone.';
+      }
+    };
+
+    const getConfirmationTitle = () => {
+      switch (closeType) {
+        case CloseTypeEnum.ALL:
+          return 'Close All Trades';
+        case CloseTypeEnum.PROFIT:
+          return 'Close Profitable Trades';
+        case CloseTypeEnum.LOSS:
+          return 'Close Losing Trades';
+        default:
+          return 'Close Trades';
+      }
+    };
+
+    Alert.alert(
+      getConfirmationTitle(),
+      getConfirmationMessage(),
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Close Trades',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoading(true);
+            setLoadingAction(
+              closeType === CloseTypeEnum.ALL ? 'closing_all' :
+                closeType === CloseTypeEnum.PROFIT ? 'closing_profits' : 'closing_losses'
+            );
+
+            try {
+              const response = await closeAllTrades({
+                account: selectedPreviewAccountId ?? selectedAccountId,
+                close_type: closeType,
+              });
+
+              if (response.status === StatusEnum.SUCCESS) {
+                const alertType =
+                  closeType === CloseTypeEnum.ALL ? 'closeAll' :
+                    closeType === CloseTypeEnum.PROFIT ? 'closeProfits' : 'closeLosses';
+                showAlert(alertType);
+              } else {
+                Alert.alert('Error closing trades', response.message);
+              }
+            } catch (error: unknown) {
+              const errorMessage = error instanceof Error
+                ? error.message
+                : 'An unexpected error occurred';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setIsLoading(false);
+              setLoadingAction('');
+            }
+          }
+        }
+      ]
+    );
+  }, [isLoading, closeAllTrades, selectedAccountId, selectedPreviewAccountId, showAlert]);
+
+  const handleCloseProfits = useCallback(() => handleCloseTrades(CloseTypeEnum.PROFIT), [handleCloseTrades]);
+  const handleCloseLosses = useCallback(() => handleCloseTrades(CloseTypeEnum.LOSS), [handleCloseTrades]);
+  const handleCloseAll = useCallback(() => handleCloseTrades(CloseTypeEnum.ALL), [handleCloseTrades]);
+
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        //Close any open botton sheets first
         if (editBottomSheetRef.current) {
           editBottomSheetRef.current.close();
           return true;
@@ -211,14 +302,13 @@ const Positions = () => {
           return true;
         }
         return false;
-      }
+      };
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
     }, [])
-  )
+  );
 
-  //Cleanup on unmount
   useEffect(() => {
     return () => {
       clearAlertTimeout();
@@ -226,196 +316,78 @@ const Positions = () => {
   }, [clearAlertTimeout]);
 
   const openEditModal = useCallback((position: Position) => {
-    logDebug(`Opening edit modal for position: ${position.symbol}`);
     setSelectedPosition(position);
-    
-    // Use setTimeout to ensure state is set before opening
     setTimeout(() => {
       try {
         editBottomSheetRef.current?.present();
-        logDebug('Edit modal presented successfully');
       } catch (error) {
-        logDebug(`Error opening edit modal: ${error}`);
         console.error('Error opening edit modal:', error);
       }
     }, 100);
-  }, [logDebug]);
+  }, []);
 
   const openCloseModal = useCallback((position: Position) => {
-    logDebug(`Opening close modal for position: ${position.symbol}`);
     setSelectedPosition(position);
-    
     setTimeout(() => {
       try {
         closeBottomSheetRef.current?.present();
-        logDebug('Close modal presented successfully');
       } catch (error) {
-        logDebug(`Error opening close modal: ${error}`);
         console.error('Error opening close modal:', error);
       }
     }, 100);
-  }, [logDebug]);
-
+  }, []);
 
   const openScreenShotModal = useCallback((history: any) => {
-    logDebug(`Opening screenshot modal for: ${history.symbol || history.id}`);
     setSelectedHistory(history);
-    
     setTimeout(() => {
       try {
         screenShotBottomSheetRef.current?.present();
-        logDebug('Screenshot modal presented successfully');
       } catch (error) {
-        logDebug(`Error opening screenshot modal: ${error}`);
         console.error('Error opening screenshot modal:', error);
       }
     }, 100);
-  }, [logDebug]);
+  }, []);
 
   const closeEditModal = useCallback(() => {
-    logDebug('Closing edit modal');
     try {
       editBottomSheetRef.current?.dismiss();
       setSelectedPosition(null);
     } catch (error) {
-      logDebug(`Error closing edit modal: ${error}`);
       console.error('Error closing edit modal:', error);
     }
-  }, [logDebug]);
+  }, []);
 
   const closeCloseModal = useCallback(() => {
-    logDebug('Closing close modal');
     try {
       closeBottomSheetRef.current?.dismiss();
       setSelectedPosition(null);
     } catch (error) {
-      logDebug(`Error closing close modal: ${error}`);
       console.error('Error closing close modal:', error);
     }
-  }, [logDebug]);
+  }, []);
 
   const closeScreenShotModal = useCallback(() => {
-    logDebug('Closing screenshot modal');
     try {
       screenShotBottomSheetRef.current?.dismiss();
       setSelectedHistory(null);
     } catch (error) {
-      logDebug(`Error closing screenshot modal: ${error}`);
       console.error('Error closing screenshot modal:', error);
     }
-  }, [logDebug]);
+  }, []);
 
   const handleSavePosition = useCallback((formData: any) => {
-    // Handle save logic here
     console.log('Saving position changes:', formData);
     console.log('For position:', selectedPosition);
     closeEditModal();
   }, [selectedPosition, closeEditModal]);
 
   const handleClosePosition = useCallback((percentage: number, customAmount?: string) => {
-    // Handle close position logic here
     closeCloseModal();
-  }, [selectedPosition, closeCloseModal]);
+  }, [closeCloseModal]);
 
   const handleScreenShot = useCallback((history: any) => {
     closeScreenShotModal();
-  }, [closeScreenShotModal])
-
-  //Sync Trades handler
-  const handleSyncTrades = useCallback(async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    setLoadingAction('syncing');
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showAlert('sync', 5000);
-      setExpandedPositions(new Set());
-    } catch (error) {
-      console.log('Error syncing trades:', error);
-      Alert.alert('Error', 'Failed to sync trades. Please try again.')
-    } finally {
-      setIsLoading(false);
-      setLoadingAction('');
-    }
-
-    // setTimeout(() => {
-    //   setIsLoading(false);
-    //   setLoadingAction('');
-    //   setShowSyncAlert(true);
-    //   // Auto hide after 5 seconds
-    //   setTimeout(() => {
-    //     setShowSyncAlert(false);
-    //   }, 5000);
-    //   // Reset expanded positions
-    // }, 3000);
-  }, [isLoading, showAlert])
-
-  const handleCloseProfits = useCallback(async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    setLoadingAction('closing_profits');
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showAlert('closeProfits');
-    } catch (error) {
-      console.error('Error closing profits:', error);
-      Alert.alert('Error', 'Failed to close profitable trades. Please try again.')
-    } finally {
-      setIsLoading(false);
-      setLoadingAction('');
-    }
-  }, [isLoading, showAlert]);
-
-  const handleCloseLosses = useCallback(async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    setLoadingAction('closing_losses');
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showAlert('closeLosses');
-    } catch (error) {
-      console.error('Error closing losses:', error);
-      Alert.alert('Error', 'Failed to close losing trades. Please try again.')
-    } finally {
-      setIsLoading(false);
-      setLoadingAction('');
-    }
-    // Auto hide after 3 seconds
-  }, [isLoading, showAlert]);
-
-  const handleCloseAll = useCallback(async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    setLoadingAction('closing_all');
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showAlert('closeAll');
-    } catch (error) {
-      console.error('Error closing all trades:', error);
-      Alert.alert('Error', 'Failed to close to all trades. Please try again.')
-    } finally {
-      setIsLoading(false);
-      setLoadingAction('');
-    }
-    // Simulate API call
-    // setTimeout(() => {
-    //   setIsLoading(false);
-    //   setLoadingAction('');
-    //   setShowCloseAllAlert(true);
-    //   // Auto hide after 3 seconds
-    //   setTimeout(() => {
-    //     setShowCloseAllAlert(false);
-    //   }, 3000);
-    // }, 2000);
-  }, [isLoading, showAlert]);
-
+  }, [closeScreenShotModal]);
 
   const toggleExpansion = useCallback((positionId: string) => {
     setExpandedPositions(prev => {
@@ -429,37 +401,42 @@ const Positions = () => {
     });
   }, []);
 
+  const tabData = useMemo(() => ({
+    openPositions: tableData?.open_trades ?? [],
+    openOrders: tableData?.open_orders ?? [],
+    orderHistory: tradeHistory?.all_trades ?? []
+  }), [tableData, tradeHistory]);
+
   const renderTabs = useMemo(() => (
     <View className="flex-row bg-[#100E0F] border-b border-gray-700">
       <TouchableOpacity
-        className={`flex-1 py-4 ${activeTab === 'positions' ? 'border-b-2 border-pink-500' : ''}`}
-        onPress={() => setActiveTab('positions')}
+        className={`flex-1 py-4 ${activeTab === TabId.OpenPositions ? 'border-b-2 border-pink-500' : ''}`}
+        onPress={() => setActiveTab(TabId.OpenPositions)}
       >
-        <Text className={`text-center font-medium ${activeTab === 'positions' ? 'text-white' : 'text-gray-400'}`}>
+        <Text className={`text-center font-medium ${activeTab === TabId.OpenPositions ? 'text-white' : 'text-gray-400'}`}>
           Open Positions {tabData.openPositions.length}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        className={`flex-1 py-4 ${activeTab === 'orders' ? 'border-b-2 border-pink-500' : ''}`}
-        onPress={() => setActiveTab('orders')}
+        className={`flex-1 py-4 ${activeTab === TabId.OpenOrders ? 'border-b-2 border-pink-500' : ''}`}
+        onPress={() => setActiveTab(TabId.OpenOrders)}
       >
-        <Text className={`text-center font-medium ${activeTab === 'orders' ? 'text-white' : 'text-gray-400'}`}>
+        <Text className={`text-center font-medium ${activeTab === TabId.OpenOrders ? 'text-white' : 'text-gray-400'}`}>
           Open Orders {tabData.openOrders.length}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        className={`flex-1 py-4 ${activeTab === 'history' ? 'border-b-2 border-pink-500' : ''}`}
-        onPress={() => setActiveTab('history')}
+        className={`flex-1 py-4 ${activeTab === TabId.OrderHistory ? 'border-b-2 border-pink-500' : ''}`}
+        onPress={() => setActiveTab(TabId.OrderHistory)}
       >
-        <Text className={`text-center font-medium ${activeTab === 'history' ? 'text-white' : 'text-gray-400'}`}>
-          Order History {tabData.orderHistory.length}
+        <Text className={`text-center font-medium ${activeTab === TabId.OrderHistory ? 'text-white' : 'text-gray-400'}`}>
+          Order History {tradeHistory?.total_count ?? 0}
         </Text>
       </TouchableOpacity>
-
     </View>
-  ), [activeTab, tabData]);
+  ), [activeTab, tabData, tradeHistory?.total_count]);
 
   const renderActionButtons = useMemo(() => (
     <View className="flex-row px-1 py-1 mt-1 bg-[#100E0F]">
@@ -506,9 +483,11 @@ const Positions = () => {
   ), [isLoading, loadingAction, handleSyncTrades, handleCloseProfits, handleCloseLosses, handleCloseAll]);
 
 
+
+
   const renderContent = useCallback(() => {
     switch (activeTab) {
-      case 'positions':
+      case TabId.OpenPositions:
         return (
           <ScrollView className="flex-1">
             {tabData.openPositions.map(position => (
@@ -523,17 +502,16 @@ const Positions = () => {
             ))}
           </ScrollView>
         );
-      case 'orders':
+      case TabId.OpenOrders:
         return (
           <ScrollView className="flex-1">
             {tabData.openOrders.length > 0 ? (
               tabData.openOrders.map(order => (
                 <OrderCard
-                  key={order.id}
-                  order={order}
-                  isExpanded={expandedPositions.has(order.id)}
-                  onToggleExpansion={toggleExpansion}
-                  onCancel={openCloseModal}
+                  openOrders={tabData?.openOrders ?? []}
+                  oneClickTradingEnabled={oneClickTradingEnabled}
+                  onEditOrder={openEditModal}
+                  onCancelOrder={openCloseModal}
                 />
               ))
             ) : (
@@ -543,7 +521,7 @@ const Positions = () => {
             )}
           </ScrollView>
         );
-      case 'history':
+      case TabId.OrderHistory:
         return (
           <ScrollView className="flex-1">
             {tabData.orderHistory.length > 0 ? (
@@ -569,8 +547,39 @@ const Positions = () => {
   }, [activeTab, expandedPositions, toggleExpansion, openEditModal, openCloseModal, openScreenShotModal, tabData]);
 
   //Alert component
-  const renderAlert = useCallback((type: AlertType, title: string, message: string) => {
+  const renderAlert = useCallback(() => {
     if (currentAlert !== type) return null;
+
+    if (!currentAlert) return null;
+
+    const getAlertContent = () => {
+      switch (currentAlert) {
+        case 'sync':
+          return {
+            title: 'Trades synced successfully',
+            message: 'All trades are synced'
+          };
+        case 'closeProfits':
+          return {
+            title: 'Trades closed successfully',
+            message: 'All profit trades closed'
+          };
+        case 'closeLosses':
+          return {
+            title: 'Trades closed successfully',
+            message: 'All loss trades closed'
+          };
+        case 'closeAll':
+          return {
+            title: 'Trades closed successfully',
+            message: 'All trades closed'
+          };
+        default:
+          return { title: '', message: '' };
+      }
+    }
+
+    const { title, message } = getAlertContent();
 
     return (
       <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
@@ -594,8 +603,7 @@ const Positions = () => {
     <SafeAreaView className="flex-1 bg-[#100E0F]">
       <Header />
       {renderTabs}
-      {activeTab === 'positions' && renderActionButtons}
-      {/* <View className="w-full h-0.5 bg-gray-800 mt-1" /> */}
+      {activeTab === TabId.OpenPositions && renderActionButtons}
       {renderContent()}
 
       <EditPositionBottomSheet
@@ -619,79 +627,7 @@ const Positions = () => {
         onScreenShot={handleScreenShot}
       />
 
-      {showSyncAlert && (
-        <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
-          <View className="flex-row items-center justify-between p-5">
-            <View className="flex-1">
-              <Text className="text-white font-InterSemiBold text-base mb-1">Trades synced successfully</Text>
-              <Text className="text-gray-300 font-InterRegular text-base">
-                All trades are synced
-              </Text>
-            </View>
-            <TouchableOpacity
-              className="ml-4 p-2"
-              onPress={() => setShowSyncAlert(false)}>
-              {/* <Text className="text-gray-400 text-lg">x</Text> */}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {showCloseProfitsAlert && (
-        <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
-          <View className="flex-row items-center justify-between p-5">
-            <View className="flex-1">
-              <Text className="text-white font-InterSemiBold text-base mb-1">Trades closed successfully</Text>
-              <Text className="text-gray-300 font-InterRegular text-base">
-                All profit trades closed
-              </Text>
-            </View>
-            <TouchableOpacity
-              className="ml-4 p-2"
-              onPress={() => setShowCloseProfitsAlert(false)}
-            >
-              {/* <Text className="text-gray-400 text-lg">✕</Text> */}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {showCloseLossesAlert && (
-        <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
-          <View className="flex-row items-center justify-between p-5">
-            <View className="flex-1">
-              <Text className="text-white font-InterSemiBold text-base mb-1">Trades clased successfully</Text>
-              <Text className="text-gray-300 font-InterRegular text-base">
-                All loss trades closed
-              </Text>
-            </View>
-            <TouchableOpacity
-              className="ml-4 p-2"
-              onPress={() => setShowCloseLossesAlert(false)}
-            >
-              {/* <Text className="text-gray-400 text-lg">✕</Text> */}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {showCloseAllAlert && (
-        <View className="absolute bottom-5 left-4 right-4 bg-[#100E0F] border border-[#1F1B1D] rounded-lg py-1 px-3 shadow-lg">
-          <View className="flex-row items-center justify-between p-5">
-            <View className="flex-1">
-              <Text className="text-white font-InterSemiBold text-base mb-1">Trades closed successfully</Text>
-              <Text className="text-gray-300 font-InterRegular text-base">
-                All trades closed
-              </Text>
-            </View>
-            <TouchableOpacity
-              className="ml-4 p-2"
-              onPress={() => setShowCloseAllAlert(false)}
-            >
-              {/* <Text className="text-gray-400 text-lg">✕</Text> */}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      {renderAlert()}
 
       {isLoading && (
         <View className="absolute inset-0 bg-black bg-opacity-50 flex-1 items-center justify-center">
@@ -709,8 +645,6 @@ const Positions = () => {
           </View>
         </View>
       )}
-
-
     </SafeAreaView>
   );
 };

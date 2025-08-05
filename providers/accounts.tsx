@@ -1,3 +1,4 @@
+// providers/accounts.tsx
 import {
     createContext,
     PropsWithChildren,
@@ -7,7 +8,6 @@ import {
     useMemo,
     useState
 } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AccountStatusEnum } from '@/shared/enums';
 import { Account } from '@/api/schema/account';
@@ -63,16 +63,25 @@ const AccountsContext = createContext<AccountsContextType>(defaultContextValue);
 export function AccountsProvider({ children }: PropsWithChildren) {
     const { isSignedIn, isLoaded } = useAuth();
 
-    // ✅ FIXED: Only make API calls when user is properly authenticated
+    // Only make API calls when user is properly authenticated
     const {
         data: accountsData,
         isLoading: isQueryLoading,
         error: queryError,
         refetch
     } = useGetAccounts({
-        enabled: isLoaded && isSignedIn, // ✅ This is the key fix
+        enabled: isLoaded && isSignedIn,
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
+        staleTime: 2 * 60 * 1000, // 2 minutes
+        retry: (failureCount, error) => {
+            // Don't retry authentication errors
+            if (error?.message?.includes('Authentication') || 
+                error?.message?.includes('Unauthorized')) {
+                return false;
+            }
+            return failureCount < 3;
+        },
     });
 
     // Local state for selected accounts
@@ -88,7 +97,13 @@ export function AccountsProvider({ children }: PropsWithChildren) {
             try {
                 const storedId = await AsyncStorage.getItem(ACCOUNT_ID_KEY);
                 const initialId = storedId ? parseInt(storedId, 10) : 0;
-                setSelectedAccountIdState(initialId);
+                
+                // Validate the stored ID
+                if (initialId && !isNaN(initialId) && initialId > 0) {
+                    setSelectedAccountIdState(initialId);
+                } else {
+                    setSelectedAccountIdState(0);
+                }
             } catch (error) {
                 console.error('[AccountsProvider] Error loading selected account ID:', error);
                 setSelectedAccountIdState(0);
@@ -103,19 +118,33 @@ export function AccountsProvider({ children }: PropsWithChildren) {
     const combinedAccounts = useMemo(() => {
         if (!accountsData) return [];
 
-        return [
+        const accounts = [
             ...(accountsData.broker_accounts ?? []),
             ...(accountsData.prop_firm_accounts ?? []),
             ...(accountsData.bt_accounts ?? []),
             ...(accountsData.copier_accounts ?? []),
-        ].filter((account): account is Account => Boolean(account?.id));
+        ].filter((account): account is Account => Boolean(account?.id && account.id > 0));
+
+        console.log('[AccountsProvider] Combined accounts:', accounts.length);
+        return accounts;
     }, [accountsData]);
 
     // Handle setting selected account with persistence
     const handleSetSelectedAccountId = useCallback(async (id: number) => {
+        if (id < 0) {
+            console.warn('[AccountsProvider] Invalid account ID:', id);
+            return;
+        }
+
+        console.log('[AccountsProvider] Setting selected account ID:', id);
         setSelectedAccountIdState(id);
+        
         try {
-            await AsyncStorage.setItem(ACCOUNT_ID_KEY, id.toString());
+            if (id > 0) {
+                await AsyncStorage.setItem(ACCOUNT_ID_KEY, id.toString());
+            } else {
+                await AsyncStorage.removeItem(ACCOUNT_ID_KEY);
+            }
         } catch (error) {
             console.error('[AccountsProvider] Error saving selected account ID:', error);
         }
@@ -123,40 +152,54 @@ export function AccountsProvider({ children }: PropsWithChildren) {
 
     // Auto-select active account when data loads
     useEffect(() => {
-        // ✅ FIXED: Wait for authentication AND initialization
+        // Wait for authentication, initialization, and data
         if (!isSignedIn || !isLoaded || !accountsData || !isInitialized) {
             return;
         }
 
+        // Check if the currently selected account still exists
         const selectedAccountExists = combinedAccounts.some(
             account => account.id === selectedAccountId
         );
 
-        if (!selectedAccountId || !selectedAccountExists) {
+        // If no account is selected or the selected account doesn't exist anymore
+        if (!selectedAccountId || selectedAccountId <= 0 || !selectedAccountExists) {
+            console.log('[AccountsProvider] Auto-selecting account...', {
+                selectedAccountId,
+                selectedAccountExists,
+                availableAccounts: combinedAccounts.length
+            });
+
+            // Try to find an active account first
             const activeAccount = combinedAccounts.find(
                 account => account.status === AccountStatusEnum.ACTIVE
-            )
+            );
 
+            // Fall back to the first available account
             const accountToSelect = activeAccount || combinedAccounts[0];
 
             if (accountToSelect) {
-                console.log('[AccountsProvider] Auto-selecting account: ', accountToSelect.id)
+                console.log('[AccountsProvider] Auto-selecting account:', accountToSelect.id, accountToSelect.name);
                 handleSetSelectedAccountId(accountToSelect.id);
+            } else {
+                console.log('[AccountsProvider] No accounts available to select');
+                handleSetSelectedAccountId(0);
             }
         }
     }, [
         isSignedIn,
-        isLoaded, // ✅ Added this dependency
+        isLoaded,
         accountsData,
         combinedAccounts,
         handleSetSelectedAccountId,
         selectedAccountId,
         isInitialized
-    ])
+    ]);
 
     // Clear data when user signs out
     useEffect(() => {
         if (!isSignedIn && isLoaded) {
+            console.log('[AccountsProvider] User signed out, clearing data');
             setSelectedAccountIdState(0);
             setSelectedPreviewAccountId(undefined);
             AsyncStorage.removeItem(ACCOUNT_ID_KEY).catch(console.error);
@@ -169,10 +212,11 @@ export function AccountsProvider({ children }: PropsWithChildren) {
     }, [combinedAccounts]);
 
     const getActiveAccount = useCallback((): Account | undefined => {
-        return getAccountById(selectedPreviewAccountId ?? selectedAccountId);
+        const accountId = selectedPreviewAccountId ?? selectedAccountId;
+        return getAccountById(accountId);
     }, [getAccountById, selectedAccountId, selectedPreviewAccountId]);
 
-    // ✅ FIXED: Better loading state logic
+    // Better loading state logic
     const isLoading = !isLoaded || !isInitialized || (isSignedIn && isQueryLoading);
 
     // Prepare all account data

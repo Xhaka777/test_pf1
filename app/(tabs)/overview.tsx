@@ -17,6 +17,7 @@ import AccountSelectorBottomSheet, { AccountSelectorRef } from '@/components/Sel
 import AccountBalanceCard from '@/components/overview/AccountBalanceCard';
 import { WinLossStats } from '@/components/overview/WinLossStats';
 import AdditionalStats from '@/components/overview/AdditionalStats';
+import { testNewWebSocketAuth } from '@/hooks/test';
 
 interface ActivityData {
   time: string;
@@ -176,6 +177,12 @@ const Overview = () => {
     fetchData();
   }, []);
 
+
+  const authTests = testNewWebSocketAuth();
+  authTests.testWebSocketTokenFlow()
+    .then(() => console.log('🎉 New auth system works!'))
+    .catch(error => console.error('❌ Still issues:', error));
+
   return (
     <SafeAreaView className='bg-[#100E0F] h-full'>
       <ScrollView>
@@ -197,11 +204,10 @@ const Overview = () => {
                   <TouchableOpacity
                     key={button.id}
                     onPress={() => setSelectedSubAccount(button.id as 'evaluation' | 'funded')}
-                    className={`py-3 px-5 rounded-lg border items-center justify-center ${
-                      selectedSubAccount === button.id
-                        ? 'border-[#e74694]'
-                        : 'bg-propfirmone-300 border border-[#4F494C]'
-                    }`}
+                    className={`py-3 px-5 rounded-lg border items-center justify-center ${selectedSubAccount === button.id
+                      ? 'border-[#e74694]'
+                      : 'bg-propfirmone-300 border border-[#4F494C]'
+                      }`}
                   >
                     <Text className='text-white text-sm font-medium'>
                       {button.text}

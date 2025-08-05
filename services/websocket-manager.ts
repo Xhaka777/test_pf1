@@ -1,3 +1,4 @@
+// services/websocket-manager.ts
 import { AppState, AppStateStatus } from 'react-native';
 import { getWSSBaseUrl } from '@/api/services/api';
 import { MessageType, parseWebSocketMessage } from '@/api/services/web-socket-parser';
@@ -17,9 +18,10 @@ export interface WebSocketConnection {
   reconnectDelay: number;
   isManuallyDisconnected: boolean;
   messageType?: MessageType;
+  isReconnecting: boolean; // Add this flag
 }
 
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'reconnecting';
 
 export class WebSocketManager {
   private static instance: WebSocketManager;
@@ -27,6 +29,7 @@ export class WebSocketManager {
   private appStateSubscription: any;
   private appState: AppStateStatus = 'active';
   private reconnectTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private connectionQueue: Set<string> = new Set(); // Prevent duplicate connections
 
   private constructor() {
     this.initializeAppStateListener();
@@ -48,11 +51,10 @@ export class WebSocketManager {
     console.log(`[WebSocketManager] App state changed: ${this.appState} -> ${nextAppState}`);
     
     if (this.appState.match(/inactive|background/) && nextAppState === 'active') {
-      // App came to foreground - reconnect all connections
       console.log('[WebSocketManager] App came to foreground, reconnecting...');
-      this.reconnectAll();
+      // Small delay to ensure app is fully active
+      setTimeout(() => this.reconnectAll(), 1000);
     } else if (nextAppState.match(/inactive|background/)) {
-      // App went to background - pause reconnection attempts
       console.log('[WebSocketManager] App went to background');
       this.pauseReconnectionAttempts();
     }
@@ -73,10 +75,20 @@ export class WebSocketManager {
   }): string {
     const { id, endpoint, subscriptionMessage, maxReconnectAttempts = 5, messageType } = config;
     
+    // Prevent duplicate connection attempts
+    if (this.connectionQueue.has(id)) {
+      console.log(`[WebSocketManager] Connection ${id} already being created, skipping`);
+      return id;
+    }
+
     // Close existing connection if it exists
     this.closeConnection(id);
 
-    const url = getWSSBaseUrl() + endpoint;
+    // Build WebSocket URL properly
+    const baseUrl = getWSSBaseUrl();
+    const url = `${baseUrl}${endpoint}`;
+    
+    console.log(`[WebSocketManager] Creating connection ${id} to ${url}`);
     
     const connection: WebSocketConnection = {
       id,
@@ -91,40 +103,88 @@ export class WebSocketManager {
       maxReconnectAttempts,
       reconnectDelay: 1000,
       isManuallyDisconnected: false,
-      messageType
+      messageType,
+      isReconnecting: false
     };
 
     this.connections.set(id, connection);
-    this.connect(id);
+    this.connectionQueue.add(id);
+    
+    // Small delay to prevent rapid connection attempts
+    setTimeout(() => {
+      this.connect(id);
+      this.connectionQueue.delete(id);
+    }, 100);
     
     return id;
   }
 
-  private connect(connectionId: string): void {
+  private async connect(connectionId: string): Promise<void> {
     const connection = this.connections.get(connectionId);
     if (!connection || connection.isManuallyDisconnected) {
       return;
     }
-
+  
+    // Prevent multiple connection attempts
+    if (connection.socket && 
+        (connection.socket.readyState === WebSocket.CONNECTING || 
+         connection.socket.readyState === WebSocket.OPEN)) {
+      console.log(`[WebSocketManager] Connection ${connectionId} already connecting/connected`);
+      return;
+    }
+  
     // Clear any existing reconnect timeout
     this.clearReconnectTimeout(connectionId);
-
-    console.log(`[WebSocketManager] Connecting to ${connection.url}`);
-
+  
+    // ✅ Get authentication token for WebSocket connection
+    let authToken: string | null = null;
     try {
-      connection.socket = new WebSocket(connection.url);
-
-      connection.socket.onopen = () => {
+      // Import useAuth dynamically to avoid hook rules issues
+      const { getToken } = await import('@clerk/clerk-expo').then(m => m.useAuth());
+      authToken = await getToken();
+    } catch (error) {
+      console.error(`[WebSocketManager] Failed to get auth token for ${connectionId}:`, error);
+      connection.onError?.('Authentication failed');
+      return;
+    }
+  
+    if (!authToken) {
+      console.error(`[WebSocketManager] No auth token available for ${connectionId}`);
+      connection.onError?.('No authentication token available');
+      return;
+    }
+  
+    // ✅ Build WebSocket URL with token as query parameter (common pattern)
+    const separator = connection.url.includes('?') ? '&' : '?';
+    const authenticatedUrl = `${connection.url}${separator}token=${encodeURIComponent(authToken)}`;
+  
+    console.log(`[WebSocketManager] Connecting to ${authenticatedUrl}`);
+    connection.isReconnecting = true;
+  
+    try {
+      // Close any existing socket first
+      if (connection.socket) {
+        connection.socket.close();
+        connection.socket = null;
+      }
+  
+      // ✅ Create WebSocket with authentication in URL
+      connection.socket = new WebSocket(authenticatedUrl);
+  
+      // Rest of the connection setup remains the same...
+      connection.socket.onopen = (event) => {
         console.log(`[WebSocketManager] Connection ${connectionId} opened`);
         connection.reconnectAttempts = 0;
+        connection.isReconnecting = false;
         connection.onOpen?.();
-
+  
         // Send subscription message if provided
         if (connection.subscriptionMessage && connection.socket?.readyState === WebSocket.OPEN) {
+          console.log(`[WebSocketManager] Sending subscription message for ${connectionId}`);
           connection.socket.send(connection.subscriptionMessage);
         }
       };
-
+  
       connection.socket.onmessage = (event: MessageEvent) => {
         try {
           let parsedData;
@@ -138,26 +198,51 @@ export class WebSocketManager {
           connection.onMessage?.(parsedData);
         } catch (error) {
           console.error(`[WebSocketManager] Failed to parse message for ${connectionId}:`, error);
+          console.error(`[WebSocketManager] Raw message:`, event.data);
         }
       };
-
+  
       connection.socket.onerror = (error: Event) => {
-        console.error(`[WebSocketManager] Connection ${connectionId} error:`, error);
+        console.error(`[WebSocketManager] Connection ${connectionId} error:`, {
+          isTrusted: (error as any).isTrusted,
+          message: (error as any).message || 'Unknown WebSocket error'
+        });
+        
+        console.error(`[WebSocketManager] Socket readyState: ${connection.socket?.readyState}`);
+        console.error(`[WebSocketManager] Socket URL: ${authenticatedUrl}`);
+        
+        connection.isReconnecting = false;
         connection.onError?.(`WebSocket connection error for ${connectionId}`);
       };
-
+  
       connection.socket.onclose = (event: CloseEvent) => {
-        console.log(`[WebSocketManager] Connection ${connectionId} closed:`, event.code, event.reason);
+        console.log(`[WebSocketManager] Connection ${connectionId} closed:`, {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
+        
+        connection.isReconnecting = false;
         connection.onClose?.();
         
-        // Only attempt reconnection if not manually disconnected
+        // Handle different close codes
+        if (event.code === 1006) {
+          console.log(`[WebSocketManager] ${connectionId} abnormal closure (likely connection failed)`);
+        } else if (event.code === 1002) {
+          console.log(`[WebSocketManager] ${connectionId} protocol error`);
+        } else if (event.code === 1003) {
+          console.log(`[WebSocketManager] ${connectionId} unsupported data`);
+        }
+        
+        // Only attempt reconnection if not manually disconnected and not a clean close
         if (!connection.isManuallyDisconnected && !event.wasClean) {
           this.scheduleReconnect(connectionId);
         }
       };
-
+  
     } catch (error) {
       console.error(`[WebSocketManager] Failed to create connection ${connectionId}:`, error);
+      connection.isReconnecting = false;
       connection.onError?.(`Failed to create WebSocket connection: ${error}`);
       this.scheduleReconnect(connectionId);
     }
@@ -181,12 +266,17 @@ export class WebSocketManager {
       return;
     }
 
-    const delay = Math.min(connection.reconnectDelay * Math.pow(2, connection.reconnectAttempts), 30000);
+    // Exponential backoff with jitter
+    const baseDelay = connection.reconnectDelay * Math.pow(2, connection.reconnectAttempts);
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const delay = Math.min(baseDelay + jitter, 30000); // Cap at 30 seconds
+    
     connection.reconnectAttempts++;
 
-    console.log(`[WebSocketManager] Scheduling reconnection ${connection.reconnectAttempts} for ${connectionId} in ${delay}ms`);
+    console.log(`[WebSocketManager] Scheduling reconnection ${connection.reconnectAttempts} for ${connectionId} in ${Math.round(delay)}ms`);
 
     const timeout = setTimeout(() => {
+      this.reconnectTimeouts.delete(connectionId);
       this.connect(connectionId);
     }, delay);
 
@@ -210,15 +300,19 @@ export class WebSocketManager {
     console.log(`[WebSocketManager] Closing connection ${connectionId}`);
     
     connection.isManuallyDisconnected = true;
+    connection.isReconnecting = false;
     this.clearReconnectTimeout(connectionId);
+    this.connectionQueue.delete(connectionId);
 
     if (connection.socket) {
+      // Clean up event handlers to prevent memory leaks
       connection.socket.onopen = null;
       connection.socket.onmessage = null;
       connection.socket.onerror = null;
       connection.socket.onclose = null;
       
-      if (connection.socket.readyState === WebSocket.OPEN || connection.socket.readyState === WebSocket.CONNECTING) {
+      if (connection.socket.readyState === WebSocket.OPEN || 
+          connection.socket.readyState === WebSocket.CONNECTING) {
         connection.socket.close(1000, 'Manual disconnect');
       }
       connection.socket = null;
@@ -237,13 +331,22 @@ export class WebSocketManager {
     console.log(`[WebSocketManager] Manual reconnection requested for ${connectionId}`);
     connection.reconnectAttempts = 0;
     connection.isManuallyDisconnected = false;
+    connection.isReconnecting = false;
     this.clearReconnectTimeout(connectionId);
     this.connect(connectionId);
   }
 
   public getConnectionStatus(connectionId: string): ConnectionStatus {
     const connection = this.connections.get(connectionId);
-    if (!connection || !connection.socket) {
+    if (!connection) {
+      return 'disconnected';
+    }
+
+    if (connection.isReconnecting) {
+      return 'reconnecting';
+    }
+
+    if (!connection.socket) {
       return 'disconnected';
     }
 
@@ -279,7 +382,9 @@ export class WebSocketManager {
   private reconnectAll(): void {
     console.log('[WebSocketManager] Reconnecting all connections...');
     this.connections.forEach((connection, connectionId) => {
-      if (!connection.isManuallyDisconnected && this.getConnectionStatus(connectionId) !== 'connected') {
+      if (!connection.isManuallyDisconnected && 
+          this.getConnectionStatus(connectionId) !== 'connected' &&
+          !connection.isReconnecting) {
         this.reconnectConnection(connectionId);
       }
     });
@@ -311,6 +416,9 @@ export class WebSocketManager {
     // Clear all timeouts
     this.reconnectTimeouts.forEach(timeout => clearTimeout(timeout));
     this.reconnectTimeouts.clear();
+
+    // Clear connection queue
+    this.connectionQueue.clear();
 
     // Remove app state listener
     if (this.appStateSubscription) {

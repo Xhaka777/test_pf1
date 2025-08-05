@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { ChevronDown, ChevronUp, Pencil, X } from 'lucide-react-native';
 import images from '@/constants/images';
+import { getCurrencyFlags, CurrencyCodeEnum } from '@/api/utils/currency-trade';
 
 interface Position {
-  id: string;
+  id?: string;
+  order_id: string;
   symbol: string;
-  type: 'LONG' | 'SHORT';
-  size: number;
-  pnl: number;
+  position_type: 'LONG' | 'SHORT';
+  quantity: number;
+  pl: number;
   entry: number;
   fees: number;
-  tp?: number;
-  sl?: number;
+  tp?: number | null;
+  sl?: number | null;
   roi: number;
-  openTime: string;
+  open_time: string;
 }
 
 interface PositionCardProps {
@@ -25,6 +27,69 @@ interface PositionCardProps {
   onClose: (position: Position) => void;
 }
 
+const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
+  //
+  const flagMap = {
+    [CurrencyCodeEnum.USD]: images.usa_png,
+    [CurrencyCodeEnum.EUR]: images.eur_png,
+    [CurrencyCodeEnum.GBP]: images.gbp_png,
+    [CurrencyCodeEnum.JPY]: images.jpy_png,
+    [CurrencyCodeEnum.AUD]: images.aud_png,
+    [CurrencyCodeEnum.CAD]: images.cad_png,
+    [CurrencyCodeEnum.CHF]: images.chf_png,
+    [CurrencyCodeEnum.NZD]: images.nzd_png,
+    [CurrencyCodeEnum.BTC]: images.btc_png,
+    [CurrencyCodeEnum.USDT]: images.usdt_png,
+    [CurrencyCodeEnum.UKNOWN]: images.usa_png,
+  }
+  return flagMap[currency] || images.usa_png;
+}
+
+const DirectionValue: React.FC<{
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  colorized?: boolean;
+  decimals?: number;
+}> = ({ value, prefix = '', suffix = '', colorized = false, decimals = 2 }) => {
+  const isPositive = value >= 0;
+  const colorClass = colorized
+    ? (isPositive ? 'text-success-main' : 'text-red-500')
+    : 'text-white';
+
+  return (
+    <Text className={`font-InterRegular ${colorClass}`}>
+      {prefix}{value.toFixed(decimals)} {suffix}
+    </Text>
+  )
+}
+
+const PositionTypeValue: React.FC<{ type: 'LONG' | 'SHORT' }> = ({ type }) => {
+  const colorClass = type === 'LONG' ? 'text-success-main' : 'text-red-500';
+  return (
+    <Text className={`font-InterRegular ${colorClass}`}>
+      {type}
+    </Text>
+  )
+}
+
+const formatDateTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch (error) {
+    return dateString;
+  }
+}
+
 const PositionCard: React.FC<PositionCardProps> = ({
   position,
   isExpanded,
@@ -32,104 +97,165 @@ const PositionCard: React.FC<PositionCardProps> = ({
   onEdit,
   onClose
 }) => {
-  const isProfitable = position.pnl > 0;
+  //
+  const positionId = position.order_id || position.id || '';
+  const isProfitable = position.pl > 0;
+
+  const { from, to } = getCurrencyFlags(position.symbol);
+  //
+  const fromFlagImage = getCurrencyFlagImage(from);
+  const toFlagImage = getCurrencyFlagImage(to);
+
+  const handleToggleExpansion = () => {
+    onToggleExpansion(positionId);
+  }
+
+  const handleEdit = () => {
+    setTimeout(() => {
+      onEdit(position);
+    }, 100);
+  }
+
+  const handleClose = () => {
+    setTimeout(() => {
+      onClose(position);
+    }, 100);
+  }
 
   return (
     <View className="bg-propfirmone-300 rounded-md m-2 shadow-lg">
       {/* Main Position Row */}
-      <View className="flex-row items-center justify-between p-4">
+      <TouchableOpacity
+        className="flex-row items-center justify-between p-4"
+        onPress={handleToggleExpansion}
+        activeOpacity={0.7}
+      >
         <View className="flex-1">
           <View className="flex-row items-center mb-1">
+            {/* Dynamic flag display using actual currency flags */}
             <View style={{ flexDirection: 'row' }}>
               <Image
-                source={images.usa_png}
+                source={fromFlagImage}
                 style={{ width: 18, height: 18 }}
               />
               <Image
-                source={images.usa_png}
+                source={toFlagImage}
                 style={{ width: 18, height: 18, marginLeft: -6 }}
               />
             </View>
-            <Text className="text-white font-InterSemiBold text-base">{position.symbol}</Text>
+            <Text className="text-white font-InterSemiBold text-base ml-2">
+              {position.symbol}
+            </Text>
           </View>
 
-          {/* Bottom row - Position Type and Size */}
+          {/* Bottom row - Position Type and Size with enhanced formatting */}
           <View className="flex-row items-center">
-            <Text className={`font-InterRegular text-base mr-2 ${position.type === 'LONG' ? 'text-success-main' : 'text-red-500'}`}>
-              {position.type}
-            </Text>
-            <Text className="text-gray-400 font-InterRegular">/ {position.size.toFixed(2)} Size</Text>
+            <PositionTypeValue type={position.position_type} />
+            <Text className="text-gray-400 font-InterRegular mx-1">/</Text>
+            <Text className="text-white font-InterRegular">{position.quantity}</Text>
+            <Text className="text-gray-400 font-InterRegular ml-1">Size</Text>
           </View>
         </View>
 
         {/* Right side - P/L and Actions */}
         <View className="items-end">
-          <Text className={`font-InterSemiBold text-base mb-2 ${isProfitable ? 'text-success-main' : 'text-red-500'}`}>
-            ${position.pnl.toFixed(2)} P/L
-          </Text>
+          <View className="flex-row items-center mb-2">
+            <DirectionValue
+              value={position.pl}
+              prefix="$"
+              colorized
+              decimals={2}
+            />
+            <Text className="text-gray-400 font-InterRegular ml-1 text-xs">P/L</Text>
+          </View>
 
-          <View className="flex-row space-x-2">
+          <View className="flex-row items-center space-x-2">
             <TouchableOpacity
               className="w-8 h-8 border border-gray-800 rounded-lg items-center justify-center mr-1"
-              onPress={() => onEdit(position)}
+              onPress={handleEdit}
+              activeOpacity={0.7}
             >
               <Pencil size={12} color="white" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center"
-              onPress={() => onClose(position)}
+              className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center mr-1"
+              onPress={handleClose}
+              activeOpacity={0.7}
             >
               <X size={12} color="white" />
             </TouchableOpacity>
 
             <TouchableOpacity
               className="w-8 h-8 rounded items-center justify-center"
-              onPress={() => onToggleExpansion(position.id)}
+              onPress={handleToggleExpansion}
+              activeOpacity={0.7}
             >
-              {isExpanded ? 
-                <ChevronDown size={12} color="white" /> : 
-                <ChevronUp size={12} color="white" />
+              {isExpanded ?
+                <ChevronUp size={16} color="white" /> :
+                <ChevronDown size={16} color="white" />
               }
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Expanded Details */}
+      {/* Enhanced Expanded Details with better formatting */}
       {isExpanded && (
-        <View className="px-4 pb-4 bg-gray-850">
-          <View className="space-y-2">
-            <View className="flex-row justify-between">
+        <View className="px-4 pb-4 bg-gray-850 border-t border-gray-700">
+          <View className="mt-3 space-y-3">
+            <View className="flex-row justify-between items-center">
               <Text className="text-gray-400 font-InterMedium text-sm">Entry:</Text>
-              <Text className="text-white font-InterMedium text-sm">{position.entry.toFixed(2)}</Text>
+              <DirectionValue
+                value={position.entry}
+                prefix="$"
+                decimals={2}
+              />
             </View>
 
-            <View className="flex-row justify-between">
+            <View className="flex-row justify-between items-center">
               <Text className="text-gray-400 font-InterMedium text-sm">Fees:</Text>
-              <Text className="text-white font-InterMedium text-sm">${position.fees.toFixed(2)}</Text>
+              <DirectionValue
+                value={position.fees}
+                prefix="$"
+                colorized
+                decimals={2}
+              />
             </View>
 
-            <View className="flex-row justify-between">
+            <View className="flex-row justify-between items-center">
               <Text className="text-gray-400 font-InterMedium text-sm">TP:</Text>
-              <Text className="text-white font-InterMedium text-sm">{position.tp ? position.tp.toFixed(2) : '-'}</Text>
-            </View>
-
-            <View className="flex-row justify-between">
-              <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
-              <Text className="text-white font-InterMedium text-sm">{position.sl ? position.sl.toFixed(2) : '-'}</Text>
-            </View>
-
-            <View className="flex-row justify-between">
-              <Text className="text-gray-400 font-InterMedium text-sm">ROI:</Text>
-              <Text className={`font-InterMedium text-sm ${position.roi >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {position.roi.toFixed(2)}%
+              <Text className="text-white font-InterMedium text-sm">
+                {position.tp ? position.tp.toFixed(2) : (
+                  <Text className="text-gray-400">-</Text>
+                )}
               </Text>
             </View>
 
-            <View className="flex-row justify-between">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
+              <Text className="text-white font-InterMedium text-sm">
+                {position.sl ? position.sl.toFixed(2) : (
+                  <Text className="text-gray-400">-</Text>
+                )}
+              </Text>
+            </View>
+
+            <View className="flex-row justify-between items-center">
+              <Text className="text-gray-400 font-InterMedium text-sm">ROI:</Text>
+              <DirectionValue
+                value={position.roi}
+                suffix="%"
+                colorized
+                decimals={2}
+              />
+            </View>
+
+            <View className="flex-row justify-between items-center">
               <Text className="text-gray-400 font-InterMedium text-sm">Open (GMT):</Text>
-              <Text className="text-white font-InterMedium text-sm">{position.openTime}</Text>
+              <Text className="text-white font-InterMedium text-sm">
+                {formatDateTime(position.open_time)}
+              </Text>
             </View>
           </View>
         </View>

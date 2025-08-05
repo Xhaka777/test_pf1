@@ -12,7 +12,16 @@ import pl_frame from '../assets/images/pl_frame.png';
 import evaluation from '../assets/images/evaluation.svg';
 import brokerage from '../assets/images/brokerage.png';
 import practice from '../assets/images/practice.svg';
-
+import btc_png from '../assets/images/btc.png';
+import cad_png from '../assets/images/cad.png';
+import eth_png from '../assets/images/eth.png';
+import chf_png from '../assets/images/chf.png';
+import jpy_png from '../assets/images/jpy.png';
+import gbp_png from '../assets/images/gbp.png';
+import aud_png from '../assets/images/aud.png';
+import nzd_png from '../assets/images/nzd.png';
+import usdt_png from '../assets/images/usdt.png';
+import eur_png from '../assets/images/eur.png';
 
 export default {
     logo,
@@ -29,4 +38,14 @@ export default {
     evaluation,
     brokerage,
     practice,
+    btc_png,
+    cad_png,
+    eth_png,
+    chf_png,
+    jpy_png,
+    gbp_png,
+    aud_png,
+    nzd_png,
+    usdt_png,
+    eur_png
 }
