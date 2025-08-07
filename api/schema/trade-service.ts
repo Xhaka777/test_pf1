@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { StatusEnum } from '../services/api'
+import { StatusEnum } from '../services/api';
 import {
   OrderTypeEnum,
   PositionTypeEnum,
   TakeProfitSlTypeEnum,
-} from '../../shared/enums'
+} from '@/constants/enums';
 
 export enum PositionColorEnum {
   LONG = 'text-green-theme',

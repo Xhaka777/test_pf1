@@ -3,32 +3,15 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { ChevronDown, ChevronUp, Pencil, X } from 'lucide-react-native';
 import images from '@/constants/images';
 import { getCurrencyFlags, CurrencyCodeEnum } from '@/api/utils/currency-trade';
-
-interface Position {
-  id?: string;
-  order_id: string;
-  symbol: string;
-  position_type: 'LONG' | 'SHORT';
-  quantity: number;
-  pl: number;
-  entry: number;
-  fees: number;
-  tp?: number | null;
-  sl?: number | null;
-  roi: number;
-  open_time: string;
-}
+import { OpenTradesData } from '@/api/schema';
 
 interface PositionCardProps {
-  position: Position;
-  isExpanded: boolean;
-  onToggleExpansion: (id: string) => void;
-  onEdit: (position: Position) => void;
-  onClose: (position: Position) => void;
+  openTrades: OpenTradesData['open_trades'];
+  onEdit: (position: OpenTradesData['open_trades'][number]) => void;
+  onClose: (position: OpenTradesData['open_trades'][number]) => void;
 }
 
 const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
-  //
   const flagMap = {
     [CurrencyCodeEnum.USD]: images.usa_png,
     [CurrencyCodeEnum.EUR]: images.eur_png,
@@ -91,175 +74,196 @@ const formatDateTime = (dateString: string): string => {
 }
 
 const PositionCard: React.FC<PositionCardProps> = ({
-  position,
-  isExpanded,
-  onToggleExpansion,
+  openTrades,
   onEdit,
   onClose
 }) => {
-  //
-  const positionId = position.order_id || position.id || '';
-  const isProfitable = position.pl > 0;
+  const [expandedTrades, setExpandedTrades] = useState<Record<string, boolean>>({});
 
-  const { from, to } = getCurrencyFlags(position.symbol);
-  //
-  const fromFlagImage = getCurrencyFlagImage(from);
-  const toFlagImage = getCurrencyFlagImage(to);
-
-  const handleToggleExpansion = () => {
-    onToggleExpansion(positionId);
+  if (!openTrades.length) {
+    return (
+      <View className="flex-1 items-center justify-center p-8">
+        <Text className="text-gray-400 font-InterRegular text-center">
+          No open positions
+        </Text>
+      </View>
+    );
   }
 
-  const handleEdit = () => {
+  const handleToggleExpansion = (orderId: string) => {
+    setExpandedTrades((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
+
+  const handleEdit = (trade: OpenTradesData['open_trades'][number]) => {
     setTimeout(() => {
-      onEdit(position);
+      onEdit(trade);
     }, 100);
-  }
+  };
 
-  const handleClose = () => {
+  const handleClose = (trade: OpenTradesData['open_trades'][number]) => {
     setTimeout(() => {
-      onClose(position);
+      onClose(trade);
     }, 100);
-  }
+  };
 
   return (
-    <View className="bg-propfirmone-300 rounded-md m-2 shadow-lg">
-      {/* Main Position Row */}
-      <TouchableOpacity
-        className="flex-row items-center justify-between p-4"
-        onPress={handleToggleExpansion}
-        activeOpacity={0.7}
-      >
-        <View className="flex-1">
-          <View className="flex-row items-center mb-1">
-            {/* Dynamic flag display using actual currency flags */}
-            <View style={{ flexDirection: 'row' }}>
-              <Image
-                source={fromFlagImage}
-                style={{ width: 18, height: 18 }}
-              />
-              <Image
-                source={toFlagImage}
-                style={{ width: 18, height: 18, marginLeft: -6 }}
-              />
-            </View>
-            <Text className="text-white font-InterSemiBold text-base ml-2">
-              {position.symbol}
-            </Text>
-          </View>
+    <View className="flex flex-col gap-4 p-4">
+      {openTrades.map((trade) => {
+        const { from, to } = getCurrencyFlags(trade.symbol);
+        const fromFlagImage = getCurrencyFlagImage(from);
+        const toFlagImage = getCurrencyFlagImage(to);
+        const isExpanded = expandedTrades[trade.order_id];
 
-          {/* Bottom row - Position Type and Size with enhanced formatting */}
-          <View className="flex-row items-center">
-            <PositionTypeValue type={position.position_type} />
-            <Text className="text-gray-400 font-InterRegular mx-1">/</Text>
-            <Text className="text-white font-InterRegular">{position.quantity}</Text>
-            <Text className="text-gray-400 font-InterRegular ml-1">Size</Text>
-          </View>
-        </View>
-
-        {/* Right side - P/L and Actions */}
-        <View className="items-end">
-          <View className="flex-row items-center mb-2">
-            <DirectionValue
-              value={position.pl}
-              prefix="$"
-              colorized
-              decimals={2}
-            />
-            <Text className="text-gray-400 font-InterRegular ml-1 text-xs">P/L</Text>
-          </View>
-
-          <View className="flex-row items-center space-x-2">
+        return (
+          <View key={trade.order_id} className="bg-propfirmone-300 rounded-md shadow-lg">
+            {/* Main Position Row */}
             <TouchableOpacity
-              className="w-8 h-8 border border-gray-800 rounded-lg items-center justify-center mr-1"
-              onPress={handleEdit}
+              className="flex-row items-center justify-between p-4"
+              onPress={() => handleToggleExpansion(trade.order_id)}
               activeOpacity={0.7}
             >
-              <Pencil size={12} color="white" />
+              <View className="flex-1">
+                <View className="flex-row items-center mb-1">
+                  {/* Dynamic flag display using actual currency flags */}
+                  <View style={{ flexDirection: 'row' }}>
+                    <Image
+                      source={fromFlagImage}
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <Image
+                      source={toFlagImage}
+                      style={{ width: 18, height: 18, marginLeft: -6 }}
+                    />
+                  </View>
+                  <Text className="text-white font-InterSemiBold text-base ml-2">
+                    {trade.symbol}
+                  </Text>
+                </View>
+
+                {/* Bottom row - Position Type and Size with enhanced formatting */}
+                <View className="flex-row items-center">
+                  <PositionTypeValue type={trade.position_type} />
+                  <Text className="text-gray-400 font-InterRegular mx-1">/</Text>
+                  <Text className="text-white font-InterRegular">{trade.quantity}</Text>
+                  <Text className="text-gray-400 font-InterRegular ml-1">Size</Text>
+                </View>
+              </View>
+
+              {/* Right side - P/L and Actions */}
+              <View className="items-end">
+                <View className="flex-row items-center mb-2">
+                  <DirectionValue
+                    value={trade.pl}
+                    prefix="$"
+                    colorized
+                    decimals={2}
+                  />
+                  <Text className="text-gray-400 font-InterRegular ml-1 text-xs">P/L</Text>
+                </View>
+
+                <View className="flex-row items-center space-x-2">
+                  <TouchableOpacity
+                    className="w-8 h-8 border border-gray-800 rounded-lg items-center justify-center mr-1"
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleEdit(trade);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Pencil size={12} color="white" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center mr-1"
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleClose(trade);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <X size={12} color="white" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="w-8 h-8 rounded items-center justify-center"
+                    onPress={() => handleToggleExpansion(trade.order_id)}
+                    activeOpacity={0.7}
+                  >
+                    {isExpanded ?
+                      <ChevronUp size={16} color="white" /> :
+                      <ChevronDown size={16} color="white" />
+                    }
+                  </TouchableOpacity>
+                </View>
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center mr-1"
-              onPress={handleClose}
-              activeOpacity={0.7}
-            >
-              <X size={12} color="white" />
-            </TouchableOpacity>
+            {/* Enhanced Expanded Details with better formatting */}
+            {isExpanded && (
+              <View className="px-4 pb-4 bg-gray-850 border-t border-gray-700">
+                <View className="mt-3 space-y-3">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">Entry:</Text>
+                    <DirectionValue
+                      value={trade.entry}
+                      prefix="$"
+                      decimals={2}
+                    />
+                  </View>
 
-            <TouchableOpacity
-              className="w-8 h-8 rounded items-center justify-center"
-              onPress={handleToggleExpansion}
-              activeOpacity={0.7}
-            >
-              {isExpanded ?
-                <ChevronUp size={16} color="white" /> :
-                <ChevronDown size={16} color="white" />
-              }
-            </TouchableOpacity>
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">Fees:</Text>
+                    <DirectionValue
+                      value={trade.fees}
+                      prefix="$"
+                      colorized
+                      decimals={2}
+                    />
+                  </View>
+
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">TP:</Text>
+                    <Text className="text-white font-InterMedium text-sm">
+                      {trade.tp ? trade.tp.toFixed(2) : (
+                        <Text className="text-gray-400">-</Text>
+                      )}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
+                    <Text className="text-white font-InterMedium text-sm">
+                      {trade.sl ? trade.sl.toFixed(2) : (
+                        <Text className="text-gray-400">-</Text>
+                      )}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">ROI:</Text>
+                    <DirectionValue
+                      value={trade.roi}
+                      suffix="%"
+                      colorized
+                      decimals={2}
+                    />
+                  </View>
+
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-gray-400 font-InterMedium text-sm">Open (GMT):</Text>
+                    <Text className="text-white font-InterMedium text-sm">
+                      {formatDateTime(trade.open_time)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
-        </View>
-      </TouchableOpacity>
-
-      {/* Enhanced Expanded Details with better formatting */}
-      {isExpanded && (
-        <View className="px-4 pb-4 bg-gray-850 border-t border-gray-700">
-          <View className="mt-3 space-y-3">
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">Entry:</Text>
-              <DirectionValue
-                value={position.entry}
-                prefix="$"
-                decimals={2}
-              />
-            </View>
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">Fees:</Text>
-              <DirectionValue
-                value={position.fees}
-                prefix="$"
-                colorized
-                decimals={2}
-              />
-            </View>
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">TP:</Text>
-              <Text className="text-white font-InterMedium text-sm">
-                {position.tp ? position.tp.toFixed(2) : (
-                  <Text className="text-gray-400">-</Text>
-                )}
-              </Text>
-            </View>
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
-              <Text className="text-white font-InterMedium text-sm">
-                {position.sl ? position.sl.toFixed(2) : (
-                  <Text className="text-gray-400">-</Text>
-                )}
-              </Text>
-            </View>
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">ROI:</Text>
-              <DirectionValue
-                value={position.roi}
-                suffix="%"
-                colorized
-                decimals={2}
-              />
-            </View>
-
-            <View className="flex-row justify-between items-center">
-              <Text className="text-gray-400 font-InterMedium text-sm">Open (GMT):</Text>
-              <Text className="text-white font-InterMedium text-sm">
-                {formatDateTime(position.open_time)}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
+        );
+      })}
     </View>
   );
 };

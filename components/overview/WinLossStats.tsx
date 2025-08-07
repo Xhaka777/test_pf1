@@ -100,10 +100,12 @@ export const WinLossStats = ({
       {/* Bottom amounts */}
       <View className="flex-row justify-between">
         <Text className="text-green-400 font-bold text-sm">
-          ${winAmount.toLocaleString()}
+          {/* ${winAmount.toLocaleString()} */}
+          ${winAmount}
         </Text>
         <Text className="text-red-500 font-bold text-sm">
-          -${lossAmount.toLocaleString()}
+          {/* -${lossAmount.toLocaleString()} */}
+          -${lossAmount}
         </Text>
       </View>
     </View>

@@ -5,216 +5,266 @@ import images from "@/constants/images";
 import { OpenTradesData } from "@/api/schema/trade-service";
 import { useCancelOrderMutation } from "@/api/hooks/trade-service";
 import { useAccounts } from "@/providers/accounts";
-import { number } from "zod";
-import { getCurrencyFlags } from "@/api/utils/currency-trade";
-
+import { getCurrencyFlags, CurrencyCodeEnum } from "@/api/utils/currency-trade";
 
 export type OpenOrdersListProps = {
     openOrders: OpenTradesData['open_orders'];
     oneClickTradingEnabled?: boolean;
     onEditOrder?: (order: OpenTradesData['open_orders'][number]) => void;
-    onCancelOrder?: (order: OpenTradesData['open_orders'][number]) => void;
+    onClose?: (order: OpenTradesData['open_orders'][number]) => void;
 }
 
-function OrderCard(props: OpenOrdersListProps) {
+const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
+    const flagMap = {
+        [CurrencyCodeEnum.USD]: images.usa_png,
+        [CurrencyCodeEnum.EUR]: images.eur_png,
+        [CurrencyCodeEnum.GBP]: images.gbp_png,
+        [CurrencyCodeEnum.JPY]: images.jpy_png,
+        [CurrencyCodeEnum.AUD]: images.aud_png,
+        [CurrencyCodeEnum.CAD]: images.cad_png,
+        [CurrencyCodeEnum.CHF]: images.chf_png,
+        [CurrencyCodeEnum.NZD]: images.nzd_png,
+        [CurrencyCodeEnum.BTC]: images.btc_png,
+        [CurrencyCodeEnum.USDT]: images.usdt_png,
+        [CurrencyCodeEnum.UKNOWN]: images.usa_png,
+    };
+    return flagMap[currency] || images.usa_png;
+};
 
-    const { openOrders, oneClickTradingEnabled = false, onEditOrder, onCancelOrder } = props;
+const DirectionValue: React.FC<{
+    value: number;
+    prefix?: string;
+    suffix?: string;
+    colorized?: boolean;
+    decimals?: number;
+}> = ({ value, prefix = '', suffix = '', colorized = false, decimals = 2 }) => {
+    const isPositive = value >= 0;
+    const colorClass = colorized
+        ? (isPositive ? 'text-success-main' : 'text-red-500')
+        : 'text-white';
+
+    return (
+        <Text className={`font-InterRegular ${colorClass}`}>
+            {prefix}{value.toFixed(decimals)} {suffix}
+        </Text>
+    );
+};
+
+const PositionTypeValue: React.FC<{ type: string }> = ({ type }) => {
+    const colorClass = type === 'BUY' || type === 'LONG' || type.toLowerCase().includes('buy') || type.toLowerCase().includes('long')
+        ? 'text-success-main'
+        : 'text-red-500';
+    return (
+        <Text className={`font-InterRegular ${colorClass}`}>
+            {type}
+        </Text>
+    );
+};
+
+const formatDateTime = (dateString: string): string => {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        });
+    } catch (error) {
+        return dateString;
+    }
+};
+
+function OrderCard(props: OpenOrdersListProps) {
+    const { openOrders, oneClickTradingEnabled = false, onEditOrder, onClose } = props;
     const { mutateAsync: cancelOrder } = useCancelOrderMutation();
     const { selectedAccountId } = useAccounts();
 
     const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
-    const [currentOrder, setCurrentOrder] = useState<OpenTradesData['open_orders'][number] | null>(null);
-    const [editOrderDialogVisible, setEditOrderDialogVisible] = useState(false);
 
     if (!openOrders.length) {
         return (
             <View className="flex-1 items-center justify-center p-8">
-                <Text className="text-gray-400 text-center text-base">No open orders</Text>
+                <Text className="text-gray-400 font-InterRegular text-center">
+                    No open orders
+                </Text>
             </View>
-        )
+        );
     }
 
     const handleToggleExpansion = useCallback((orderId: string) => {
         setExpandedOrders((prev) => ({
             ...prev,
             [orderId]: !prev[orderId],
-        }))
+        }));
     }, []);
 
     const handleEdit = useCallback((order: OpenTradesData['open_orders'][number]) => {
         if (onEditOrder) {
-            onEditOrder(order);
+            setTimeout(() => {
+                onEditOrder(order);
+            }, 100);
         }
     }, [onEditOrder]);
 
-    const handleCancelOrder = useCallback(async (order: OpenTradesData['open_orders'][number]) => {
-        if (onCancelOrder) {
-            onCancelOrder(order);
+    const handleClose = useCallback(async (order: OpenTradesData['open_orders'][number]) => {
+        if (onClose) {
+            setTimeout(() => {
+                onClose(order);
+            }, 100);
             return;
         }
 
+        // Fallback to direct cancel if no onClose handler
         try {
-            //
-            if (!oneClickTradingEnabled) {
-
-            }
-
             await cancelOrder({
                 symbol: order.symbol,
                 account: selectedAccountId,
                 order_id: order.order_id,
-            })
-            //
+            });
             console.log(`Order "${order.order_id}" canceled successfully`);
         } catch (error) {
             console.error(`Failed to cancel order:`, error);
         }
-    }, [onCancelOrder, cancelOrder, selectedAccountId, oneClickTradingEnabled]);
-
-    const getCurrencyImages = (symbol: string) => {
-        const { from, to } = getCurrencyFlags(symbol);
-
-        // Map currency codes to your local images from constants
-        const getLocalImage = (currencyCode: string) => {
-            switch (currencyCode) {
-                case 'AUD':
-                    return images.aud_png; // Add this to your images constants
-                case 'BTC':
-                    return images.btc_png; // Add this to your images constants
-                case 'EUR':
-                    return images.eur_png; // Add this to your images constants
-                case 'CHF':
-                    return images.chf_png; // Add this to your images constants
-                case 'JPY':
-                    return images.jpy_png; // Add this to your images constants
-                case 'GBP':
-                    return images.gbp_png; // Add this to your images constants
-                case 'NZD':
-                    return images.nzd_png; // Add this to your images constants
-                case 'CAD':
-                    return images.cad_png; // Add this to your images constants
-                case 'USD':
-                case 'USDT':
-                    return images.usa_png; // Your existing USA flag
-                case 'UNKNOWN':
-                default:
-                    return images.usa_png; // Fallback to USA flag
-            }
-        };
-
-        return {
-            fromImage: getLocalImage(from),
-            toImage: getLocalImage(to),
-        };
-    };
-
+    }, [onClose, cancelOrder, selectedAccountId]);
 
     return (
-        <View className="flex-1 p-4">
+        <View className="flex flex-col gap-4 p-4">
             {openOrders.map((order) => {
+                const { from, to } = getCurrencyFlags(order.symbol);
+                const fromFlagImage = getCurrencyFlagImage(from);
+                const toFlagImage = getCurrencyFlagImage(to);
                 const isExpanded = expandedOrders[order.order_id];
-                const { fromImage, toImage } = getCurrencyImages(order.symbol);
 
                 return (
-                    <View key={order.order_id} className="bg-propfirmone-300 rounded-md mb-4 shadow-lg">
+                    <View key={order.order_id} className="bg-propfirmone-300 rounded-md shadow-lg">
+                        {/* Main Order Row */}
                         <TouchableOpacity
                             className="flex-row items-center justify-between p-4"
                             onPress={() => handleToggleExpansion(order.order_id)}
+                            activeOpacity={0.7}
                         >
                             <View className="flex-1">
                                 <View className="flex-row items-center mb-1">
+                                    {/* Dynamic flag display using actual currency flags */}
                                     <View style={{ flexDirection: 'row' }}>
-
                                         <Image
-                                            source={fromImage}
+                                            source={fromFlagImage}
                                             style={{ width: 18, height: 18 }}
                                         />
-                                        <Image source={toImage}
+                                        <Image
+                                            source={toFlagImage}
                                             style={{ width: 18, height: 18, marginLeft: -6 }}
                                         />
                                     </View>
-                                    <Text className="text-white text-base font-InterSemiBold ml-2">
+                                    <Text className="text-white font-InterSemiBold text-base ml-2">
                                         {order.symbol}
                                     </Text>
                                 </View>
+
+                                {/* Bottom row - Order Type and Size */}
                                 <View className="flex-row items-center">
-                                    <Text className={`font-InterRegular text-base mr-2 ${order.position_type === 'BUY' || order.position_type === 'LONG'
-                                        ? 'text-green-500'
-                                        : 'text-red-500'
-                                        }`}>
-                                        {order.position_type}
-                                    </Text>
-                                    <Text className="font-InterRegular text-base text-gray-400">
-                                        / {order.quantity} Size
-                                    </Text>
+                                    <PositionTypeValue type={order.position_type} />
+                                    <Text className="text-gray-400 font-InterRegular mx-1">/</Text>
+                                    <Text className="text-white font-InterRegular">{order.quantity}</Text>
+                                    <Text className="text-gray-400 font-InterRegular ml-1">Size</Text>
                                 </View>
                             </View>
 
-                            <View className="flex-row space-x-2">
-                                <TouchableOpacity
-                                    className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center"
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        handleEdit(order);
-                                    }}
-                                >
-                                    <Pencil size={18} color="white" />
-                                </TouchableOpacity>
+                            {/* Right side - Price and Actions */}
+                            <View className="items-end">
+                                <View className="flex-row items-center mb-2">
+                                    <DirectionValue
+                                        value={order.price}
+                                        prefix="$"
+                                        decimals={2}
+                                    />
+                                    <Text className="text-gray-400 font-InterRegular ml-1 text-xs">Price</Text>
+                                </View>
 
-                                <TouchableOpacity
-                                    className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center"
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        handleCancelOrder(order);
-                                    }}
-                                >
-                                    <X size={18} color="white" />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center"
-                                    onPress={() => handleToggleExpansion(order.order_id)}
-                                >
-                                    {isExpanded ? (
-                                        <ChevronUp size={18} color="white" />
-                                    ) : (
-                                        <ChevronDown size={18} color="white" />
+                                <View className="flex-row items-center space-x-2">
+                                    {onEditOrder && (
+                                        <TouchableOpacity
+                                            className="w-8 h-8 border border-gray-800 rounded-lg items-center justify-center mr-1"
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                handleEdit(order);
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Pencil size={12} color="white" />
+                                        </TouchableOpacity>
                                     )}
-                                </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        className="w-8 h-8 border border-gray-700 rounded-lg items-center justify-center mr-1"
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handleClose(order);
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <X size={12} color="white" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        className="w-8 h-8 rounded items-center justify-center"
+                                        onPress={() => handleToggleExpansion(order.order_id)}
+                                        activeOpacity={0.7}
+                                    >
+                                        {isExpanded ?
+                                            <ChevronUp size={16} color="white" /> :
+                                            <ChevronDown size={16} color="white" />
+                                        }
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </TouchableOpacity>
 
+                        {/* Enhanced Expanded Details */}
                         {isExpanded && (
-                            <View className="px-4 pb-4 bg-gray-850">
-                                <View className="space-y-2">
-                                    <View className="flex-row justify-between">
+                            <View className="px-4 pb-4 bg-gray-850 border-t border-gray-700">
+                                <View className="mt-3 space-y-3">
+                                    <View className="flex-row justify-between items-center">
                                         <Text className="text-gray-400 font-InterMedium text-sm">ID:</Text>
                                         <Text className="text-white font-InterMedium text-sm">{order.order_id}</Text>
                                     </View>
-                                    <View className="flex-row justify-between">
+
+                                    <View className="flex-row justify-between items-center">
                                         <Text className="text-gray-400 font-InterMedium text-sm">TP:</Text>
                                         <Text className="text-white font-InterMedium text-sm">
-                                            {order.tp ? order.tp.toFixed(2) : '-'}
+                                            {order.tp ? order.tp.toFixed(2) : (
+                                                <Text className="text-gray-400">-</Text>
+                                            )}
                                         </Text>
                                     </View>
 
-                                    <View className="flex-row justify-between">
+                                    <View className="flex-row justify-between items-center">
                                         <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
-                                        <Text className="text-white font-InterMedium text-sm">{order.sl ? order.sl.toFixed(2) : '-'}</Text>
+                                        <Text className="text-white font-InterMedium text-sm">
+                                            {order.sl ? order.sl.toFixed(2) : (
+                                                <Text className="text-gray-400">-</Text>
+                                            )}
+                                        </Text>
                                     </View>
 
-                                    <View className="flex-row justify-between">
+                                    <View className="flex-row justify-between items-center">
                                         <Text className="text-gray-400 font-InterMedium text-sm">Placed (GMT):</Text>
-                                        <Text className="text-gray-400 font-InterMedium text-sm">{order.placed_time}</Text>
+                                        <Text className="text-white font-InterMedium text-sm">
+                                            {formatDateTime(order.placed_time)}
+                                        </Text>
                                     </View>
                                 </View>
                             </View>
                         )}
                     </View>
-                )
+                );
             })}
         </View>
-    )
+    );
 }
 
 export default OrderCard;

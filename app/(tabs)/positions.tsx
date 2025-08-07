@@ -1,47 +1,23 @@
 import React, { useCallback, useRef, useMemo, useEffect, useState } from "react";
 import Header from "@/components/Header/header";
-import { useAccounts, useBrokerAccounts } from "@/hooks";
-import { ActivityIndicator, Alert, BackHandler, Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { ChevronDown, ChevronsUpDown, ChevronUp, Edit, Pencil, X } from "lucide-react-native";
-import images from "@/constants/images";
+import { useAccounts } from "@/providers/accounts"; 
+import { ActivityIndicator, Alert, BackHandler, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { X } from "lucide-react-native";
 import BottomSheet, { BottomSheetModal } from "@gorhom/bottom-sheet";
 import EditPositionBottomSheet from "@/components/EditPositionBottomSheet";
 import ClosePositionBottomSheet from "@/components/ClosePositionBottomSheet";
 import PositionCard from "@/components/positions/PositionCard";
 import OrderCard from "@/components/positions/OrderCard";
-import { tags } from "react-native-svg/lib/typescript/xmlTags";
 import HistoryCard from "@/components/positions/HistoryCard";
 import ScreenShotBottomSheet from "@/components/ScreenShotBottomsheet";
 import { useFocusEffect } from "expo-router";
 import { useOpenPositionsWS } from "@/providers/open-positions";
-import { useCloseAllTradesMutation, useGetOpenTradesQuery, useSyncTradesMutation } from "@/api/hooks/trade-service";
+import { useCloseAllTradesMutation, useSyncTradesMutation } from "@/api/hooks/trade-service";
 import { useGetTradeHistory } from "@/api/hooks/trade-history";
 import { CloseTypeEnum, OpenTradesData } from "@/api/schema";
 import { StatusEnum } from "@/api/services/api";
 import { parseOrdersArray, parseTradesArray } from "@/utils/data-parsing";
-import { oneClickTradingEnabledAtom } from "@/atoms";
 import { useOpenTradesManager } from "@/api/hooks/use-open-trades-manager";
-
-// Types
-interface Position {
-  id: string;
-  symbol: string;
-  type: 'LONG' | 'SHORT';
-  size: number;
-  pnl: number;
-  entry: number;
-  fees: number;
-  tp?: number;
-  sl?: number;
-  roi: number;
-  openTime: string;
-}
-
-interface TabData {
-  openPositions: Position[];
-  openOrders: any[];
-  orderHistory: any[];
-}
 
 enum TabId {
   OpenPositions = 'open-positions',
@@ -53,39 +29,47 @@ type AlertType = 'sync' | 'closeProfits' | 'closeLosses' | 'closeAll' | null;
 
 const Positions = () => {
   const [activeTab, setActiveTab] = useState<TabId>(TabId.OpenPositions);
-  const [expandedPositions, setExpandedPositions] = useState<Set<string>>(new Set());
-  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
-  const [selectedHistory, setSelectedHistory] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingAction, setLoadingAction] = useState<string>('');
   const [currentAlert, setCurrentAlert] = useState<AlertType>(null);
   const [alertTimeoutId, setAlertTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string>('');
+
+  // Bottom sheet visibility states - matching web pattern
+  const [editPositionDialogVisible, setEditPositionDialogVisible] = useState(false);
+  const [closePositionDialogVisible, setClosePositionDialogVisible] = useState(false);
+  const [screenshotPositionDialogVisible, setScreenshotPositionDialogVisible] = useState(false);
+
+  // Current selected items for bottom sheets
+  const [currentPosition, setCurrentPosition] = useState<OpenTradesData['open_trades'][number] | null>(null);
+  const [currentOrder, setCurrentOrder] = useState<OpenTradesData['open_orders'][number] | null>(null);
+  const [currentHistory, setCurrentHistory] = useState<any>(null);
 
   const { selectedAccountId, selectedPreviewAccountId } = useAccounts();
   const { data } = useOpenPositionsWS();
   const prevCountsRef = useRef<{ trades: number; orders: number }>({
     trades: 0,
     orders: 0
-  })
+  });
 
-  const { data: openTrades, refetch: refetchTradeHistory } = useOpenTradesManager({
+  const { data: openTrades, refetch: refetchOpenTrades } = useOpenTradesManager({
     account: selectedPreviewAccountId ?? selectedAccountId,
-  })
+  });
 
   const { data: tradeHistory, refetch: refetchTradeHistory } = useGetTradeHistory({
     account: selectedPreviewAccountId ?? selectedAccountId,
     page
-  })
+  });
 
   const { mutateAsync: syncTrades } = useSyncTradesMutation();
   const { mutateAsync: closeAllTrades } = useCloseAllTradesMutation();
 
-  //Bottom sheet refs
+  // Bottom sheet refs
   const editBottomSheetRef = useRef<BottomSheetModal>(null);
   const closeBottomSheetRef = useRef<BottomSheetModal>(null);
   const screenShotBottomSheetRef = useRef<BottomSheetModal>(null);
 
+  // Table data logic - same as web version
   const tableData: OpenTradesData | null = useMemo(() => {
     const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
@@ -101,16 +85,16 @@ const Positions = () => {
           open_orders: data.open_orders || [],
           other_open_trades: [],
           other_open_orders: [],
-        }
+        };
       }
       return null;
     }
-    //
+
     const isWebSocketStale = data?.account && data.account !== currentAccountId;
     if (isWebSocketStale) {
       console.log('WebSocket data account mismatch detected - using API only',
         `WS: ${data?.account}, Current: ${currentAccountId}`
-      )
+      );
       return openTrades;
     }
 
@@ -118,13 +102,11 @@ const Positions = () => {
       return {
         account: openTrades.account,
         status: openTrades.status,
-        //
         open_trades: parseTradesArray(data.open_trades || []),
         open_orders: parseOrdersArray(data.open_orders || []),
-        //
         other_open_trades: parseTradesArray(openTrades.other_open_trades || []),
         other_open_orders: parseOrdersArray(openTrades.other_open_orders || []),
-      }
+      };
     }
 
     if (openTrades) {
@@ -134,12 +116,13 @@ const Positions = () => {
         open_orders: parseOrdersArray(openTrades.open_orders || []),
         other_open_trades: parseTradesArray(openTrades.other_open_trades || []),
         other_open_orders: parseOrdersArray(openTrades.other_open_orders || []),
-      }
+      };
     }
 
     return openTrades;
   }, [data, openTrades, selectedAccountId, selectedPreviewAccountId]);
 
+  // Refetch logic - same as web version
   useEffect(() => {
     const currentTrades = tableData?.open_trades?.length ?? 0;
     const currentOrders = tableData?.open_orders?.length ?? 0;
@@ -160,12 +143,13 @@ const Positions = () => {
     tableData?.open_orders?.length,
     refetchOpenTrades,
     refetchTradeHistory,
-  ])
+  ]);
 
   useEffect(() => {
     prevCountsRef.current = { trades: 0, orders: 0 };
-  }, [selectedAccountId])
+  }, [selectedAccountId]);
 
+  // Alert management
   const clearAlertTimeout = useCallback(() => {
     if (alertTimeoutId) {
       clearTimeout(alertTimeoutId);
@@ -185,6 +169,7 @@ const Positions = () => {
     setAlertTimeoutId(timeoutId);
   }, [clearAlertTimeout]);
 
+  // Trade actions - same logic as web
   const handleSyncTrades = useCallback(async () => {
     if (isLoading) return;
 
@@ -194,24 +179,25 @@ const Positions = () => {
     try {
       const response = await syncTrades({
         account: selectedPreviewAccountId ?? selectedAccountId
-      })
+      });
 
       if (response.status === StatusEnum.SUCCESS) {
         showAlert('sync', 5000);
-        setExpandedPositions(new Set());
       } else {
         Alert.alert('Error syncing trades', response.message);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+      setLoadingAction('');
     }
   }, [isLoading, showAlert, syncTrades, selectedAccountId, selectedPreviewAccountId]);
 
   const handleCloseTrades = useCallback(async (closeType: CloseTypeEnum) => {
     if (isLoading) return;
 
-    // Show confirmation dialog before proceeding
     const getConfirmationMessage = () => {
       switch (closeType) {
         case CloseTypeEnum.ALL:
@@ -286,27 +272,56 @@ const Positions = () => {
   const handleCloseLosses = useCallback(() => handleCloseTrades(CloseTypeEnum.LOSS), [handleCloseTrades]);
   const handleCloseAll = useCallback(() => handleCloseTrades(CloseTypeEnum.ALL), [handleCloseTrades]);
 
+  // Bottom sheet handlers - matching web pattern
+  const openEditModal = useCallback((position: OpenTradesData['open_trades'][number]) => {
+    setCurrentPosition(position);
+    setTimeout(() => {
+      setEditPositionDialogVisible(true);
+    }, 100);
+  }, []);
+
+  const openCloseModal = useCallback((item: OpenTradesData['open_trades'][number] | OpenTradesData['open_orders'][number]) => {
+    if ('position_type' in item) {
+      // It's a trade
+      setCurrentPosition(item as OpenTradesData['open_trades'][number]);
+    } else {
+      // It's an order
+      setCurrentOrder(item as OpenTradesData['open_orders'][number]);
+    }
+    setTimeout(() => {
+      setClosePositionDialogVisible(true);
+    }, 100);
+  }, []);
+
+  const openScreenShotModal = useCallback((history: any) => {
+    setCurrentHistory(history);
+    setTimeout(() => {
+      setScreenshotPositionDialogVisible(true);
+    }, 100);
+  }, []);
+
+  // Back handler
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        if (editBottomSheetRef.current) {
-          editBottomSheetRef.current.close();
+        if (editPositionDialogVisible) {
+          setEditPositionDialogVisible(false);
           return true;
         }
-        if (closeBottomSheetRef.current) {
-          closeBottomSheetRef.current.close();
+        if (closePositionDialogVisible) {
+          setClosePositionDialogVisible(false);
           return true;
         }
-        if (screenShotBottomSheetRef.current) {
-          screenShotBottomSheetRef.current.close();
+        if (screenshotPositionDialogVisible) {
+          setScreenshotPositionDialogVisible(false);
           return true;
-        }
+         }
         return false;
       };
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [])
+    }, [editPositionDialogVisible, closePositionDialogVisible, screenshotPositionDialogVisible])
   );
 
   useEffect(() => {
@@ -315,98 +330,14 @@ const Positions = () => {
     };
   }, [clearAlertTimeout]);
 
-  const openEditModal = useCallback((position: Position) => {
-    setSelectedPosition(position);
-    setTimeout(() => {
-      try {
-        editBottomSheetRef.current?.present();
-      } catch (error) {
-        console.error('Error opening edit modal:', error);
-      }
-    }, 100);
-  }, []);
-
-  const openCloseModal = useCallback((position: Position) => {
-    setSelectedPosition(position);
-    setTimeout(() => {
-      try {
-        closeBottomSheetRef.current?.present();
-      } catch (error) {
-        console.error('Error opening close modal:', error);
-      }
-    }, 100);
-  }, []);
-
-  const openScreenShotModal = useCallback((history: any) => {
-    setSelectedHistory(history);
-    setTimeout(() => {
-      try {
-        screenShotBottomSheetRef.current?.present();
-      } catch (error) {
-        console.error('Error opening screenshot modal:', error);
-      }
-    }, 100);
-  }, []);
-
-  const closeEditModal = useCallback(() => {
-    try {
-      editBottomSheetRef.current?.dismiss();
-      setSelectedPosition(null);
-    } catch (error) {
-      console.error('Error closing edit modal:', error);
-    }
-  }, []);
-
-  const closeCloseModal = useCallback(() => {
-    try {
-      closeBottomSheetRef.current?.dismiss();
-      setSelectedPosition(null);
-    } catch (error) {
-      console.error('Error closing close modal:', error);
-    }
-  }, []);
-
-  const closeScreenShotModal = useCallback(() => {
-    try {
-      screenShotBottomSheetRef.current?.dismiss();
-      setSelectedHistory(null);
-    } catch (error) {
-      console.error('Error closing screenshot modal:', error);
-    }
-  }, []);
-
-  const handleSavePosition = useCallback((formData: any) => {
-    console.log('Saving position changes:', formData);
-    console.log('For position:', selectedPosition);
-    closeEditModal();
-  }, [selectedPosition, closeEditModal]);
-
-  const handleClosePosition = useCallback((percentage: number, customAmount?: string) => {
-    closeCloseModal();
-  }, [closeCloseModal]);
-
-  const handleScreenShot = useCallback((history: any) => {
-    closeScreenShotModal();
-  }, [closeScreenShotModal]);
-
-  const toggleExpansion = useCallback((positionId: string) => {
-    setExpandedPositions(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(positionId)) {
-        newSet.delete(positionId);
-      } else {
-        newSet.add(positionId);
-      }
-      return newSet;
-    });
-  }, []);
-
+  // Tab data - dynamic based on tableData
   const tabData = useMemo(() => ({
     openPositions: tableData?.open_trades ?? [],
     openOrders: tableData?.open_orders ?? [],
     orderHistory: tradeHistory?.all_trades ?? []
   }), [tableData, tradeHistory]);
 
+  // Render functions
   const renderTabs = useMemo(() => (
     <View className="flex-row bg-[#100E0F] border-b border-gray-700">
       <TouchableOpacity
@@ -482,74 +413,45 @@ const Positions = () => {
     </View>
   ), [isLoading, loadingAction, handleSyncTrades, handleCloseProfits, handleCloseLosses, handleCloseAll]);
 
-
-
-
   const renderContent = useCallback(() => {
     switch (activeTab) {
       case TabId.OpenPositions:
         return (
           <ScrollView className="flex-1">
-            {tabData.openPositions.map(position => (
-              <PositionCard
-                key={position.id}
-                position={position}
-                isExpanded={expandedPositions.has(position.id)}
-                onToggleExpansion={toggleExpansion}
-                onEdit={openEditModal}
-                onClose={openCloseModal}
-              />
-            ))}
+            <PositionCard
+              openTrades={tabData.openPositions}
+              onEdit={openEditModal}
+              onClose={openCloseModal}
+            />
           </ScrollView>
         );
       case TabId.OpenOrders:
         return (
           <ScrollView className="flex-1">
-            {tabData.openOrders.length > 0 ? (
-              tabData.openOrders.map(order => (
-                <OrderCard
-                  openOrders={tabData?.openOrders ?? []}
-                  oneClickTradingEnabled={oneClickTradingEnabled}
-                  onEditOrder={openEditModal}
-                  onCancelOrder={openCloseModal}
-                />
-              ))
-            ) : (
-              <View className="flex-1 items-center justify-center">
-                <Text className="text-gray-400">No open orders</Text>
-              </View>
-            )}
+            <OrderCard
+              openOrders={tabData.openOrders}
+              onClose={openCloseModal}
+            />
           </ScrollView>
         );
       case TabId.OrderHistory:
         return (
           <ScrollView className="flex-1">
-            {tabData.orderHistory.length > 0 ? (
-              tabData.orderHistory.map(history => (
-                <HistoryCard
-                  key={history.id}
-                  history={history}
-                  isExpanded={expandedPositions.has(history.id)}
-                  onToggleExpansion={toggleExpansion}
-                  onScreenShot={openScreenShotModal}
-                />
-              ))
-            ) : (
-              <View className="flex-1 items-center justify-center">
-                <Text className="text-gray-400">No order history</Text>
-              </View>
-            )}
+            <HistoryCard
+              orderHistory={tabData.orderHistory}
+              page={page}
+              setPage={setPage}
+              total={tradeHistory?.total_count ?? 0}
+              onScreenShot={openScreenShotModal}
+            />
           </ScrollView>
         );
       default:
         return null;
     }
-  }, [activeTab, expandedPositions, toggleExpansion, openEditModal, openCloseModal, openScreenShotModal, tabData]);
+  }, [activeTab, tabData, page, tradeHistory, openEditModal, openCloseModal, openScreenShotModal]);
 
-  //Alert component
   const renderAlert = useCallback(() => {
-    if (currentAlert !== type) return null;
-
     if (!currentAlert) return null;
 
     const getAlertContent = () => {
@@ -577,7 +479,7 @@ const Positions = () => {
         default:
           return { title: '', message: '' };
       }
-    }
+    };
 
     const { title, message } = getAlertContent();
 
@@ -596,8 +498,8 @@ const Positions = () => {
           </TouchableOpacity>
         </View>
       </View>
-    )
-  }, [currentAlert])
+    );
+  }, [currentAlert]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#100E0F]">
@@ -606,26 +508,42 @@ const Positions = () => {
       {activeTab === TabId.OpenPositions && renderActionButtons}
       {renderContent()}
 
-      <EditPositionBottomSheet
-        ref={editBottomSheetRef}
-        position={selectedPosition}
-        onSave={handleSavePosition}
-        onClose={closeEditModal}
-      />
+      {/* Bottom Sheets - matching web pattern */}
+      {currentPosition && (
+        <EditPositionBottomSheet
+          isOpen={editPositionDialogVisible}
+          onClose={() => {
+            setEditPositionDialogVisible(false);
+            setTimeout(() => setCurrentPosition(null), 100);
+          }}
+          openTrade={currentPosition}
+        />
+      )}
 
-      <ClosePositionBottomSheet
-        ref={closeBottomSheetRef}
-        position={selectedPosition}
-        onClose={closeCloseModal}
-        onClosePosition={handleClosePosition}
-      />
+      {(currentPosition || currentOrder) && (
+        <ClosePositionBottomSheet
+          isOpen={closePositionDialogVisible}
+          onClose={() => {
+            setClosePositionDialogVisible(false);
+            setTimeout(() => {
+              setCurrentPosition(null);
+              setCurrentOrder(null);
+            }, 100);
+          }}
+          openTrade={currentPosition || currentOrder}
+        />
+      )}
 
-      <ScreenShotBottomSheet
-        ref={screenShotBottomSheetRef}
-        history={selectedHistory}
-        onClose={closeScreenShotModal}
-        onScreenShot={handleScreenShot}
-      />
+      {currentHistory && (
+        <ScreenShotBottomSheet
+          isOpen={screenshotPositionDialogVisible}
+          onClose={() => {
+            setScreenshotPositionDialogVisible(false);
+            setTimeout(() => setCurrentHistory(null), 100);
+          }}
+          history={currentHistory}
+        />
+      )}
 
       {renderAlert()}
 
@@ -649,6 +567,4 @@ const Positions = () => {
   );
 };
 
-
-
-export default Positions
+export default Positions;
