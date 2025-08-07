@@ -120,7 +120,6 @@ const TradingButtons = () => {
     const [clickedPositionType, setClickedPositionType] = useState(false);
     const [animatedHeight] = useState(new Animated.Value(40));
 
-    // Web logic - exactly as teammates
     const { selectedAccountId } = useAccounts();
     const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
     const [activeSymbol] = useActiveSymbol();

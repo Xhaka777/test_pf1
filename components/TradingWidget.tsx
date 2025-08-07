@@ -108,6 +108,8 @@ export function TradingWidget() {
 
     const spread = useMemo(() => {
         if (symbolData.ask && symbolData.bid) {
+            console.log('spread', spread);
+            console.log('object', symbolData.ask - symbolData.bid)
             return symbolData.ask - symbolData.bid;
         }
         return 0;
@@ -190,11 +192,11 @@ export function TradingWidget() {
                     <View className='min-h-[20px] justify-center'>
                         {spread ? (
                             <View>
-                                <Text className='text-sm lg:text-base text-yellow-500 font-medium'>
+                                {/* <Text className='text-sm lg:text-base text-yellow-500 font-medium'>
                                     {spread.toLocaleString('en-US', {
                                         maximumFractionDigits: spread.toString().length
                                     })}
-                                </Text>
+                                </Text> */}
                                 <Text className='text-xs text-gray-500'>
                                     ({spreadPercentage.toFixed(3)}%)
                                 </Text>

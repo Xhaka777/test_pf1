@@ -152,7 +152,7 @@ export function TradingPrices() {
                                         style={{ width: 18, height: 18, marginLeft: -6 }}
                                     />
                                 </View>
-                                <Text className="font-semibold text-sm text-black" numberOfLines={1}>
+                                <Text className="font-semibold text-sm text-white" numberOfLines={1}>
                                     {currency.symbol}
                                 </Text>
                             </View>
@@ -224,12 +224,12 @@ export function TradingPrices() {
     const modalContent = (
         <>
             {/* Search Container */}
-            <View className="p-4 bg-white">
-                <View className="flex-row items-center bg-gray-100 rounded-lg px-3 py-2">
+            <View className="p-4 bg-propfirmone-main">
+                <View className="flex-row items-center bg-propfirmone-200 border border-gray-800 rounded-lg px-3 py-2">
                     <SearchIcon />
                     <TextInput
                         ref={searchInputRef}
-                        className="flex-1 ml-2 text-base text-black"
+                        className="flex-1 ml-2 text-base text-white"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder={t('Search')}
@@ -257,7 +257,7 @@ export function TradingPrices() {
                     {tabs.map((tab) => (
                         <TouchableOpacity
                             key={tab.id}
-                            className={`px-3 py-2 rounded-md ${activeTab === tab.id ? 'bg-gray-200' : 'bg-gray-100'
+                            className={`px-3 py-2 rounded-md border border-gray-800 ${activeTab === tab.id ? 'bg-propfirmone-200' : 'bg-propfirmone-100'
                                 }`}
                             onPress={() => setActiveTab(tab.id as 'all' | 'favorites')}
                             accessible={true}
@@ -269,7 +269,7 @@ export function TradingPrices() {
                                 {tab.id === 'favorites' && (
                                     <Star size={12} color='#FFD700' fill='#FFD700' />
                                 )}
-                                <Text className={`text-sm ${activeTab === tab.id ? 'text-black' : 'text-gray-500'
+                                <Text className={`text-sm ${activeTab === tab.id ? 'text-white' : 'text-white'
                                     }`}>
                                     {tab.label}
                                 </Text>
@@ -331,10 +331,10 @@ export function TradingPrices() {
                 presentationStyle="pageSheet"
                 onRequestClose={handleModalClose}
             >
-                <View className="flex-1 bg-white">
+                <View className="flex-1 bg-propfirmone-main">
                     {/* Modal Header */}
                     <View className="flex-row justify-between items-center p-5 border-b border-gray-200">
-                        <Text className="text-lg font-semibold text-black">{t('Assets')}</Text>
+                        <Text className="text-lg font-semibold text-white">{t('Assets')}</Text>
                         <TouchableOpacity
                             className="p-2"
                             onPress={handleModalClose}

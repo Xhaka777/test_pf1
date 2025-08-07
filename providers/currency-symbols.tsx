@@ -35,7 +35,7 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 3; // ✅ Reduced from 5
+  const maxReconnectAttempts = 3;
 
   const connectWebSocket = useCallback(async () => {
     if (!isLoaded || !isSignedIn || !accountDetails || isConnectingRef.current) {
@@ -45,7 +45,6 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
     const { exchange, server } = accountDetails;
     if (!exchange || !server) return;
 
-    // ✅ Close existing connection gracefully
     if (socketRef.current) {
       socketRef.current.close(1000, 'Reconnecting');
       socketRef.current = null;
@@ -58,6 +57,7 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
       const wsToken = await tokenManager.getToken(getToken);
 
       console.log('[CurrencySymbols] Connecting with new auth system...');
+      console.log('wsToken', wsToken)
 
       const wsUrl = `wss://staging-server.propfirmone.com/all_prices?auth_key=${wsToken}`;
       const origin = 'https://staging.propfirmone.com';
@@ -71,12 +71,12 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
         setIsConnected(true);
         setError(null);
         isConnectingRef.current = false;
-        reconnectAttemptsRef.current = 0; // ✅ Reset on success
+        reconnectAttemptsRef.current = 0; 
 
         // Send subscription message
         if (socketRef.current?.readyState === WebSocket.OPEN) {
           const subscriptionMessage = getWsPriceRequest(exchange, server);
-          console.log('[CurrencySymbols] Sending subscription:', subscriptionMessage);
+          // console.log('[CurrencySymbols] Sending subscription:', subscriptionMessage);
           socketRef.current.send(subscriptionMessage);
         }
       };
@@ -141,7 +141,7 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
 
   const reconnect = useCallback(() => {
     console.log('[CurrencySymbols] Manual reconnection requested');
-    reconnectAttemptsRef.current = 0; // ✅ Reset attempts on manual reconnect
+    reconnectAttemptsRef.current = 0;
 
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -150,7 +150,7 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
     connectWebSocket();
   }, [connectWebSocket]);
 
-  // ✅ Connect only once when ready
+
   useEffect(() => {
     if (isLoaded && isSignedIn && accountDetails) {
       connectWebSocket();
@@ -164,7 +164,7 @@ export function CurrencySymbolProvider({ children }: { children: React.ReactNode
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [isLoaded, isSignedIn, accountDetails?.id]); // ✅ Only reconnect if account ID changes
+  }, [isLoaded, isSignedIn, accountDetails?.id]); 
 
   // Clear state on sign out
   useEffect(() => {

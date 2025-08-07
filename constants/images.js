@@ -7,21 +7,21 @@ import avatar80 from '../assets/images/Avatar80.png';
 import alpha_capital from '../assets/images/alpha_capital_group.png';
 import funding_pips from '../assets/images/funding_pips.png';
 import mini_funding_logo from '../assets/images/mini_funding_logo.png';
-import usa_png from '../assets/images/usa.png';
 import pl_frame from '../assets/images/pl_frame.png';
 import evaluation from '../assets/images/evaluation.svg';
 import brokerage from '../assets/images/brokerage.png';
 import practice from '../assets/images/practice.svg';
 import btc_png from '../assets/images/btc.png';
-import cad_png from '../assets/images/cad.png';
-import eth_png from '../assets/images/eth.png';
-import chf_png from '../assets/images/chf.png';
-import jpy_png from '../assets/images/jpy.png';
+import usa_png from '../assets/images/usa.png';
+import eur_png from '../assets/images/eur.png';
 import gbp_png from '../assets/images/gbp.png';
 import aud_png from '../assets/images/aud.png';
+import jpy_png from '../assets/images/jpy.png';
+import cad_png from '../assets/images/cad.png';
+import chf_png from '../assets/images/chf.png';
 import nzd_png from '../assets/images/nzd.png';
 import usdt_png from '../assets/images/usdt.png';
-import eur_png from '../assets/images/eur.png';
+import eth_png from '../assets/images/eth.png';
 
 export default {
     logo,
