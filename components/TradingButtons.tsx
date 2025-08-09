@@ -19,7 +19,6 @@ import { useGetSymbolInfo } from "@/api/hooks/metrics";
 import { useCreateTradeMutation } from "@/api/hooks/trade-service";
 import { OpenTradeInput } from "@/api/schema/trade-service"; 
 import { StatusEnum } from "@/api/services/api";
-// import { OpenTradeInput } from "@/api/schema/trade-service";
 
 // Complete web schema logic - exactly as your teammates have
 const getTradeFormSchema = (
@@ -111,14 +110,13 @@ const roundQuantity = (value: number) => {
 
 const TradingButtons = () => {
     const { t } = useTranslation();
-    const [isExpanded, setIsExpanded] = useState(false);
     const [selectedPositionType, setSelectedPositionType] = useState<PositionTypeEnum>(PositionTypeEnum.LONG);
-    const [selectedOrderType, setSelectedOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.MARKET);
     const [showSlTp, setShowSlTp] = useState(false);
-    const [takeProfitType, setTakeProfitType] = useState<TakeProfitSlTypeEnum | null>(null);
-    const [stopLossType, setStopLossType] = useState<TakeProfitSlTypeEnum | null>(null);
+    const [takeProfitType] = useState<TakeProfitSlTypeEnum | null>(null);
+    const [stopLossType] = useState<TakeProfitSlTypeEnum | null>(null);
     const [clickedPositionType, setClickedPositionType] = useState(false);
-    const [animatedHeight] = useState(new Animated.Value(40));
+    const [selectedOrderType, setSelectedOrderType] = useState<OrderTypeEnum>(OrderTypeEnum.MARKET);
+    const [animatedHeight] = useState(new Animated.Value(60)); // Start with collapsed height
 
     const { selectedAccountId } = useAccounts();
     const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
@@ -144,7 +142,7 @@ const TradingButtons = () => {
         };
     }, [activeSymbol, findCurrencyPairBySymbol]);
 
-    // Form setup with web logic
+    // Form setup with web logic - MATCH EXACTLY
     const methods = useForm<TradeFormValues>({
         resolver: zodResolver(
             getTradeFormSchema(
@@ -182,7 +180,7 @@ const TradingButtons = () => {
         return number?.toString();
     }, []);
 
-    // Buy at value calculation (web logic)
+    // Buy at value calculation (web logic) - MATCH EXACTLY
     const buyAtValue = useMemo(() => {
         if (selectedOrderType === OrderTypeEnum.MARKET && symbolData.marketPrice) {
             return ` @ ${symbolData.marketPrice.toLocaleString('en-US', {
@@ -255,20 +253,18 @@ const TradingButtons = () => {
                     keepValues: true,
                     keepIsSubmitSuccessful: false,
                 });
-                // Close the expanded view after successful submission
-                handleClose();
             },
         });
     };
 
+    // WEB LOGIC: Position select triggers expansion - MATCH EXACTLY
     const handlePositionSelect = (position: PositionTypeEnum) => {
-        setClickedPositionType(true);
+        setClickedPositionType(true); // This is the key state from web
         setSelectedPositionType(position);
-        methods.setValue('position', position);
-        setIsExpanded(true);
-
-        // Animate expansion - adjust height based on TP/SL state
-        const expandedHeight = showSlTp ? 380 : 300;
+        methods.setValue('position', position); // Set form value
+        
+        // Animate expansion
+        const expandedHeight = showSlTp ? 420 : 300;
         Animated.timing(animatedHeight, {
             toValue: expandedHeight,
             duration: 300,
@@ -277,22 +273,21 @@ const TradingButtons = () => {
         }).start();
     }
 
+    // WEB LOGIC: Close handler - MATCH EXACTLY
     const handleClose = () => {
+        // Reset form first
+        methods.reset();
+        setSelectedOrderType(OrderTypeEnum.MARKET);
+        setClickedPositionType(false); // Reset expansion state
+        setShowSlTp(false); // Reset TP/SL state
+        
         // Animate collapse
         Animated.timing(animatedHeight, {
-            toValue: 40,
+            toValue: 60, // Collapsed height
             duration: 300,
             easing: Easing.out(Easing.quad),
             useNativeDriver: false,
-        }).start(() => {
-            setIsExpanded(false);
-            setClickedPositionType(false);
-            setSelectedPositionType(PositionTypeEnum.LONG);
-            // Reset form completely
-            methods.reset();
-            setSelectedOrderType(OrderTypeEnum.MARKET);
-            setShowSlTp(false);
-        })
+        }).start();
     }
 
     const handleQuantityChange = (increment: number) => {
@@ -323,15 +318,15 @@ const TradingButtons = () => {
         methods.setValue('sl', roundedValue);
     }
 
-    const handleTpSlToggle = () => {
-        const newTpSlState = !showSlTp;
-        setShowSlTp(newTpSlState);
-        methods.setValue('showSlTp', newTpSlState);
-        methods.setValue('add_tp_sl', newTpSlState);
+    // WEB LOGIC: TP/SL toggle - MATCH EXACTLY
+    const handleTpSlToggle = (checked: boolean) => {
+        setShowSlTp(checked);
+        methods.setValue('showSlTp', checked);
+        methods.setValue('add_tp_sl', checked); // This is crucial for the form
 
         // Animate height change when TP/SL is toggled during expanded state
-        if (isExpanded) {
-            const newHeight = newTpSlState ? 380 : 300;
+        if (clickedPositionType) {
+            const newHeight = checked ? 420 : 300;
             Animated.timing(animatedHeight, {
                 toValue: newHeight,
                 duration: 200,
@@ -353,13 +348,11 @@ const TradingButtons = () => {
     const closeStopLossBottomSheet = () => stopLossBottomSheetRef.current?.close();
 
     const handleTakeProfitTypeSelect = (type: TakeProfitSlTypeEnum) => {
-        setTakeProfitType(type);
         methods.setValue('tp_type', type);
         closeTakeProfitBottomSheet();
     }
 
     const handleStopLossTypeSelect = (type: TakeProfitSlTypeEnum) => {
-        setStopLossType(type);
         methods.setValue('sl_type', type);
         closeStopLossBottomSheet();
     }
@@ -391,320 +384,307 @@ const TradingButtons = () => {
         </TouchableOpacity>
     );
 
-    if (!isExpanded) {
-        // Initial collapsed view - just Buy/Sell buttons
-        return (
-            <Animated.View
-                style={{ height: animatedHeight }}
-                className="bg-propfirmone-main rounded-lg px-2 m-2 overflow-hidden"
-            >
-                <View className="flex-row gap-2">
-                    <BuySellButtons
-                        selectedPositionType={selectedPositionType}
-                        onClickBuy={() => handlePositionSelect(PositionTypeEnum.LONG)}
-                        onClickSell={() => handlePositionSelect(PositionTypeEnum.SHORT)}
-                        isExpanded={false}
-                    />
-                </View>
-            </Animated.View>
-        );
-    }
-
     return (
         <FormProvider {...methods}>
             <Animated.View
                 style={{ height: animatedHeight }}
-                className="bg-propfirmone-main rounded-lg p-4 overflow-hidden mt-2"
+                className="bg-propfirmone-main rounded-lg px-2 m-2 overflow-hidden"
             >
-                {/* Top row: Buy/Sell + TP/SL checkbox + Close button */}
-                <View className="flex-row justify-between items-center">
-                    <View className="flex-row gap-2 flex-1">
-                        <BuySellButtons
-                            selectedPositionType={selectedPositionType}
-                            onClickBuy={() => {
-                                setSelectedPositionType(PositionTypeEnum.LONG);
-                                methods.setValue('position', PositionTypeEnum.LONG);
-                            }}
-                            onClickSell={() => {
-                                setSelectedPositionType(PositionTypeEnum.SHORT);
-                                methods.setValue('position', PositionTypeEnum.SHORT);
-                            }}
-                            isExpanded={true}
-                        />
-                    </View>
-
-                    <View className="flex-row items-center gap-3 ml-10">
-                        <CheckBox
-                            checked={showSlTp}
-                            onPress={handleTpSlToggle}
-                        />
-                        <View className="w-px h-5 bg-gray-600" />
-                        <TouchableOpacity onPress={handleClose}>
-                            <X size={20} color='#898587' />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Order type buttons */}
-                <View className="flex-row gap-2 mt-3">
-                    {Object.values(OrderTypeEnum).map((type) => (
-                        <TouchableOpacity
-                            key={type}
-                            className={`flex-1 py-2 rounded-md items-center justify-center ${
-                                selectedOrderType === type 
-                                    ? 'bg-[#252223] border border-[#898587]' 
-                                    : 'bg-[#1A1819]'
-                            }`}
-                            onPress={() => handleOrderTypeSelect(type)}
-                            activeOpacity={0.8}
-                            disabled={isPending}
+                <View className="p-2">
+                    {/* Top row: Buy/Sell + conditionally show TP/SL checkbox + Close button */}
+                    <View className="flex-row items-center">
+                        <View 
+                            className={`flex-row gap-2 ${clickedPositionType ? 'flex-1' : 'w-full'}`}
                         >
-                            <Text className={`text-sm font-InterSemiBold ${
-                                selectedOrderType === type ? 'text-white' : 'text-gray-400'
-                            }`}>
-                                {t(type.charAt(0).toUpperCase() + type.slice(1))}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                            <BuySellButtons
+                                selectedPositionType={selectedPositionType}
+                                onClickBuy={() => handlePositionSelect(PositionTypeEnum.LONG)}
+                                onClickSell={() => handlePositionSelect(PositionTypeEnum.SHORT)}
+                                isExpanded={clickedPositionType}
+                            />
+                        </View>
 
-                {/* Labels row */}
-                <View className="flex-row justify-between items-center mt-3">
-                    {selectedOrderType === OrderTypeEnum.MARKET ? (
+                        {clickedPositionType && (
+                            <View className="flex-row items-center gap-3 ml-4">
+                                <CheckBox
+                                    checked={showSlTp}
+                                    onPress={() => handleTpSlToggle(!showSlTp)}
+                                />
+                                <View className="w-px h-5 bg-gray-600" />
+                                <TouchableOpacity onPress={handleClose}>
+                                    <X size={20} color='#898587' />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Expanded content - only show when clickedPositionType is true */}
+                    {clickedPositionType && (
                         <>
-                            <Text className="text-gray-400 text-sm font-Inter">
-                                {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
-                            </Text>
-                            <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
-                        </>
-                    ) : (
-                        <>
-                            <Text className="text-gray-400 text-sm font-Inter">
-                                {selectedOrderType === OrderTypeEnum.LIMIT ? t('Limit Price') : t('Stop Price')}
-                            </Text>
-                            <View className="flex-row gap-4">
-                                <Text className="text-gray-400 text-sm font-Inter">
-                                    {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
-                                </Text>
-                                <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
-                            </View>
-                        </>
-                    )}
-                </View>
-
-                {/* Input section */}
-                {selectedOrderType === OrderTypeEnum.MARKET ? (
-                    // Market: Full-width quantity input only
-                    <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-500/50">
-                        <TouchableOpacity
-                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                            onPress={() => handleQuantityChange(-0.01)}
-                            activeOpacity={0.8}
-                            disabled={isPending}
-                        >
-                            <Minus size={16} strokeWidth={3} color='#898587' />
-                        </TouchableOpacity>
-
-                        <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
-                            <Text className="text-[#898587] text-base font-Inter">
-                                {currentQuantity.toFixed(2)}
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity
-                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                            onPress={() => handleQuantityChange(0.01)}
-                            activeOpacity={0.8}
-                            disabled={isPending}
-                        >
-                            <Plus size={16} strokeWidth={3} color='#898587' />
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    // Limit/Stop: Two inputs side by side
-                    <View className="flex-row gap-2 mt-3">
-                        {/* Price Input (Limit or Stop) */}
-                        <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
-                            <TouchableOpacity
-                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                onPress={() => handlePriceChange(-0.01)}
-                                activeOpacity={0.8}
-                                disabled={isPending}
-                            >
-                                <Minus size={16} strokeWidth={3} color='#898587' />
-                            </TouchableOpacity>
-
-                            <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
-                                <Text className="text-[#898587] text-base font-Inter">
-                                    {currentPrice.toFixed(5)}
-                                </Text>
-                            </View>
-
-                            <TouchableOpacity
-                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                onPress={() => handlePriceChange(0.01)}
-                                activeOpacity={0.8}
-                                disabled={isPending}
-                            >
-                                <Plus size={16} strokeWidth={3} color='#898587' />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Quantity Input */}
-                        <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
-                            <TouchableOpacity
-                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                onPress={() => handleQuantityChange(-0.01)}
-                                activeOpacity={0.8}
-                                disabled={isPending}
-                            >
-                                <Minus size={16} strokeWidth={3} color='#898587' />
-                            </TouchableOpacity>
-
-                            <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
-                                <Text className="text-[#898587] text-base font-Inter">
-                                    {currentQuantity.toFixed(2)}
-                                </Text>
-                            </View>
-
-                            <TouchableOpacity
-                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                onPress={() => handleQuantityChange(0.01)}
-                                activeOpacity={0.8}
-                                disabled={isPending}
-                            >
-                                <Plus size={16} strokeWidth={3} color='#898587' />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* TP/SL inputs - only show when checkbox is checked */}
-                {showSlTp && (
-                    <View className="flex-row gap-2 mt-3">
-                        {/* Take Profit Section */}
-                        <View className="flex-1">
-                            <Text className="text-white text-sm font-Inter mb-2">{t('Take Profit (TP)')}</Text>
-                            <View className="bg-[#1A1819] border border-gray-500/50 rounded-md">
-                                <View className="flex-row items-center">
+                            {/* Order type buttons */}
+                            <View className="flex-row gap-2 mt-3">
+                                {Object.values(OrderTypeEnum).map((type) => (
                                     <TouchableOpacity
-                                        className="py-3 px-3"
-                                        onPress={() => handleTpChange(-0.01)}
-                                        disabled={isPending}
-                                    >
-                                        <Minus size={12} color='#898587' />
-                                    </TouchableOpacity>
-                                    
-                                    <View className="flex-1 items-center">
-                                        <Text className="text-[#898587] text-sm font-Inter">
-                                            {currentTp.toFixed(2)}
-                                        </Text>
-                                    </View>
-                                    
-                                    <TouchableOpacity
-                                        className="py-3 px-3"
-                                        onPress={() => handleTpChange(0.01)}
-                                        disabled={isPending}
-                                    >
-                                        <Plus size={12} color='#898587' />
-                                    </TouchableOpacity>
-                                    
-                                    <View className="w-px h-5 bg-gray-600 mx-2" />
-                                    
-                                    <TouchableOpacity
-                                        className="flex-row items-center gap-1 pr-3"
-                                        onPress={openTakeProfitBottomSheet}
+                                        key={type}
+                                        className={`flex-1 py-2 rounded-md items-center justify-center ${
+                                            selectedOrderType === type 
+                                                ? 'bg-[#252223] border border-[#898587]' 
+                                                : 'bg-[#1A1819]'
+                                        }`}
+                                        onPress={() => handleOrderTypeSelect(type)}
                                         activeOpacity={0.8}
                                         disabled={isPending}
                                     >
-                                        <Text className="text-[#898587] text-sm font-Inter">
-                                            {takeProfitType === TakeProfitSlTypeEnum.PRICE ? t('Price') : t('Pips')}
+                                        <Text className={`text-sm font-InterSemiBold ${
+                                            selectedOrderType === type ? 'text-white' : 'text-gray-400'
+                                        }`}>
+                                            {t(type.charAt(0).toUpperCase() + type.slice(1))}
                                         </Text>
-                                        <ChevronDown size={16} color='#898587' />
                                     </TouchableOpacity>
-                                </View>
+                                ))}
                             </View>
-                        </View>
 
-                        {/* Stop Loss Section */}
-                        <View className="flex-1">
-                            <Text className="text-white text-sm font-Inter mb-2">{t('Stop Loss (SL)')}</Text>
-                            <View className="bg-[#1A1819] border border-gray-500/50 rounded-md">
-                                <View className="flex-row items-center">
-                                    <TouchableOpacity
-                                        className="py-3 px-3"
-                                        onPress={() => handleSlChange(-0.01)}
-                                        disabled={isPending}
-                                    >
-                                        <Minus size={12} color='#898587' />
-                                    </TouchableOpacity>
-                                    
-                                    <View className="flex-1 items-center">
-                                        <Text className="text-[#898587] text-sm font-Inter">
-                                            {currentSl.toFixed(2)}
+                            {/* Labels row */}
+                            <View className="flex-row justify-between items-center mt-3">
+                                {selectedOrderType === OrderTypeEnum.MARKET ? (
+                                    <>
+                                        <Text className="text-gray-400 text-sm font-Inter">
+                                            {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
                                         </Text>
-                                    </View>
-                                    
+                                        <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Text className="text-gray-400 text-sm font-Inter">
+                                            {selectedOrderType === OrderTypeEnum.LIMIT ? t('Limit Price') : t('Stop Price')}
+                                        </Text>
+                                        <View className="flex-row gap-4">
+                                            <Text className="text-gray-400 text-sm font-Inter">
+                                                {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
+                                            </Text>
+                                            <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+
+                            {/* Input section */}
+                            {selectedOrderType === OrderTypeEnum.MARKET ? (
+                                // Market: Full-width quantity input only
+                                <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-500/50">
                                     <TouchableOpacity
-                                        className="py-3 px-3"
-                                        onPress={() => handleSlChange(0.01)}
-                                        disabled={isPending}
-                                    >
-                                        <Plus size={12} color='#898587' />
-                                    </TouchableOpacity>
-                                    
-                                    <View className="w-px h-5 bg-gray-600 mx-2" />
-                                    
-                                    <TouchableOpacity
-                                        className="flex-row items-center gap-1 pr-3"
-                                        onPress={openStopLossBottomSheet}
+                                        className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                        onPress={() => handleQuantityChange(-0.01)}
                                         activeOpacity={0.8}
                                         disabled={isPending}
                                     >
-                                        <Text className="text-[#898587] text-sm font-Inter">
-                                            {stopLossType === TakeProfitSlTypeEnum.PRICE ? t('Price') : t('Pips')}
+                                        <Minus size={16} strokeWidth={3} color='#898587' />
+                                    </TouchableOpacity>
+
+                                    <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                        <Text className="text-[#898587] text-base font-Inter">
+                                            {currentQuantity.toFixed(2)}
                                         </Text>
-                                        <ChevronDown size={16} color='#898587' />
+                                    </View>
+
+                                    <TouchableOpacity
+                                        className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                        onPress={() => handleQuantityChange(0.01)}
+                                        activeOpacity={0.8}
+                                        disabled={isPending}
+                                    >
+                                        <Plus size={16} strokeWidth={3} color='#898587' />
                                     </TouchableOpacity>
                                 </View>
-                            </View>
-                        </View>
-                    </View>
-                )}
+                            ) : (
+                                // Limit/Stop: Two inputs side by side
+                                <View className="flex-row gap-2 mt-3">
+                                    {/* Price Input (Limit or Stop) */}
+                                    <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
+                                        <TouchableOpacity
+                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                            onPress={() => handlePriceChange(-0.01)}
+                                            activeOpacity={0.8}
+                                            disabled={isPending}
+                                        >
+                                            <Minus size={16} strokeWidth={3} color='#898587' />
+                                        </TouchableOpacity>
 
-                <TouchableOpacity
-                    className={`py-3 rounded-md items-center justify-center mt-3 ${
-                        selectedPositionType === PositionTypeEnum.LONG ? 'bg-[#31C48D]' : 'bg-red-500'
-                    }`}
-                    onPress={methods.handleSubmit(onSubmit)}
-                    activeOpacity={0.8}
-                    disabled={isPending}
-                >
-                    {isPending ? (
-                        <View className="flex-row items-center">
-                            <Loader2 size={16} color='#000' className="mr-2" />
-                            <Text className="text-[#000] text-base font-InterMedium ml-2">
-                                {t('Processing...')}
-                            </Text>
-                        </View>
-                    ) : (
-                        <Text className="text-[#000] text-base font-InterMedium">
-                            {selectedPositionType === PositionTypeEnum.LONG
-                                ? selectedOrderType === OrderTypeEnum.LIMIT
-                                    ? t('Buy Limit')
-                                    : selectedOrderType === OrderTypeEnum.STOP
-                                        ? t('Buy Stop')
-                                        : t('Buy')
-                                : selectedOrderType === OrderTypeEnum.LIMIT
-                                    ? t('Sell Limit')
-                                    : selectedOrderType === OrderTypeEnum.STOP
-                                        ? t('Sell Stop')
-                                        : t('Sell')
-                            }
-                            {buyAtValue}
-                        </Text>
+                                        <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                            <Text className="text-[#898587] text-base font-Inter">
+                                                {currentPrice.toFixed(5)}
+                                            </Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                            onPress={() => handlePriceChange(0.01)}
+                                            activeOpacity={0.8}
+                                            disabled={isPending}
+                                        >
+                                            <Plus size={16} strokeWidth={3} color='#898587' />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Quantity Input */}
+                                    <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-500/50">
+                                        <TouchableOpacity
+                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                            onPress={() => handleQuantityChange(-0.01)}
+                                            activeOpacity={0.8}
+                                            disabled={isPending}
+                                        >
+                                            <Minus size={16} strokeWidth={3} color='#898587' />
+                                        </TouchableOpacity>
+
+                                        <View className="bg-[#1A1819] flex-1 items-center justify-center py-3">
+                                            <Text className="text-[#898587] text-base font-Inter">
+                                                {currentQuantity.toFixed(2)}
+                                            </Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                            onPress={() => handleQuantityChange(0.01)}
+                                            activeOpacity={0.8}
+                                            disabled={isPending}
+                                        >
+                                            <Plus size={16} strokeWidth={3} color='#898587' />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* TP/SL inputs - only show when checkbox is checked */}
+                            {showSlTp && (
+                                <View className="flex-row gap-2 mt-3">
+                                    {/* Take Profit Section */}
+                                    <View className="flex-1">
+                                        <Text className="text-white text-sm font-Inter mb-2">{t('Take Profit (TP)')}</Text>
+                                        <View className="bg-[#1A1819] border border-gray-500/50 rounded-md">
+                                            <View className="flex-row items-center">
+                                                <TouchableOpacity
+                                                    className="py-3 px-3"
+                                                    onPress={() => handleTpChange(-0.01)}
+                                                    disabled={isPending}
+                                                >
+                                                    <Minus size={12} color='#898587' />
+                                                </TouchableOpacity>
+                                                
+                                                <View className="flex-1 items-center">
+                                                    <Text className="text-[#898587] text-sm font-Inter">
+                                                        {currentTp.toFixed(2)}
+                                                    </Text>
+                                                </View>
+                                                
+                                                <TouchableOpacity
+                                                    className="py-3 px-3"
+                                                    onPress={() => handleTpChange(0.01)}
+                                                    disabled={isPending}
+                                                >
+                                                    <Plus size={12} color='#898587' />
+                                                </TouchableOpacity>
+                                                
+                                                <View className="w-px h-5 bg-gray-600 mx-2" />
+                                                
+                                                <TouchableOpacity
+                                                    className="flex-row items-center gap-1 pr-3"
+                                                    onPress={openTakeProfitBottomSheet}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Text className="text-[#898587] text-sm font-Inter">
+                                                        {takeProfitType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
+                                                    </Text>
+                                                    <ChevronDown size={16} color='#898587' />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Stop Loss Section */}
+                                    <View className="flex-1">
+                                        <Text className="text-white text-sm font-Inter mb-2">{t('Stop Loss (SL)')}</Text>
+                                        <View className="bg-[#1A1819] border border-gray-500/50 rounded-md">
+                                            <View className="flex-row items-center">
+                                                <TouchableOpacity
+                                                    className="py-3 px-3"
+                                                    onPress={() => handleSlChange(-0.01)}
+                                                    disabled={isPending}
+                                                >
+                                                    <Minus size={12} color='#898587' />
+                                                </TouchableOpacity>
+                                                
+                                                <View className="flex-1 items-center">
+                                                    <Text className="text-[#898587] text-sm font-Inter">
+                                                        {currentSl.toFixed(2)}
+                                                    </Text>
+                                                </View>
+                                                
+                                                <TouchableOpacity
+                                                    className="py-3 px-3"
+                                                    onPress={() => handleSlChange(0.01)}
+                                                    disabled={isPending}
+                                                >
+                                                    <Plus size={12} color='#898587' />
+                                                </TouchableOpacity>
+                                                
+                                                <View className="w-px h-5 bg-gray-600 mx-2" />
+                                                
+                                                <TouchableOpacity
+                                                    className="flex-row items-center gap-1 pr-3"
+                                                    onPress={openStopLossBottomSheet}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Text className="text-[#898587] text-sm font-Inter">
+                                                        {stopLossType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
+                                                    </Text>
+                                                    <ChevronDown size={16} color='#898587' />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Submit Button */}
+                            <TouchableOpacity
+                                className={`py-3 rounded-md items-center justify-center mt-3 ${
+                                    selectedPositionType === PositionTypeEnum.LONG ? 'bg-[#31C48D]' : 'bg-red-500'
+                                }`}
+                                onPress={methods.handleSubmit(onSubmit)}
+                                activeOpacity={0.8}
+                                disabled={isPending}
+                            >
+                                {isPending ? (
+                                    <View className="flex-row items-center">
+                                        <Loader2 size={16} color='#000' className="mr-2" />
+                                        <Text className="text-[#000] text-base font-InterMedium ml-2">
+                                            {t('Processing...')}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text className="text-[#000] text-base font-InterMedium">
+                                        {selectedPositionType === PositionTypeEnum.LONG
+                                            ? selectedOrderType === OrderTypeEnum.LIMIT
+                                                ? t('Buy Limit')
+                                                : selectedOrderType === OrderTypeEnum.STOP
+                                                    ? t('Buy Stop')
+                                                    : t('Buy')
+                                            : selectedOrderType === OrderTypeEnum.LIMIT
+                                                ? t('Sell Limit')
+                                                : selectedOrderType === OrderTypeEnum.STOP
+                                                    ? t('Sell Stop')
+                                                    : t('Sell')
+                                        }
+                                        {buyAtValue}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </>
                     )}
-                </TouchableOpacity>
+                </View>
 
                 {/* Bottom Sheets */}
                 <TPBottomSheet

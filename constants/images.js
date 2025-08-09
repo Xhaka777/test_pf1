@@ -23,6 +23,21 @@ import nzd_png from '../assets/images/nzd.png';
 import usdt_png from '../assets/images/usdt.png';
 import eth_png from '../assets/images/eth.png';
 
+import cnh_png from '../assets/images/cnh.png'; // Chinese Yuan Offshore
+import czk_png from '../assets/images/czk.png'; // Czech Koruna
+import dkk_png from '../assets/images/dkk.png'; // Danish Krone
+import hkd_png from '../assets/images/hkd.png'; // Hong Kong Dollar
+import huf_png from '../assets/images/huf.png'; // Hungarian Forint
+import mxn_png from '../assets/images/mxn.png'; // Mexican Peso
+import nok_png from '../assets/images/nok.png'; // Norwegian Krone
+import pln_png from '../assets/images/pln.png'; // Polish Zloty
+import rub_png from '../assets/images/rub.png'; // Russian Ruble
+import sek_png from '../assets/images/sek.png'; // Swedish Krona
+import sgd_png from '../assets/images/sgd.png'; // Singapore Dollar
+import thb_png from '../assets/images/thb.png'; // Thai Baht
+import try_png from '../assets/images/try.png'; // Turkish Lira
+import zar_png from '../assets/images/zar.png'; // South African Rand
+
 export default {
     logo,
     frame,
@@ -47,5 +62,20 @@ export default {
     aud_png,
     nzd_png,
     usdt_png,
-    eur_png
+    eur_png,
+    cnh_png,
+    czk_png,
+    dkk_png,
+    hkd_png,
+    huf_png,
+    mxn_png,
+    nok_png,
+    pln_png,
+    rub_png,
+    sek_png,
+    sgd_png,
+    thb_png,
+    try_png,
+    zar_png,
+
 }

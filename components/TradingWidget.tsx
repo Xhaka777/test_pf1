@@ -78,13 +78,34 @@ const LivePrice = ({
 
 export function TradingWidget() {
     const { t } = useTranslation();
-    const [activeSymbol] = useActiveSymbol();
+    const [activeSymbol, setActiveSymbol] = useActiveSymbol();
     const { findCurrencyPairBySymbol } = useCurrencySymbol();
+    const { currencySymbols } = useCurrencySymbol();
+
     const [previousPrice, setPreviousPrice] = useState<{
         marketPrice: number | null;
         bid: number | null;
         ask: number | null;
     }>({ marketPrice: null, bid: null, ask: null });
+
+    // console.log('activeSymbol', activeSymbol)
+
+    useEffect(() => {
+        if (!activeSymbol && currencySymbols.length > 0) {
+            // Check if BTCUSD exists in the available symbols
+            const btcSymbol = currencySymbols.find(symbol => symbol.symbol === 'BTCUSD');
+
+            if (btcSymbol) {
+                console.log('Setting default symbol to BTCUSD');
+                setActiveSymbol('BTCUSD');
+            } else {
+                // Fallback to first available symbol if BTCUSD doesn't exist
+                console.log('BTCUSD not available, using first symbol:', currencySymbols[0].symbol);
+                setActiveSymbol(currencySymbols[0].symbol);
+            }
+        }
+    }, [activeSymbol, currencySymbols, setActiveSymbol]);
+
 
     const symbolData = useMemo(() => {
         const symbol = activeSymbol ? findCurrencyPairBySymbol(activeSymbol) : null;
@@ -108,8 +129,8 @@ export function TradingWidget() {
 
     const spread = useMemo(() => {
         if (symbolData.ask && symbolData.bid) {
-            console.log('spread', spread);
-            console.log('object', symbolData.ask - symbolData.bid)
+            // console.log('spread', spread);
+            // console.log('object', symbolData.ask - symbolData.bid)
             return symbolData.ask - symbolData.bid;
         }
         return 0;
@@ -185,18 +206,18 @@ export function TradingWidget() {
                     />
                 </View>
 
-                <View className='min-w-[75px] flex-1 lg:flex-none'>
+                {/* <View className='min-w-[75px] flex-1 lg:flex-none'>
                     <Text className='text-gray-400 text-xs lg:text-sm mb-1'>
                         {t('Spread')}
                     </Text>
                     <View className='min-h-[20px] justify-center'>
                         {spread ? (
                             <View>
-                                {/* <Text className='text-sm lg:text-base text-yellow-500 font-medium'>
+                                <Text className='text-sm lg:text-base text-yellow-500 font-medium'>
                                     {spread.toLocaleString('en-US', {
                                         maximumFractionDigits: spread.toString().length
                                     })}
-                                </Text> */}
+                                </Text>
                                 <Text className='text-xs text-gray-500'>
                                     ({spreadPercentage.toFixed(3)}%)
                                 </Text>
@@ -205,7 +226,7 @@ export function TradingWidget() {
                             <Skeleton width={60} height={20} />
                         )}
                     </View>
-                </View>
+                </View> */}
 
             </ScrollView>
         </View>

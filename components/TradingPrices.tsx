@@ -61,7 +61,7 @@ const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
         [CurrencyCodeEnum.NZD]: images.nzd_png,
         [CurrencyCodeEnum.BTC]: images.btc_png,
         [CurrencyCodeEnum.USDT]: images.usdt_png,
-        [CurrencyCodeEnum.UKNOWN]: images.usa_png,
+        [CurrencyCodeEnum.UNKNOWN]: images.usa_png,
     };
     return flagMap[currency] || images.usa_png;
 };
