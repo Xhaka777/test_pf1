@@ -1,0 +1,357 @@
+import React, { useRef, useState, useCallback, useMemo, RefObject } from "react";
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    TextInput,
+    Modal,
+    ScrollView,
+    Image,
+    ActivityIndicator
+} from 'react-native'
+import { getCurrencyFlags, CurrencyCodeEnum } from "@/api/utils/currency-trade";
+import { useTranslation } from 'react-i18next';
+import { useCurrencySymbol } from "@/providers/currency-symbols";
+import { useActiveSymbol } from "@/hooks/use-active-symbol";
+import { useFavorites } from "@/hooks/use-favorites";
+import { ChevronDown, Search, X, Star } from "lucide-react-native";
+import images from "@/constants/images";
+
+const ChevronDownIcon = () => (
+    <ChevronDown size={16} color='#6B7280' />
+)
+
+const SearchIcon = () => (
+    <Search size={16} color='#6B7280' />
+)
+
+const ClearIcon = () => (
+    <X size={16} color='#6B7280' />
+)
+
+const StarIcon = ({ filled = false, onPress }: { filled?: boolean; onPress: () => void }) => (
+    <TouchableOpacity
+        onPress={onPress}
+        className="p-1"
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={filled ? "Remove from favorites" : "Add to favorites"}
+    >
+        <Star
+            size={16}
+            color={filled ? '#FFD700' : '#6B7280'}
+            fill={filled ? '#FFD700' : 'transparent'}
+        />
+    </TouchableOpacity>
+)
+
+const Skeleton = () => (
+    <View className="h-5 bg-gray-200 rounded" />
+)
+
+const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
+    const flagMap = {
+        [CurrencyCodeEnum.USD]: images.usa_png,
+        [CurrencyCodeEnum.EUR]: images.eur_png,
+        [CurrencyCodeEnum.GBP]: images.gbp_png,
+        [CurrencyCodeEnum.JPY]: images.jpy_png,
+        [CurrencyCodeEnum.AUD]: images.aud_png,
+        [CurrencyCodeEnum.CAD]: images.cad_png,
+        [CurrencyCodeEnum.CHF]: images.chf_png,
+        [CurrencyCodeEnum.NZD]: images.nzd_png,
+        [CurrencyCodeEnum.BTC]: images.btc_png,
+        [CurrencyCodeEnum.USDT]: images.usdt_png,
+        [CurrencyCodeEnum.UNKNOWN]: images.usa_png,
+    };
+    return flagMap[currency] || images.usa_png;
+};
+
+export function TradingPrices() {
+    const { t } = useTranslation();
+    const [activeSymbol, setActiveSymbol] = useActiveSymbol();
+    const { currencySymbols, findCurrencyPairBySymbol } = useCurrencySymbol();
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+    const [isLoading, setIsLoading] = useState(false);
+    const searchInputRef = useRef<TextInput>(null);
+
+    const { favoriteSymbols, toggleFavorite: toggleFavoriteApi } = useFavorites();
+
+    const handleToggleFavorite = useCallback((symbol: string, event?: any) => {
+        event?.stopPropagation?.();
+        try {
+            toggleFavoriteApi(symbol);
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+        }
+    }, [toggleFavoriteApi])
+
+    const handleModalOpen = useCallback(() => {
+        setOpen(true);
+        // Focus search input after modal animation
+        setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, 300);
+    }, []);
+
+    const handleModalClose = useCallback(() => {
+        setOpen(false);
+        setSearchQuery('');
+    }, []);
+
+    const filteredCurrencySymbols = useMemo(() => {
+        return currencySymbols
+            .filter((currency) => {
+                if (activeTab === 'favorites' && !favoriteSymbols.includes(currency.symbol)) {
+                    return false;
+                }
+
+                if (!searchQuery) {
+                    return true;
+                }
+
+                return (
+                    currency.symbol === searchQuery ||
+                    currency.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+            })
+            .map((currency, index) => {
+                const { from, to } = getCurrencyFlags(currency.symbol);
+                const fromFlagImage = getCurrencyFlagImage(from);
+                const toFlagImage = getCurrencyFlagImage(to);
+                const isStarred = favoriteSymbols.includes(currency.symbol);
+
+                return (
+                    <TouchableOpacity
+                        key={currency.symbol}
+                        className="px-4 py-2"
+                        onPress={() => {
+                            setActiveSymbol(currency.symbol)
+                            handleModalClose();
+                        }}
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${currency.symbol}, current price ${currency.marketPrice}`}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <View className="w-8 items-center">
+                                <StarIcon
+                                    filled={isStarred}
+                                    onPress={() => handleToggleFavorite(currency.symbol)}
+                                />
+                            </View>
+                            <View className="flex-1 flex-row items-center gap-2 overflow-hidden">
+                                <View className="flex-row w-11">
+                                    <Image
+                                        source={fromFlagImage}
+                                        style={{ width: 18, height: 18 }}
+                                    />
+                                    <Image
+                                        source={toFlagImage}
+                                        style={{ width: 18, height: 18, marginLeft: -6 }}
+                                    />
+                                </View>
+                                <Text className="font-semibold text-sm text-white" numberOfLines={1}>
+                                    {currency.symbol}
+                                </Text>
+                            </View>
+                            <View className="flex-1 items-center">
+                                <Text className="font-semibold text-sm text-red-500">
+                                    {currency.marketPrice.toLocaleString('en-US', {
+                                        maximumFractionDigits: currency.marketPrice.toString().length
+                                    })}
+                                </Text>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                )
+            })
+    }, [
+        currencySymbols,
+        activeTab,
+        favoriteSymbols,
+        searchQuery,
+        handleToggleFavorite,
+        setActiveSymbol,
+        handleModalClose
+    ])
+
+    const selectedSymbolData = useMemo(() => {
+        if (!activeSymbol) {
+            return <Skeleton />
+        }
+
+        const currency = findCurrencyPairBySymbol(activeSymbol);
+        if (!currency) {
+            return <Skeleton />
+        }
+
+        const { from, to } = getCurrencyFlags(currency.symbol);
+        const fromFlagImage = getCurrencyFlagImage(from);
+        const toFlagImage = getCurrencyFlagImage(to);
+
+        return (
+            <View className="flex-row items-center justify-between min-w-fit">
+                <View className="flex-row items-center gap-2 overflow-hidden">
+                    <View className="flex-row">
+                        <Image
+                            source={fromFlagImage}
+                            style={{ width: 18, height: 18 }}
+                        />
+                        <Image
+                            source={toFlagImage}
+                            style={{ width: 18, height: 18, marginLeft: -6 }}
+                        />
+                    </View>
+                    <Text className="font-semibold text-base text-white max-w-[25vw]" numberOfLines={1}>
+                        {currency.symbol}
+                    </Text>
+                </View>
+            </View>
+        )
+    }, [activeSymbol, findCurrencyPairBySymbol])
+
+    const tabs = [
+        { id: 'all', label: t('All Assets'), count: currencySymbols.length },
+        { id: 'favorites', label: t('Favorites'), count: favoriteSymbols.length }
+    ]
+
+    const clearSearch = useCallback(() => {
+        setSearchQuery('');
+    }, []);
+
+    const modalContent = (
+        <>
+            {/* Search Container */}
+            <View className="p-4 bg-propfirmone-main">
+                <View className="flex-row items-center bg-propfirmone-200 border border-gray-800 rounded-lg px-3 py-2">
+                    <SearchIcon />
+                    <TextInput
+                        ref={searchInputRef}
+                        className="flex-1 ml-2 text-base text-white"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder={t('Search')}
+                        placeholderTextColor='#6B7280'
+                        accessible={true}
+                        accessibilityLabel="Search currency pairs"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity
+                            onPress={clearSearch}
+                            className="p-1"
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear search"
+                        >
+                            <ClearIcon />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+
+            {/* Tabs Container */}
+            <View className="px-4">
+                <View className="flex-row mb-4 gap-2">
+                    {tabs.map((tab) => (
+                        <TouchableOpacity
+                            key={tab.id}
+                            className={`px-3 py-2 rounded-md border border-gray-800 ${activeTab === tab.id ? 'bg-propfirmone-200' : 'bg-propfirmone-100'
+                                }`}
+                            onPress={() => setActiveTab(tab.id as 'all' | 'favorites')}
+                            accessible={true}
+                            accessibilityRole="tab"
+                            accessibilityLabel={`${tab.label} tab`}
+                            accessibilityState={{ selected: activeTab === tab.id }}
+                        >
+                            <View className="flex-row items-center gap-1">
+                                {tab.id === 'favorites' && (
+                                    <Star size={12} color='#FFD700' fill='#FFD700' />
+                                )}
+                                <Text className={`text-sm ${activeTab === tab.id ? 'text-white' : 'text-white'
+                                    }`}>
+                                    {tab.label}
+                                </Text>
+                                <Text className="text-sm text-blue-500">
+                                    ({tab.count})
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Header Row */}
+            <View className="flex-row items-center px-4 py-2 gap-2">
+                <View className="w-8" />
+                <Text className="flex-1 text-xs text-gray-500">{t('Instruments')}</Text>
+                <Text className="flex-1 text-xs text-gray-500 text-center">{t('Market Price')}</Text>
+            </View>
+
+            {/* Currency List */}
+            <ScrollView className="flex-1">
+                {isLoading ? (
+                    <View className="flex-1 justify-center items-center py-8">
+                        <ActivityIndicator size="large" color="#3B82F6" />
+                        <Text className="text-gray-500 mt-2">{t('Loading...')}</Text>
+                    </View>
+                ) : filteredCurrencySymbols.length > 0 ? (
+                    filteredCurrencySymbols
+                ) : (
+                    <View className="py-8 items-center">
+                        <Text className="text-sm text-gray-500 text-center">
+                            {activeTab === 'favorites'
+                                ? t('No favorite assets yet. Star some assets to add them here.')
+                                : t('No assets found matching your search.')
+                            }
+                        </Text>
+                    </View>
+                )}
+            </ScrollView>
+        </>
+    )
+
+    return (
+        <>
+            <TouchableOpacity
+                className="flex-row items-center gap-2 p-2"
+                onPress={handleModalOpen}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Open currency selector"
+            >
+                {selectedSymbolData}
+                <ChevronDownIcon />
+            </TouchableOpacity>
+
+            <Modal
+                visible={open}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={handleModalClose}
+            >
+                <View className="flex-1 bg-propfirmone-main">
+                    {/* Modal Header */}
+                    <View className="flex-row justify-between items-center p-5 border-b border-gray-200">
+                        <Text className="text-lg font-semibold text-white">{t('Assets')}</Text>
+                        <TouchableOpacity
+                            className="p-2"
+                            onPress={handleModalClose}
+                            accessible={true}
+                            accessibilityRole="button"
+                            accessibilityLabel="Close modal"
+                        >
+                            <ClearIcon />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Modal Content */}
+                    <View className="flex-1">
+                        {modalContent}
+                    </View>
+                </View>
+            </Modal>
+        </>
+    )
+}

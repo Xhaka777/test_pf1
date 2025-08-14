@@ -1,0 +1,497 @@
+import { View, Text, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useUser } from '@clerk/clerk-expo';
+
+import MenuHeader from '@/components/Header/menuHeader';
+import SelectableButton from '@/components/SelectableButton';
+import Profile from '@/components/Profile';
+import BottomSheet, { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
+import ProfileBottomSheet from '@/components/ProfileBottomSheet';
+import ConfirmBottomSheet from '@/components/ConfirmBottomSheet';
+import DemoAccBottomSheet from '@/components/AccountBottomSheet';
+import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet';
+import SeachInput from '@/components/SearchInput';
+import NoPropFirmAccounts from '@/components/NoPropFirmAccounts';
+import NoBrokerAccount from '@/components/NoBrokerAccount';
+
+import { EvaluatedAccountIcon } from '@/components/icons/EvaluatedAccountIcon';
+import { FundedAccountIcon } from '@/components/icons/FundedAccountIcon';
+import AccountIcon from '@/components/icons/AccountIcon';
+import { PracticeIcon } from '@/components/icons/PracticeIcon';
+import { useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
+import { AccountStatusEnum } from '@/constants/enums';
+
+const Menu = () => {
+  const { user } = useUser();
+
+  // Updated state to use the three account types
+  const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
+  const [selectedAccount, setSelectedAccount] = useState(null); // For bottom sheet
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeOnly, setActiveOnly] = useState(true); // Default to true like web
+
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const confirmSignOutSheetRef = useRef<BottomSheet>(null);
+  const demoBottomSheetRef = useRef<BottomSheetModal>(null);
+  const accountBottomSheetRef = useRef<BottomSheetModal>(null);
+
+  const {
+    data: propFirmAccountsData,
+    isLoading: propFirmAccountsLoading,
+    error: propFirmAccountsError,
+    refetch: refetchPropFirmAccounts
+  } = useGetPropFirmAccounts({
+    enabled: selectedAccountType === 'propFirm',
+  });
+
+  const {
+    data: propFirmOverviewData,
+    isLoading: propFirmOverviewLoading,
+    error: propFirmOverviewError
+  } = useFetchPropFirmAccountsOverview({
+    enabled: selectedAccountType === 'propFirm',
+  });
+
+  const {
+    data: brokerAccountsData,
+    isLoading: brokerAccountsLoading,
+    error: brokerAccountsError,
+    refetch: refetchBrokerAccounts
+  } = useGetBrokerAccounts();
+
+  const processedPropFirmAccounts = useMemo(() => {
+    if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
+
+    console.log('[Menu] Processing prop firm accounts:', propFirmAccountsData.prop_firm_accounts.length);
+
+    const processedAccounts = propFirmAccountsData.prop_firm_accounts.map((account: any) => {
+      // Calculate performance percentage
+      const totalGainLoss = account.balance - account.starting_balance;
+      const totalPerformancePercentage = account.starting_balance > 0
+        ? (totalGainLoss / account.starting_balance) * 100
+        : 0;
+
+      return {
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        dailyPL: account.daily_pl,
+        changePercentage: totalPerformancePercentage,
+        type: account.account_type.toLowerCase() === 'funded' ? 'Funded' : 'Challenge',
+        currency: account.currency || 'USD',
+        firm: account.firm,
+        program: account.program,
+        totalPL: account.total_pl,
+        netPL: account.net_pl,
+        startingBalance: account.starting_balance,
+        maxTotalDD: account.max_total_dd,
+        profitTarget: account.profit_target,
+        status: account.status, 
+        originalData: account,
+      };
+    });
+
+    // Separate by account type
+    const evaluation = processedAccounts.filter(acc => acc.type === 'Challenge');
+    const funded = processedAccounts.filter(acc => acc.type === 'Funded');
+
+    console.log('[Menu] Processed prop firm accounts:', { evaluation: evaluation.length, funded: funded.length });
+
+    return { evaluation, funded };
+  }, [propFirmAccountsData]);
+
+  const processedBrokerAccounts = useMemo(() => {
+    if (!brokerAccountsData?.broker_accounts) return { live: [], demo: [] };
+
+    console.log('[Menu] Processing broker accounts:', brokerAccountsData.broker_accounts.length);
+
+    const processedAccounts = brokerAccountsData.broker_accounts.map((account: any) => {
+      const totalGainLoss = account.balance - account.starting_balance;
+      const totalPerformancePercentage = account.starting_balance > 0
+        ? (totalGainLoss / account.starting_balance) * 100
+        : 0;
+
+      return {
+        id: account.id,
+        name: account.name,
+        balance: account.balance,
+        dailyPL: account.daily_pl,
+        changePercentage: totalPerformancePercentage,
+        type: account.account_type.toLowerCase() === 'demo' ? 'Demo' : 'Live',
+        currency: account.currency,
+        firm: account.firm,
+        exchange: account.exchange,
+        server: account.server,
+        status: account.status, 
+        totalPL: account.total_pl,
+        startingBalance: account.starting_balance,
+        originalData: account,
+      };
+    });
+
+    const live = processedAccounts.filter(acc => acc.type === 'Live');
+    const demo = processedAccounts.filter(acc => acc.type === 'Demo');
+
+    console.log('[Menu] Processed broker accounts:', { live: live.length, demo: demo.length });
+
+    return { live, demo };
+  }, [brokerAccountsData]);
+
+  const filteredActiveAccounts = useMemo(() => {
+    let allAccounts = [];
+    
+    // Get all accounts based on selected type
+    if (selectedAccountType === 'propFirm') {
+      allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
+    } else if (selectedAccountType === 'brokerage') {
+      allAccounts = processedBrokerAccounts.live;
+    } else if (selectedAccountType === 'practice') {
+      allAccounts = processedBrokerAccounts.demo;
+    }
+
+    // Filter by ACTIVE status first (like web teammate's logic)
+    const activeAccounts = allAccounts.filter((account) => 
+      account.status === AccountStatusEnum.ACTIVE
+    );
+
+    // Then apply search filter (like web teammate's logic)
+    return activeAccounts.filter((account) =>
+      account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.id.toString().includes(searchTerm) ||
+      (account.currency && account.currency.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (account.firm && account.firm.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [
+    selectedAccountType,
+    processedPropFirmAccounts.evaluation,
+    processedPropFirmAccounts.funded,
+    processedBrokerAccounts.live,
+    processedBrokerAccounts.demo,
+    searchTerm
+  ]);
+
+  const filteredArchivedAccounts = useMemo(() => {
+    let allAccounts = [];
+    
+    // Get all accounts based on selected type
+    if (selectedAccountType === 'propFirm') {
+      allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
+    } else if (selectedAccountType === 'brokerage') {
+      allAccounts = processedBrokerAccounts.live;
+    } else if (selectedAccountType === 'practice') {
+      allAccounts = processedBrokerAccounts.demo;
+    }
+
+    // Filter by INACTIVE status first (PASSED, FAILED, DISCONNECTED like web teammate's logic)
+    const inactiveAccounts = allAccounts.filter((account) =>
+      [
+        AccountStatusEnum.PASSED,
+        AccountStatusEnum.FAILED,
+        AccountStatusEnum.DISCONNECTED,
+      ].includes(account.status)
+    );
+
+    // Then apply search filter (like web teammate's logic)
+    return inactiveAccounts.filter((account) =>
+      account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.id.toString().includes(searchTerm) ||
+      (account.currency && account.currency.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (account.firm && account.firm.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [
+    selectedAccountType,
+    processedPropFirmAccounts.evaluation,
+    processedPropFirmAccounts.funded,
+    processedBrokerAccounts.live,
+    processedBrokerAccounts.demo,
+    searchTerm
+  ]);
+
+  const finalAccountsToShow = useMemo(() => {
+    if (selectedAccountType === 'propFirm') {
+      const activeEvaluation = filteredActiveAccounts.filter(acc => acc.type === 'Challenge');
+      const activeFunded = filteredActiveAccounts.filter(acc => acc.type === 'Funded');
+      
+      if (activeOnly) {
+        return { evaluation: activeEvaluation, funded: activeFunded };
+      } else {
+        // Include archived accounts too
+        const archivedEvaluation = filteredArchivedAccounts.filter(acc => acc.type === 'Challenge');
+        const archivedFunded = filteredArchivedAccounts.filter(acc => acc.type === 'Funded');
+        
+        return { 
+          evaluation: [...activeEvaluation, ...archivedEvaluation], 
+          funded: [...activeFunded, ...archivedFunded] 
+        };
+      }
+    } else {
+      // For broker/practice accounts
+      if (activeOnly) {
+        return { accounts: filteredActiveAccounts };
+      } else {
+        return { accounts: [...filteredActiveAccounts, ...filteredArchivedAccounts] };
+      }
+    }
+  }, [
+    selectedAccountType,
+    filteredActiveAccounts,
+    filteredArchivedAccounts,
+    activeOnly
+  ]);
+
+  // Handle sign out
+  const handleSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert("Signed out successfully!");
+          }
+        }
+      ]
+    );
+  };
+
+  // Handle profile press (passed to Profile component)
+  const handleProfilePress = useCallback(() => {
+    bottomSheetRef.current?.expand();
+  }, []);
+
+  //Handle confirm signOut press (passed to ProfileBottomSheet reusable component...)
+  const handleConfirmSignOutPress = useCallback(() => {
+    bottomSheetRef.current?.forceClose();
+    confirmSignOutSheetRef.current?.expand();
+  }, []);
+
+  const handleDemoPress = useCallback(() => {
+    demoBottomSheetRef.current?.present();
+  }, []);
+
+  // Handle account press - opens account details bottom sheet
+  const handleAccountPress = useCallback((account: any) => {
+    console.log('[Menu] Account pressed:', account.id, account.name, account.type);
+    setSelectedAccount(account);
+    
+    // ✅ FIXED: Use appropriate bottom sheet based on account type
+    if (account.type === 'Challenge' || account.type === 'Funded') {
+      // Use AccountBottomSheet for prop firm accounts
+      demoBottomSheetRef.current?.present();
+    } else if (account.type === 'Live' || account.type === 'Demo') {
+      // Use BrokerBottomSheet for broker accounts
+      accountBottomSheetRef.current?.present();
+    } else {
+      // Fallback to AccountBottomSheet
+      demoBottomSheetRef.current?.present();
+    }
+  }, []);
+
+  // Handle trade press from bottom sheet
+  const handleTradePress = useCallback((accountData: any) => {
+    accountBottomSheetRef.current?.dismiss();
+  }, []);
+
+  // ✅ Handle search (like web teammate's logic)
+  const handleSearch = useCallback((text: string) => {
+    setSearchTerm(text);
+  }, []);
+
+  // Render account content based on selected account type
+  const renderAccountContent = () => {
+    switch (selectedAccountType) {
+      case 'propFirm':
+        return (
+          <NoPropFirmAccounts
+            showTimePeriods={false}
+            showMetrics={false}
+            isMenuScreen={true}
+            hideTabBar={false} 
+            // ✅ Pass filtered data instead of original data
+            accountData={finalAccountsToShow}
+            isLoading={propFirmAccountsLoading}
+            error={propFirmAccountsError}
+            onAccountPress={handleAccountPress}
+            onRefresh={refetchPropFirmAccounts}
+          />
+        );
+
+      case 'brokerage':
+        return (
+          <NoBrokerAccount
+            showCart={false}
+            showTimePeriods={false}
+            showMetrics={false}
+            showTabs={true}
+            isMenuScreen={true}
+            presetActiveTab="Live"
+            hideTabBar={false}
+            showOnlyPresetTab={true}
+            brokerAccountsData={{
+              broker_accounts: finalAccountsToShow.accounts?.map(acc => acc.originalData) || []
+            }}
+            brokerAccountsLoading={brokerAccountsLoading}
+            brokerAccountsError={brokerAccountsError}
+            refetchBrokerAccounts={refetchBrokerAccounts}
+          />
+        );
+
+      case 'practice':
+        return (
+          <NoBrokerAccount
+            showCart={false}
+            showTimePeriods={false}
+            showMetrics={false}
+            showTabs={true}
+            isMenuScreen={true}
+            presetActiveTab="Demo"
+            hideTabBar={false}
+            showOnlyPresetTab={true}
+            brokerAccountsData={{
+              broker_accounts: finalAccountsToShow.accounts?.map(acc => acc.originalData) || []
+            }}
+            brokerAccountsLoading={brokerAccountsLoading}
+            brokerAccountsError={brokerAccountsError}
+            refetchBrokerAccounts={refetchBrokerAccounts}
+          />
+        );
+
+      default:
+        return (
+          <NoPropFirmAccounts
+            showTimePeriods={false}
+            showMetrics={false}
+            isMenuScreen={true}
+
+            accountData={finalAccountsToShow}
+            isLoading={propFirmAccountsLoading}
+            error={propFirmAccountsError}
+            onAccountPress={handleAccountPress}
+            onRefresh={refetchPropFirmAccounts}
+          />
+        );
+    }
+  };
+
+  return (
+    <GestureHandlerRootView className='flex-1 bg-propfirmone-main'>
+      <SafeAreaView className="bg-propfirmone-main flex-1">
+        <MenuHeader onSignOut={handleSignOut} />
+
+        {/* Main content */}
+        <View className="flex-1">
+          <View className="px-6 pb-2 mt-3">
+            <Text className="text-white text-xl text-start font-InterSemiBold">
+              Switch Account
+            </Text>
+          </View>
+
+          {/* Three Account Type Buttons */}
+          <View className="flex-row px-3 py-2 space-x-2">
+            <SelectableButton
+              text="Prop Firm"
+              isSelected={selectedAccountType === 'propFirm'}
+              selectedBorderColor="border-primary-100"
+              unselectedBorderColor="border-gray-700"
+              onPress={() => setSelectedAccountType('propFirm')}
+              additionalStyles="flex-1"
+            />
+            <SelectableButton
+              text="Brokerage"
+              isSelected={selectedAccountType === 'brokerage'}
+              selectedBorderColor="border-primary-100"
+              unselectedBorderColor="border-gray-700"
+              onPress={() => setSelectedAccountType('brokerage')}
+              additionalStyles="flex-1 mx-2"
+            />
+            <SelectableButton
+              text="Practice"
+              isSelected={selectedAccountType === 'practice'}
+              selectedBorderColor="border-primary-100"
+              unselectedBorderColor="border-gray-700"
+              onPress={() => setSelectedAccountType('practice')}
+              additionalStyles="flex-1"
+            />
+          </View>
+
+          {/* Account Content */}
+          <View className='flex-1'>
+            {renderAccountContent()}
+          </View>
+        </View>
+
+        {/* Profile at bottom */}
+        <View>
+          <View className="h-0.5 bg-propfirmone-100 mx-4" />
+          <Profile
+            onProfilePress={handleProfilePress}
+            planName="Free Plan" />
+        </View>
+
+        <ProfileBottomSheet
+          bottomSheetRef={bottomSheetRef}
+          onSignOutPress={handleConfirmSignOutPress}
+        />
+
+        <ConfirmBottomSheet
+          bottomSheetRef={bottomSheetRef}
+          confirmSignOutSheetRef={confirmSignOutSheetRef}
+        />
+
+        <DemoAccBottomSheet
+          bottomSheetRef={demoBottomSheetRef}
+          accountData={selectedAccount && (selectedAccount.type === 'Challenge' || selectedAccount.type === 'Funded') ? {
+            id: selectedAccount.id,
+            name: selectedAccount.name,
+            balance: `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
+            dailyPL: `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
+            changePercentage: `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
+            type: selectedAccount.type,
+            originalData: selectedAccount.originalData,
+            currency: selectedAccount.currency,
+            firm: selectedAccount.firm,
+            program: selectedAccount.program,
+            totalPL: selectedAccount.totalPL,
+            netPL: selectedAccount.netPL,
+            startingBalance: selectedAccount.startingBalance,
+            maxTotalDD: selectedAccount.maxTotalDD,
+            profitTarget: selectedAccount.profitTarget,
+          } : undefined}
+        />
+
+        {selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') && (
+          <BrokerBottomSheet
+            bottomSheetRef={accountBottomSheetRef}
+            accountData={{
+              id: selectedAccount.id,
+              name: selectedAccount.name,
+              balance: `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
+              dailyPL: `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
+              changePercentage: `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
+              type: selectedAccount.type,
+              originalData: selectedAccount.originalData,
+              currency: selectedAccount.currency,
+              firm: selectedAccount.firm,
+              exchange: selectedAccount.exchange,
+              server: selectedAccount.server,
+              status: selectedAccount.status,
+              totalPL: selectedAccount.totalPL,
+              startingBalance: selectedAccount.startingBalance,
+            }}
+          />
+        )}
+
+      </SafeAreaView>
+    </GestureHandlerRootView>
+  );
+};
+
+export default Menu;
