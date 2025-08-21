@@ -57,7 +57,7 @@ const EditPositionBottomSheet = forwardRef<BottomSheetModal, EditPositionBottomS
     const { mutateAsync: updatePartialTp } = useUpdatePartialTpMutation();
     const { mutateAsync: updateTrailingSl } = useUpdateTrailingSlMutation();
 
-    const snapPoints = useMemo(() => ['80%'], []);
+    const snapPoints = useMemo(() => ['85%'], []);
 
     // Initialize state when openTrade changes
     useEffect(() => {

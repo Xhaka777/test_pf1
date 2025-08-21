@@ -16,16 +16,24 @@ const AdditionalStats = ({
 
   const formatWinRate = (rate: number) => {
     if (isLoading) return '--';
+
+    if (rate === null || rate === undefined || isNaN(rate)) {
+      return '--';
+    }
+
     return `${rate.toFixed(2)}%`;
   };
 
-  const formatProfitFactor = (factor: number) => {
+  const formatProfitFactor = (factor: number | null | undefined) => {
     if (isLoading) return '--';
-    return factor.toFixed(2);
-  }
+  
+    const safeValue = typeof factor === "number" && !isNaN(factor) ? factor : 0;
+    return safeValue.toFixed(2);
+  };
+  
 
   return (
-    <View className="px-2">
+    <View className="px-2 mt-2 mb-2">
       <View style={{
         flexDirection: 'row',
         justifyContent: 'space-between',

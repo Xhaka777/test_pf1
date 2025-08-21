@@ -1,4 +1,4 @@
-// components/ScreenShotBottomSheet.tsx - Debugged version with enhanced error handling
+// components/ScreenShotBottomSheet.tsx - Version without MediaLibrary for Android
 import BottomSheet, { BottomSheetModal, BottomSheetScrollView, BottomSheetView } from "@gorhom/bottom-sheet";
 import { FileIcon, X, Download, Share2 } from "lucide-react-native";
 import React, { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
@@ -8,7 +8,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import images from "@/constants/images";
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import ViewShot from 'react-native-view-shot';
@@ -18,6 +17,12 @@ import { TradeSummary } from "@/api/schema/metrics";
 import { useFetchPLSSMutation } from "@/api/hooks/trade-service";
 import { useGetCurrentUser } from "@/api/hooks/auth";
 import { useTranslation } from 'react-i18next';
+
+// iOS-only MediaLibrary import (will be tree-shaken out on Android builds)
+let MediaLibrary: any = null;
+if (Platform.OS === 'ios') {
+    MediaLibrary = require('expo-media-library');
+}
 
 type TradeData =
     | OpenTradesData['open_trades'][number]
@@ -59,58 +64,118 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
 
         useEffect(() => {
             if (history && !plssData && currentUser && useServerImage) {
-                // Only try to fetch server image for real data, not mock data
-                const isMockData = history.order_id && history.order_id.toString().startsWith('MOCK_');
-                
-                if (!isMockData) {
-                    fetchPLSS(
-                        {
-                            user_id: currentUser.user_id,
-                            account: history.account_id,
-                            trade_id: history.order_id,
-                            history: isHistory,
-                            backtesting: backtesting,
-                        },
-                        {
-                            onSuccess: (data) => {
-                                // Enhanced blob to base64 conversion with better error handling
-                                try {
-                                    const reader = new FileReader();
-                                    reader.onload = () => {
-                                        const result = reader.result as string;
-                                        if (result) {
-                                            setImageUrl(result);
-                                        } else {
-                                            console.warn('Empty result from FileReader');
-                                            setUseServerImage(false);
-                                        }
-                                    };
-                                    reader.onerror = (error) => {
-                                        console.error('FileReader error:', error);
+                fetchPLSS(
+                    {
+                        user_id: currentUser.user_id,
+                        account: history.account_id,
+                        trade_id: history.order_id,
+                        history: isHistory,
+                        backtesting: backtesting,
+                    },
+                    {
+                        onSuccess: (data) => {
+                            try {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const result = reader.result as string;
+                                    if (result) {
+                                        setImageUrl(result);
+                                    } else {
+                                        console.warn('Empty result from FileReader');
                                         setUseServerImage(false);
-                                    };
-                                    reader.readAsDataURL(data);
-                                } catch (error) {
-                                    console.error('Error processing server image:', error);
+                                    }
+                                };
+                                reader.onerror = (error) => {
+                                    console.error('FileReader error:', error);
                                     setUseServerImage(false);
-                                }
-                            },
-                            onError: (error) => {
-                                console.error('Failed to fetch server screenshot:', error);
-                                // Fallback to local generation
+                                };
+                                reader.readAsDataURL(data);
+                            } catch (error) {
+                                console.error('Error processing server image:', error);
                                 setUseServerImage(false);
                             }
+                        },
+                        onError: (error) => {
+                            console.error('Failed to fetch server screenshot:', error);
+                            setUseServerImage(false);
                         }
-                    );
-                } else {
-                    // For mock data, skip server fetch and use local generation
-                    console.log('🧪 [MOCK] Skipping server screenshot for mock data');
-                    setUseServerImage(false);
-                }
+                    }
+                );
             }
         }, [history, isHistory, backtesting, fetchPLSS, plssData, currentUser, useServerImage]);
 
-        // Enhanced permission request with timeout and better Android 13+ handling
+        // Android-specific storage permission request (without MediaLibrary)
+        const requestAndroidStoragePermissions = async (): Promise<boolean> => {
+            console.log('📱 Requesting Android storage permissions...');
+            
+            const androidVersion = Platform.Version as number;
+            console.log('📱 Android version:', androidVersion);
+
+            if (androidVersion >= 33) {
+                // Android 13+ - Scoped storage, no explicit permission needed for app's own files
+                console.log('📱 Android 13+ - Using scoped storage (no explicit permission needed)');
+                return true;
+            } else if (androidVersion >= 29) {
+                // Android 10-12 - Request WRITE_EXTERNAL_STORAGE but use scoped storage
+                console.log('📱 Android 10-12 - Requesting WRITE_EXTERNAL_STORAGE permission');
+                try {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                        {
+                            title: 'Storage Permission',
+                            message: 'This app needs access to save images to your gallery',
+                            buttonNeutral: 'Ask Me Later',
+                            buttonNegative: 'Cancel',
+                            buttonPositive: 'OK',
+                        }
+                    );
+                    console.log('📱 Storage permission result:', granted);
+                    return granted === PermissionsAndroid.RESULTS.GRANTED;
+                } catch (error) {
+                    console.error('❌ Error requesting storage permission:', error);
+                    return false;
+                }
+            } else {
+                // Android 9 and below - Request WRITE_EXTERNAL_STORAGE
+                console.log('📱 Android 9 and below - Requesting WRITE_EXTERNAL_STORAGE permission');
+                try {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+                        {
+                            title: 'Storage Permission',
+                            message: 'This app needs access to save images to your device',
+                            buttonNeutral: 'Ask Me Later',
+                            buttonNegative: 'Cancel',
+                            buttonPositive: 'OK',
+                        }
+                    );
+                    return granted === PermissionsAndroid.RESULTS.GRANTED;
+                } catch (error) {
+                    console.error('❌ Error requesting storage permission:', error);
+                    return false;
+                }
+            }
+        };
+
+        // iOS-specific permission request using MediaLibrary
+        const requestIOSPermissions = async (): Promise<boolean> => {
+            if (!MediaLibrary) {
+                console.error('❌ MediaLibrary not available on iOS');
+                return false;
+            }
+
+            try {
+                console.log('🍎 iOS - requesting MediaLibrary permissions');
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                console.log('🍎 MediaLibrary permission result:', status);
+                return status === 'granted';
+            } catch (error) {
+                console.error('❌ Error requesting iOS permissions:', error);
+                return false;
+            }
+        };
+
+        // Platform-agnostic permission request
         const requestPermissions = async (): Promise<boolean> => {
             console.log('🔐 Requesting permissions...');
             
@@ -119,59 +184,162 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                 return true;
             }
 
+            if (Platform.OS === 'android') {
+                return await requestAndroidStoragePermissions();
+            } else if (Platform.OS === 'ios') {
+                return await requestIOSPermissions();
+            }
+
+            return false;
+        };
+
+        // Android-specific save function (without MediaLibrary)
+        const saveToAndroidGallery = async (uri: string): Promise<boolean> => {
             try {
-                if (Platform.OS === 'android') {
-                    const androidVersion = Platform.Version as number;
-                    console.log('📱 Android version:', androidVersion);
-
-                    if (androidVersion >= 33) {
-                        // Android 13+ - For saving images, we actually don't need special permissions
-                        // MediaLibrary.createAssetAsync works without explicit permissions on Android 13+
-                        console.log('📱 Android 13+ - Using MediaLibrary permissions instead');
-                        const { status } = await MediaLibrary.requestPermissionsAsync();
-                        console.log('📱 MediaLibrary permission result:', status);
-                        return status === 'granted';
-                    } else {
-                        // Android 12 and below - use legacy permissions
-                        console.log('📱 Android 12 and below - requesting WRITE_EXTERNAL_STORAGE permission');
+                console.log('📱 Saving to Android gallery without MediaLibrary...');
+                
+                const androidVersion = Platform.Version as number;
+                const fileName = `trading-screenshot-${Date.now()}.png`;
+                
+                if (androidVersion >= 29) {
+                    // Android 10+ - Use scoped storage approach
+                    console.log('📱 Using Android scoped storage approach');
+                    
+                    // Method 1: Try to save to Pictures directory using FileSystem
+                    try {
+                        const picturesDir = FileSystem.documentDirectory + 'Pictures/';
                         
-                        // Add timeout to prevent hanging
-                        const permissionPromise = PermissionsAndroid.request(
-                            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-                            {
-                                title: 'Storage Permission',
-                                message: 'This app needs access to save images to your gallery',
-                                buttonNeutral: 'Ask Me Later',
-                                buttonNegative: 'Cancel',
-                                buttonPositive: 'OK',
-                            }
-                        );
-
-                        const timeoutPromise = new Promise<string>((_, reject) => {
-                            setTimeout(() => reject(new Error('Permission request timeout')), 10000);
+                        // Ensure Pictures directory exists
+                        const dirInfo = await FileSystem.getInfoAsync(picturesDir);
+                        if (!dirInfo.exists) {
+                            await FileSystem.makeDirectoryAsync(picturesDir, { intermediates: true });
+                        }
+                        
+                        const finalPath = picturesDir + fileName;
+                        await FileSystem.copyAsync({
+                            from: uri,
+                            to: finalPath
                         });
-
-                        const granted = await Promise.race([permissionPromise, timeoutPromise]);
-                        console.log('📱 WRITE_EXTERNAL_STORAGE permission result:', granted);
-                        return granted === PermissionsAndroid.RESULTS.GRANTED;
+                        
+                        console.log('📱 Method 1 success: Image saved to Pictures directory');
+                        return true;
+                    } catch (method1Error) {
+                        console.log('📱 Method 1 failed:', method1Error.message);
+                        
+                        // Method 2: Try to save to Downloads directory
+                        try {
+                            const downloadsDir = FileSystem.documentDirectory + 'Downloads/';
+                            
+                            const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
+                            if (!dirInfo.exists) {
+                                await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+                            }
+                            
+                            const finalPath = downloadsDir + fileName;
+                            await FileSystem.copyAsync({
+                                from: uri,
+                                to: finalPath
+                            });
+                            
+                            console.log('📱 Method 2 success: Image saved to Downloads directory');
+                            return true;
+                        } catch (method2Error) {
+                            console.log('📱 Method 2 failed:', method2Error.message);
+                            
+                            // Method 3: Save to app's document directory (always works)
+                            try {
+                                const appDir = FileSystem.documentDirectory + 'Screenshots/';
+                                
+                                const dirInfo = await FileSystem.getInfoAsync(appDir);
+                                if (!dirInfo.exists) {
+                                    await FileSystem.makeDirectoryAsync(appDir, { intermediates: true });
+                                }
+                                
+                                const finalPath = appDir + fileName;
+                                await FileSystem.copyAsync({
+                                    from: uri,
+                                    to: finalPath
+                                });
+                                
+                                console.log('📱 Method 3 success: Image saved to app directory');
+                                Alert.alert(
+                                    'Image Saved',
+                                    `Screenshot saved to app directory: ${finalPath}`,
+                                    [{ text: 'OK' }]
+                                );
+                                return true;
+                            } catch (method3Error) {
+                                console.log('📱 Method 3 failed:', method3Error.message);
+                                throw method3Error;
+                            }
+                        }
                     }
                 } else {
-                    // iOS - use MediaLibrary permissions
-                    console.log('🍎 iOS - requesting MediaLibrary permissions');
-                    const { status } = await MediaLibrary.requestPermissionsAsync();
-                    console.log('🍎 MediaLibrary permission result:', status);
-                    return status === 'granted';
+                    // Android 9 and below - Try to save to external storage
+                    console.log('📱 Using legacy Android storage approach');
+                    
+                    // Try to save to external storage (if permission granted)
+                    const externalDir = FileSystem.documentDirectory + '../../../Pictures/';
+                    const finalPath = externalDir + fileName;
+                    
+                    await FileSystem.copyAsync({
+                        from: uri,
+                        to: finalPath
+                    });
+                    
+                    console.log('📱 Legacy method success: Image saved to external Pictures');
+                    return true;
                 }
             } catch (error) {
-                console.error('❌ Error requesting permissions:', error);
+                console.error('❌ Android save failed:', error);
                 
-                // On Android 13+, if permission fails, try without explicit permission
-                if (Platform.OS === 'android' && Platform.Version >= 33) {
-                    console.log('📱 Android 13+ - Attempting to save without explicit permission');
-                    return true; // Let MediaLibrary handle it
+                // Final fallback: Save to app's document directory
+                try {
+                    const fallbackPath = FileSystem.documentDirectory + `screenshot-${Date.now()}.png`;
+                    await FileSystem.copyAsync({
+                        from: uri,
+                        to: fallbackPath
+                    });
+                    
+                    console.log('📱 Fallback success: Image saved to app directory');
+                    Alert.alert(
+                        'Image Saved',
+                        'Screenshot saved to app directory. You can find it in the file manager.',
+                        [{ text: 'OK' }]
+                    );
+                    return true;
+                } catch (fallbackError) {
+                    console.error('❌ Fallback save failed:', fallbackError);
+                    return false;
                 }
-                
+            }
+        };
+
+        // iOS-specific save function using MediaLibrary
+        const saveToIOSGallery = async (uri: string): Promise<boolean> => {
+            if (!MediaLibrary) {
+                console.error('❌ MediaLibrary not available for iOS');
                 return false;
+            }
+
+            try {
+                console.log('🍎 Saving to iOS gallery using MediaLibrary...');
+                await MediaLibrary.saveToLibraryAsync(uri);
+                console.log('🍎 iOS save success');
+                return true;
+            } catch (error) {
+                console.error('❌ iOS save failed:', error);
+                
+                // Fallback: try createAssetAsync
+                try {
+                    console.log('🍎 Trying iOS fallback method...');
+                    await MediaLibrary.createAssetAsync(uri);
+                    console.log('🍎 iOS fallback success');
+                    return true;
+                } catch (fallbackError) {
+                    console.error('❌ iOS fallback failed:', fallbackError);
+                    return false;
+                }
             }
         };
 
@@ -179,7 +347,6 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
         const downloadForWeb = (uri: string) => {
             try {
                 console.log('🌐 Starting web download...');
-                // Create a temporary link element for web download
                 const link = document.createElement('a');
                 link.href = uri;
                 link.download = `trading-summary-${Date.now()}.png`;
@@ -194,11 +361,9 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
             }
         };
 
-        // Enhanced download function with detailed debugging
+        // Main download function
         const handleDownload = async () => {
             console.log('📸 Starting download process...');
-            console.log('📸 useServerImage:', useServerImage);
-            console.log('📸 imageUrl available:', !!imageUrl);
             console.log('📸 Platform:', Platform.OS);
             
             try {
@@ -219,7 +384,6 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                     }
 
                     try {
-                        // Use the ViewShot capture method with detailed options
                         console.log('📸 Calling ViewShot.capture...');
                         uri = await cardRef.current.capture({
                             format: 'png',
@@ -230,7 +394,6 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                     } catch (captureError) {
                         console.error('❌ ViewShot capture error:', captureError);
                         
-                        // Fallback: try using captureRef
                         console.log('📸 Trying fallback with captureRef...');
                         try {
                             uri = await captureRef(cardRef, {
@@ -254,157 +417,33 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
 
                 console.log('📸 Generated URI:', uri);
 
+                // Platform-specific saving
                 if (Platform.OS === 'web') {
-                    console.log('🌐 Platform is web, using web download');
                     downloadForWeb(uri);
                 } else {
-                    console.log('📱 Platform is mobile, saving to gallery');
-                    
-                    // Request permissions
+                    // Request permissions first
                     const hasPermission = await requestPermissions();
                     console.log('🔐 Permission granted:', hasPermission);
                     
-                    if (!hasPermission) {
-                        Alert.alert('Permission Required', 'Please grant permission to save images to your device');
+                    if (!hasPermission && Platform.OS === 'ios') {
+                        Alert.alert('Permission Required', 'Please grant permission to save images to your photo library');
                         return;
                     }
 
-                    console.log('💾 Creating asset in MediaLibrary...');
+                    // Save to gallery based on platform
+                    let saveSuccess = false;
                     
-                    try {
-                        // Debug the URI and MediaLibrary
-                        console.log('💾 URI type:', typeof uri);
-                        console.log('💾 URI value:', uri);
-                        console.log('💾 MediaLibrary available methods:', Object.keys(MediaLibrary));
-                        
-                        // Try different approaches for saving the image
-                        let asset;
-                        
-                        try {
-                            // Method 1: Use saveToLibraryAsync instead of createAssetAsync
-                            console.log('💾 Method 1: Using saveToLibraryAsync...');
-                            await MediaLibrary.saveToLibraryAsync(uri);
-                            console.log('💾 Method 1 success: Image saved to library');
-                            
-                            // Success! No need to continue to other methods
-                            console.log('✅ Download completed successfully');
-                            Alert.alert('Success', 'Trading screenshot saved to your gallery!');
-                            return;
-                            
-                        } catch (method1Error) {
-                            console.log('💾 Method 1 failed:', method1Error.message);
-                            
-                            try {
-                                // Method 2: Use deprecated createAssetAsync syntax (without await in case of sync call)
-                                console.log('💾 Method 2: Trying createAssetAsync without await...');
-                                const result = MediaLibrary.createAssetAsync(uri);
-                                console.log('💾 Method 2 result type:', typeof result);
-                                
-                                if (result && typeof result.then === 'function') {
-                                    // It's a promise
-                                    asset = await result;
-                                    console.log('💾 Method 2 promise success:', asset);
-                                } else {
-                                    // It's synchronous
-                                    asset = result;
-                                    console.log('💾 Method 2 sync success:', asset);
-                                }
-                            } catch (method2Error) {
-                                console.log('💾 Method 2 failed:', method2Error.message);
-                                
-                                try {
-                                    // Method 3: Copy file to a different location and try saveToLibraryAsync
-                                    console.log('💾 Method 3: Copy and use saveToLibraryAsync...');
-                                    const fileName = `trading-screenshot-${Date.now()}.png`;
-                                    const tempUri = `${FileSystem.documentDirectory}${fileName}`;
-                                    
-                                    console.log('💾 Copying from:', uri);
-                                    console.log('💾 Copying to:', tempUri);
-                                    
-                                    await FileSystem.copyAsync({
-                                        from: uri,
-                                        to: tempUri
-                                    });
-                                    
-                                    console.log('💾 File copied, now using saveToLibraryAsync...');
-                                    await MediaLibrary.saveToLibraryAsync(tempUri);
-                                    console.log('💾 Method 3 success with saveToLibraryAsync');
-                                    
-                                    // Clean up temp file
-                                    try {
-                                        await FileSystem.deleteAsync(tempUri);
-                                        console.log('💾 Temp file cleaned up');
-                                    } catch (cleanupError) {
-                                        console.log('💾 Cleanup warning:', cleanupError.message);
-                                    }
-                                    
-                                    console.log('✅ Download completed successfully');
-                                    Alert.alert('Success', 'Trading screenshot saved to your gallery!');
-                                    return;
-                                    
-                                } catch (method3Error) {
-                                    console.log('💾 Method 3 failed:', method3Error.message);
-                                    
-                                    try {
-                                        // Method 4: Try using FileSystem to move to Downloads or Pictures directory
-                                        console.log('💾 Method 4: Direct file system approach...');
-                                        
-                                        // For Android, try saving to the Downloads directory
-                                        if (Platform.OS === 'android') {
-                                            const downloadsDir = FileSystem.documentDirectory + 'Download/';
-                                            
-                                            // Ensure Downloads directory exists
-                                            const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
-                                            if (!dirInfo.exists) {
-                                                await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
-                                            }
-                                            
-                                            const finalPath = downloadsDir + `trading-screenshot-${Date.now()}.png`;
-                                            await FileSystem.copyAsync({
-                                                from: uri,
-                                                to: finalPath
-                                            });
-                                            
-                                            console.log('💾 Method 4 success: File saved to Downloads');
-                                            Alert.alert('Success', 'Trading screenshot saved to Downloads folder!');
-                                            return;
-                                        }
-                                    } catch (method4Error) {
-                                        console.log('💾 Method 4 failed:', method4Error.message);
-                                        throw new Error(`All save methods failed. Last error: ${method4Error.message}`);
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // If we got here with an asset from createAssetAsync, try album operations
-                        if (asset) {
-                            console.log('💾 Asset created successfully:', asset.id);
-                            
-                            // Try to create album, but don't fail if it doesn't work
-                            try {
-                                console.log('📁 Attempting album operations...');
-                                const album = await MediaLibrary.getAlbumAsync('Trading App');
-                                if (album) {
-                                    console.log('📁 Album exists, adding asset...');
-                                    await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-                                } else {
-                                    console.log('📁 Creating new album...');
-                                    await MediaLibrary.createAlbumAsync('Trading App', asset, false);
-                                }
-                                console.log('📁 Album operation completed');
-                            } catch (albumError) {
-                                console.warn('⚠️ Album operation failed, but asset was saved:', albumError);
-                                // Don't throw here, the image was still saved
-                            }
-                            
-                            console.log('✅ Download completed successfully');
-                            Alert.alert('Success', 'Trading screenshot saved to your gallery!');
-                        }
-                        
-                    } catch (mediaError) {
-                        console.error('❌ Final MediaLibrary error:', mediaError);
-                        throw new Error(`Failed to save to gallery: ${mediaError.message}`);
+                    if (Platform.OS === 'android') {
+                        saveSuccess = await saveToAndroidGallery(uri);
+                    } else if (Platform.OS === 'ios') {
+                        saveSuccess = await saveToIOSGallery(uri);
+                    }
+
+                    if (saveSuccess) {
+                        console.log('✅ Download completed successfully');
+                        Alert.alert('Success', 'Trading screenshot saved successfully!');
+                    } else {
+                        Alert.alert('Error', 'Failed to save image to gallery');
                     }
                 }
             } catch (error) {
@@ -417,7 +456,7 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
             }
         };
 
-        // Enhanced share function with debugging
+        // Share function (unchanged, as Sharing works on both platforms)
         const handleShare = async () => {
             if (Platform.OS === 'web') {
                 Alert.alert('Not Available', 'Sharing is not available on web. Use the download button instead.');
@@ -452,7 +491,6 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                         console.log('📤 Share image generated:', uri);
                     } catch (captureError) {
                         console.error('❌ Share capture error:', captureError);
-                        // Try fallback
                         uri = await captureRef(cardRef, {
                             format: 'png',
                             quality: 1.0,
@@ -491,7 +529,7 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
             handleClose();
         }, [handleClose]);
 
-        // Enhanced cleanup on unmount
+        // Cleanup on unmount
         useEffect(() => {
             return () => {
                 if (imageUrl && imageUrl.startsWith('blob:')) {
@@ -503,11 +541,10 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
         if (!history) return null;
 
         const isProfitable = history.pl !== undefined && history.pl > 0;
-        const isMockData = history.order_id && history.order_id.toString().startsWith('MOCK_');
 
-        // Enhanced server content rendering
+        // Server content rendering
         const renderServerContent = () => {
-            if (isFetchingPLSS && !isMockData) {
+            if (isFetchingPLSS) {
                 return (
                     <View className="flex-1 items-center justify-center py-8">
                         <ActivityIndicator size="large" color="#EC4899" />
@@ -540,21 +577,21 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                 <View className="flex-1 items-center justify-center py-8">
                     <FileIcon size={40} color="#9CA3AF" />
                     <Text className="text-gray-400 text-sm mt-2">
-                        {isMockData ? t('🧪 Mock data - No server image') : t('No image available')}
+                        {t('No image available')}
                     </Text>
                     <TouchableOpacity
                         className="mt-4 px-4 py-2 bg-gray-700 rounded-lg"
                         onPress={() => setUseServerImage(false)}
                     >
                         <Text className="text-white text-sm">
-                            {isMockData ? t('🧪 Generate Mock Screenshot') : t('Generate Local Screenshot')}
+                            {t('Generate Local Screenshot')}
                         </Text>
                     </TouchableOpacity>
                 </View>
             );
         };
 
-        // Enhanced local content rendering with ViewShot wrapper
+        // Local content rendering with ViewShot wrapper
         const renderLocalContent = () => (
             <View className="flex-1 items-center justify-center mb-6">
                 <View className="w-full p-3 relative">
@@ -576,13 +613,6 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                             resizeMode="cover"
                         >
                             <View className="flex-1 p-6 justify-between ml-1">
-                                {/* Mock data indicator */}
-                                {isMockData && (
-                                    <View className="absolute top-2 right-2 bg-yellow-500 px-2 py-1 rounded-md z-10">
-                                        <Text className="text-black text-xs font-bold">🧪 MOCK</Text>
-                                    </View>
-                                )}
-
                                 <View className="mt-2">
                                     <Text className="text-white text-2xl font-InterBold">
                                         {history.symbol}
@@ -640,14 +670,12 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                     </ViewShot>
                 </View>
 
-                {!isMockData && (
-                    <TouchableOpacity
-                        className="mt-4 px-4 py-2 bg-gray-700 rounded-lg"
-                        onPress={() => setUseServerImage(true)}
-                    >
-                        <Text className="text-white text-sm">{t('Use Server Screenshot')}</Text>
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                    className="mt-4 px-4 py-2 bg-gray-700 rounded-lg"
+                    onPress={() => setUseServerImage(true)}
+                >
+                    <Text className="text-white text-sm">{t('Use Server Screenshot')}</Text>
+                </TouchableOpacity>
             </View>
         );
 
@@ -673,7 +701,7 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                 >
                     <View className="flex-row items-center justify-between px-4 py-3">
                         <Text className="text-white text-lg font-InterBold">
-                            {t('P/L Screenshot')} {isMockData && <Text className="text-yellow-400">🧪</Text>}
+                            {t('P/L Screenshot')}
                         </Text>
                         <TouchableOpacity onPress={handleClose}>
                             <X size={20} color="#FFFFFF" />
@@ -683,7 +711,7 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                     {/* Dynamic content based on mode */}
                     {useServerImage ? renderServerContent() : renderLocalContent()}
 
-                    {/* Enhanced action buttons with Download and Share */}
+                    {/* Action buttons with Download and Share */}
                     <View className="flex-row items-center justify-between mb-3 space-x-2">
                         <TouchableOpacity
                             className="flex-1 py-3 rounded-lg border border-gray-700 items-center justify-center mr-2"
@@ -693,12 +721,12 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                         </TouchableOpacity>
                         
                         <TouchableOpacity
-                            className={`flex-1 py-3 rounded-lg border items-center justify-center mr-2 ${isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS && !isMockData)
+                            className={`flex-1 py-3 rounded-lg border items-center justify-center mr-2 ${isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS)
                                 ? 'bg-gray-600 border-gray-600'
                                 : 'bg-blue-600 border-blue-600'
                                 }`}
                             onPress={handleShare}
-                            disabled={isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS && !isMockData) || Platform.OS === 'web'}
+                            disabled={isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS) || Platform.OS === 'web'}
                         >
                             <View className="flex-row items-center">
                                 <Share2 size={16} color="#FFFFFF" />
@@ -709,21 +737,18 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            className={`flex-1 py-3 rounded-lg border items-center justify-center ${isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS && !isMockData)
+                            className={`flex-1 py-3 rounded-lg border items-center justify-center ${isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS)
                                 ? 'bg-gray-600 border-gray-600'
                                 : 'bg-primary-100 border-primary-100'
                                 }`}
                             onPress={handleDownload}
-                            disabled={isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS && !isMockData)}
+                            disabled={isDownloading || (useServerImage && !imageUrl && !isFetchingPLSS)}
                         >
                             <View className="flex-row items-center">
                                 {isDownloading && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 4 }} />}
                                 <Download size={16} color="#FFFFFF" />
                                 <Text className="text-white font-InterBold ml-1">
-                                    {isDownloading 
-                                        ? (isMockData ? t('🧪 Saving...') : t('Saving...'))
-                                        : (isMockData ? t('🧪 Download') : t('Download'))
-                                    }
+                                    {isDownloading ? t('Saving...') : t('Download')}
                                 </Text>
                             </View>
                         </TouchableOpacity>
@@ -731,10 +756,12 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
 
                     <View className="px-4 mt-4">
                         <Text className="text-gray-400 text-xs text-center">
-                            {isMockData && <Text className="text-yellow-400">🧪 {t('Mock data')} - </Text>}
-                            {t('Screenshot will be saved to your {{location}}', {
-                                location: Platform.OS === 'ios' ? t('Photos') : t('Gallery')
-                            })}
+                            {Platform.OS === 'android' 
+                                ? t('Screenshot will be saved to your device storage')
+                                : t('Screenshot will be saved to your {{location}}', {
+                                    location: Platform.OS === 'ios' ? t('Photos') : t('Gallery')
+                                })
+                            }
                         </Text>
                     </View>
                 </BottomSheetScrollView>

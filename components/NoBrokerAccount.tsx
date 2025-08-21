@@ -187,18 +187,29 @@ function NoBrokerAccount({
   }, [liveAccounts, demoAccounts]);
 
   const handleAccountPress = useCallback((account: DisplayAccount) => {
-    console.log('[NoBrokerAccount] Account pressed:', account.id, account.name);
+    console.log('[NoBrokerAccount] Account pressed - Full touch area:', {
+      id: account.id,
+      name: account.name,
+      type: account.type,
+      hasOnAccountPress: !!onAccountPress,
+      context
+    });
 
+    // If external handler is provided, use it immediately
     if (onAccountPress) {
+      console.log('[NoBrokerAccount] Using external onAccountPress handler');
       onAccountPress(account);
       return;
     }
 
+    // Internal handler for direct usage
+    console.log('[NoBrokerAccount] Using internal bottom sheet handler');
+    
     const enhancedAccountData = {
       id: account.id,
       name: account.name,
       balance: `${account.currency || 'USD'} ${account.balance.toLocaleString()}`,
-      dailyPL: `${account.dailyPL >= 0 ? '+' : ''}${account.currency || 'USD'} ${account.dailyPL.toLocaleString()}`,
+      dailyPL: `${account.dailyPL >= 0 ? '+' : ''}${account.currency || 'USD'} ${Math.abs(account.dailyPL).toLocaleString()}`,
       changePercentage: `${account.changePercentage >= 0 ? '+' : ''}${account.changePercentage.toFixed(2)}%`,
       type: account.type,
       originalData: account.originalData,
@@ -212,8 +223,13 @@ function NoBrokerAccount({
     };
 
     setSelectedAccount(enhancedAccountData);
-    demoBottomSheetRef.current?.present();
-  }, [onAccountPress]);
+    
+    // Present bottom sheet immediately
+    requestAnimationFrame(() => {
+      demoBottomSheetRef.current?.present();
+    });
+  }, [onAccountPress, context]);
+
 
   const renderTabContent = () => {
     // Show loading state while fetching data

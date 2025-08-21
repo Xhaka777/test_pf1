@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "trading_app",
-    "slug": "trading_app",
+    "slug": "tradepfone",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -66,8 +66,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "4d1c0803-7b06-43fc-9793-aa1d247e39f9"
+        "projectId": "63fa5aaf-f828-406c-9d98-a54b3a08c856"
       }
-    }
+    },
+    "owner": "xhaka211"
   }
 }

@@ -30,7 +30,7 @@ const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
         [CurrencyCodeEnum.NZD]: images.nzd_png,
         [CurrencyCodeEnum.BTC]: images.btc_png,
         [CurrencyCodeEnum.USDT]: images.usdt_png,
-        [CurrencyCodeEnum.UKNOWN]: images.usa_png,
+        [CurrencyCodeEnum.UNKNOWN]: images.usa_png,
     };
     return flagMap[currency] || images.usa_png;
 };
@@ -79,8 +79,7 @@ const LivePrice = ({
 export function TradingWidget() {
     const { t } = useTranslation();
     const [activeSymbol, setActiveSymbol] = useActiveSymbol();
-    const { findCurrencyPairBySymbol } = useCurrencySymbol();
-    const { currencySymbols } = useCurrencySymbol();
+    const { coreSymbols, findCurrencyPairBySymbol, isLoadingCore } = useCurrencySymbol();
 
     const [previousPrice, setPreviousPrice] = useState<{
         marketPrice: number | null;
@@ -88,49 +87,56 @@ export function TradingWidget() {
         ask: number | null;
     }>({ marketPrice: null, bid: null, ask: null });
 
-    // console.log('activeSymbol', activeSymbol)
-
+    // Set default symbol to BTCUSD only if we have core symbols loaded
     useEffect(() => {
-        if (!activeSymbol && currencySymbols.length > 0) {
-            // Check if BTCUSD exists in the available symbols
-            const btcSymbol = currencySymbols.find(symbol => symbol.symbol === 'BTCUSD');
+        if (!activeSymbol && coreSymbols.length > 0 && !isLoadingCore) {
+            // Check if BTCUSD exists in the core symbols first
+            const btcSymbol = coreSymbols.find(symbol => symbol.symbol === 'BTCUSD');
 
             if (btcSymbol) {
-                console.log('Setting default symbol to BTCUSD');
+                console.log('Setting default symbol to BTCUSD from core symbols');
                 setActiveSymbol('BTCUSD');
             } else {
-                // Fallback to first available symbol if BTCUSD doesn't exist
-                console.log('BTCUSD not available, using first symbol:', currencySymbols[0].symbol);
-                setActiveSymbol(currencySymbols[0].symbol);
+                // Fallback to first available core symbol
+                console.log('BTCUSD not in core symbols, using first core symbol:', coreSymbols[0].symbol);
+                setActiveSymbol(coreSymbols[0].symbol);
             }
         }
-    }, [activeSymbol, currencySymbols, setActiveSymbol]);
+    }, [activeSymbol, coreSymbols, setActiveSymbol, isLoadingCore]);
 
-
+    // Optimized symbol data lookup - only look for current active symbol
     const symbolData = useMemo(() => {
-        const symbol = activeSymbol ? findCurrencyPairBySymbol(activeSymbol) : null;
+        if (!activeSymbol) {
+            return {
+                symbol: null,
+                marketPrice: 0,
+                ask: 0,
+                bid: 0
+            };
+        }
+
+        const symbol = findCurrencyPairBySymbol(activeSymbol);
         return {
             symbol: symbol,
             marketPrice: symbol?.marketPrice ?? 0,
             ask: symbol?.ask ?? 0,
             bid: symbol?.bid ?? 0
         }
-    }, [activeSymbol, findCurrencyPairBySymbol])
+    }, [activeSymbol, findCurrencyPairBySymbol]);
 
+    // Update previous prices only when current symbol data changes
     useEffect(() => {
         if (symbolData.marketPrice || symbolData.bid || symbolData.ask) {
             setPreviousPrice(prev => ({
-                marketPrice: symbolData.marketPrice || prev.marketPrice,
-                bid: prev.bid !== symbolData.bid ? prev.bid : null,
-                ask: prev.ask !== symbolData.ask ? prev.ask : null,
+                marketPrice: symbolData.marketPrice !== prev.marketPrice ? prev.marketPrice : null,
+                bid: symbolData.bid !== prev.bid ? prev.bid : null,
+                ask: symbolData.ask !== prev.ask ? prev.ask : null,
             }))
         }
     }, [symbolData.marketPrice, symbolData.bid, symbolData.ask])
 
     const spread = useMemo(() => {
         if (symbolData.ask && symbolData.bid) {
-            // console.log('spread', spread);
-            // console.log('object', symbolData.ask - symbolData.bid)
             return symbolData.ask - symbolData.bid;
         }
         return 0;
@@ -155,12 +161,31 @@ export function TradingWidget() {
         }
     }, [activeSymbol]);
 
+    // Show loading state if core symbols are still loading
+    if (isLoadingCore) {
+        return (
+            <View className='flex-row items-center p-2 border-b'>
+                <Skeleton width={120} height={40} />
+                <Separator />
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className='flex-1'
+                    contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 8 }}
+                >
+                    <Skeleton width={75} height={40} />
+                    <Skeleton width={75} height={40} />
+                    <Skeleton width={75} height={40} />
+                </ScrollView>
+            </View>
+        );
+    }
+
     return (
         <View className='flex-row items-center p-2 border-b'>
             <View className='flex-shrink-0'>
                 <TradingPrices />
             </View>
-
 
             <Separator />
 
@@ -205,29 +230,6 @@ export function TradingWidget() {
                         isLoading={!symbolData.symbol}
                     />
                 </View>
-
-                {/* <View className='min-w-[75px] flex-1 lg:flex-none'>
-                    <Text className='text-gray-400 text-xs lg:text-sm mb-1'>
-                        {t('Spread')}
-                    </Text>
-                    <View className='min-h-[20px] justify-center'>
-                        {spread ? (
-                            <View>
-                                <Text className='text-sm lg:text-base text-yellow-500 font-medium'>
-                                    {spread.toLocaleString('en-US', {
-                                        maximumFractionDigits: spread.toString().length
-                                    })}
-                                </Text>
-                                <Text className='text-xs text-gray-500'>
-                                    ({spreadPercentage.toFixed(3)}%)
-                                </Text>
-                            </View>
-                        ) : (
-                            <Skeleton width={60} height={20} />
-                        )}
-                    </View>
-                </View> */}
-
             </ScrollView>
         </View>
     )

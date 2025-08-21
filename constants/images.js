@@ -43,6 +43,8 @@ import mt5 from '../assets/images/mt5.png';
 import dxtrade from '../assets/images/dxtrade.png';
 import binance from '../assets/images/binance.jpg';
 
+import profile_clerk from '../assets/images/profile_clerk.png';
+
 export default {
     logo,
     frame,
@@ -87,4 +89,6 @@ export default {
     mt5,
     dxtrade,
     binance,
+
+    profile_clerk
 }

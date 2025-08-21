@@ -3,28 +3,31 @@ import React from "react";
 import PropFirmPLCard from "./PropFirmPLCard";
 import { EvaluatedAccountIcon } from "./icons/EvaluatedAccountIcon";
 
-interface PropFirmAccount {
-    id: number;
-    name: string;
-    balance: number;
-    dailyPL: number;
-    changePercentage: number;
-    type?: 'Challenge' | 'Funded';
-    currency?: string;
-    firm?: string;
-    program?: string;
-    totalPL?: number;
-    netPL?: number;
-    startingBalance?: number;
-    maxTotalDD?: number;
-    profitTarget?: number;
-    originalData?: any;
+interface ChallengeAccountsProps {
+    accounts: Array<{
+        id: number;
+        name: string;
+        balance: number;
+        dailyPL: number;
+        changePercentage: number;
+        type?: 'Challenge' | 'Funded';
+        currency?: string;
+        firm?: string;
+        program?: string;
+        totalPL?: number;
+        netPL?: number;
+        startingBalance?: number;
+        maxTotalDD?: number;
+        profitTarget?: number;
+        originalData?: any;
+    }>,
+    onAccountPress: (account: any) => void;
 }
 
-interface ChallengeAccountsProps {
-    accounts: PropFirmAccount[];
-    onAccountPress: (account: PropFirmAccount) => void;
-}
+// interface ChallengeAccountsProps {
+//     accounts: PropFirmAccount[];
+//     onAccountPress: (account: PropFirmAccount) => void;
+// }
 
 const ChallengeAccounts = ({
     accounts,
@@ -33,12 +36,12 @@ const ChallengeAccounts = ({
 
     return (
         <View className="mt-2">
-            {accounts.map((account: PropFirmAccount) => (
+            {accounts.map((account) => (
                 <TouchableOpacity
                     key={account.id}
                     onPress={() => onAccountPress(account)}
                 >
-                   <PropFirmPLCard
+                    <PropFirmPLCard
                         account={account}
                         activeTab="Challenge"
                         accountName={account.name}

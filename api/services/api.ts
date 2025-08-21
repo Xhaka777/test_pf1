@@ -1,12 +1,11 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
+import { clerkTokenManager } from '@/utils/clerk-token-manager';
 
 type FetchApiOptions = AxiosRequestConfig & {
   formData?: FormData;
   returnMethod?: 'json' | 'blob';
 };
-
-// ✅ REMOVED: getWSSBaseUrl function - no longer needed
 
 export function useAuthenticatedApi<T>() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -27,9 +26,10 @@ export function useAuthenticatedApi<T>() {
       throw new Error('User not authenticated. Please sign in.');
     }
 
+    // Use the enhanced token manager for fast token retrieval
     let clerkToken: string | null = null;
     try {
-      clerkToken = await getToken();
+      clerkToken = await clerkTokenManager.getToken(getToken);
     } catch (tokenError) {
       console.error('[API] Failed to get Clerk token:', tokenError);
       throw new Error('Failed to get authentication token');
@@ -98,6 +98,8 @@ export function useAuthenticatedApi<T>() {
         const status = error.response?.status || 0;
         
         if (status === 401 || status === 403) {
+          // Token might be invalid, force refresh on next call
+          await clerkTokenManager.clearCache();
           throw new Error('Authentication failed. Please sign in again.');
         } else if (status === 404) {
           throw new Error(`Resource not found: ${endpoint}`);

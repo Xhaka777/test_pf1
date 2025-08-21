@@ -371,12 +371,6 @@ const Overview = () => {
               dailyPLPercentage={currentAccountData.dailyPLPercentage}
             />
 
-            {/* <WinLossStats
-              winPercentage={33.32}
-              lossPercentage={64.68}
-              winAmount={129}
-              lossAmount={29.85}
-            /> */}
             <WinLossStats
               winPercentage={winLossStats.winPercentage}
               lossPercentage={winLossStats.lossPercentage}

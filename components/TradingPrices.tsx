@@ -1,13 +1,15 @@
-import React, { useRef, useState, useCallback, useMemo, RefObject } from "react";
+// components/TradingPrices.tsx - Original UI with FlatList and Live Prices
+import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import {
     View,
     Text,
     TouchableOpacity,
     TextInput,
     Modal,
-    ScrollView,
+    FlatList,
     Image,
-    ActivityIndicator
+    ActivityIndicator,
+    ListRenderItem
 } from 'react-native'
 import { getCurrencyFlags, CurrencyCodeEnum } from "@/api/utils/currency-trade";
 import { useTranslation } from 'react-i18next';
@@ -15,6 +17,7 @@ import { useCurrencySymbol } from "@/providers/currency-symbols";
 import { useActiveSymbol } from "@/hooks/use-active-symbol";
 import { useFavorites } from "@/hooks/use-favorites";
 import { ChevronDown, Search, X, Star } from "lucide-react-native";
+import { TradingPair } from "@/api/schema/trading-service";
 import images from "@/constants/images";
 
 const ChevronDownIcon = () => (
@@ -66,26 +69,108 @@ const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
     return flagMap[currency] || images.usa_png;
 };
 
+// Memoized FlatList item component for better performance
+const CurrencyListItem = React.memo(({ 
+    item, 
+    favoriteSymbols, 
+    onToggleFavorite, 
+    onSelectSymbol 
+}: {
+    item: TradingPair;
+    favoriteSymbols: string[];
+    onToggleFavorite: (symbol: string) => void;
+    onSelectSymbol: (symbol: string) => void;
+}) => {
+    const { from, to } = getCurrencyFlags(item.symbol);
+    const fromFlagImage = getCurrencyFlagImage(from);
+    const toFlagImage = getCurrencyFlagImage(to);
+    const isStarred = favoriteSymbols.includes(item.symbol);
+
+    return (
+        <TouchableOpacity
+            className="px-4 py-2"
+            onPress={() => onSelectSymbol(item.symbol)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`Select ${item.symbol}, current price ${item.marketPrice}`}
+        >
+            <View className="flex-row items-center gap-2">
+                <View className="w-8 items-center">
+                    <StarIcon
+                        filled={isStarred}
+                        onPress={() => onToggleFavorite(item.symbol)}
+                    />
+                </View>
+                <View className="flex-1 flex-row items-center gap-2 overflow-hidden">
+                    <View className="flex-row w-11">
+                        <Image
+                            source={fromFlagImage}
+                            style={{ width: 18, height: 18 }}
+                        />
+                        <Image
+                            source={toFlagImage}
+                            style={{ width: 18, height: 18, marginLeft: -6 }}
+                        />
+                    </View>
+                    <Text className="font-semibold text-sm text-white" numberOfLines={1}>
+                        {item.symbol}
+                    </Text>
+                </View>
+                <View className="flex-1 items-center">
+                    <Text className="font-semibold text-sm text-red-500">
+                        {item.marketPrice.toLocaleString('en-US', {
+                            maximumFractionDigits: Math.min(
+                                item.marketPrice.toString().split('.')[1]?.length || 0, 
+                                8
+                            )
+                        })}
+                    </Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
 export function TradingPrices() {
     const { t } = useTranslation();
     const [activeSymbol, setActiveSymbol] = useActiveSymbol();
-    const { currencySymbols, findCurrencyPairBySymbol } = useCurrencySymbol();
+    const { 
+        coreSymbols, 
+        allSymbols, 
+        findCurrencyPairBySymbol, 
+        loadAllSymbols, 
+        isLoadingAll 
+    } = useCurrencySymbol();
+    
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
-    const [isLoading, setIsLoading] = useState(false);
     const searchInputRef = useRef<TextInput>(null);
+    const flatListRef = useRef<FlatList>(null);
 
     const { favoriteSymbols, toggleFavorite: toggleFavoriteApi } = useFavorites();
 
-    const handleToggleFavorite = useCallback((symbol: string, event?: any) => {
-        event?.stopPropagation?.();
+    // Load all symbols when modal opens (lazy loading)
+    useEffect(() => {
+        if (open && allSymbols.length === 0) {
+            console.log('Loading all symbols for TradingPrices modal...');
+            loadAllSymbols();
+        }
+    }, [open, allSymbols.length, loadAllSymbols]);
+
+    const handleToggleFavorite = useCallback((symbol: string) => {
         try {
             toggleFavoriteApi(symbol);
         } catch (error) {
             console.error('Error toggling favorite:', error);
         }
-    }, [toggleFavoriteApi])
+    }, [toggleFavoriteApi]);
+
+    const handleSelectSymbol = useCallback((symbol: string) => {
+        setActiveSymbol(symbol);
+        setOpen(false);
+        setSearchQuery('');
+    }, [setActiveSymbol]);
 
     const handleModalOpen = useCallback(() => {
         setOpen(true);
@@ -100,82 +185,42 @@ export function TradingPrices() {
         setSearchQuery('');
     }, []);
 
-    const filteredCurrencySymbols = useMemo(() => {
-        return currencySymbols
-            .filter((currency) => {
-                if (activeTab === 'favorites' && !favoriteSymbols.includes(currency.symbol)) {
-                    return false;
-                }
+    // Use appropriate symbol set based on modal state
+    const currentSymbols = useMemo(() => {
+        return open ? allSymbols : coreSymbols;
+    }, [open, allSymbols, coreSymbols]);
 
-                if (!searchQuery) {
-                    return true;
-                }
+    // Filtered symbols for FlatList - return raw data, not JSX
+    const filteredSymbols = useMemo(() => {
+        const symbolsToFilter = currentSymbols.filter((currency) => {
+            if (activeTab === 'favorites' && !favoriteSymbols.includes(currency.symbol)) {
+                return false;
+            }
 
-                return (
-                    currency.symbol === searchQuery ||
-                    currency.symbol.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-            })
-            .map((currency, index) => {
-                const { from, to } = getCurrencyFlags(currency.symbol);
-                const fromFlagImage = getCurrencyFlagImage(from);
-                const toFlagImage = getCurrencyFlagImage(to);
-                const isStarred = favoriteSymbols.includes(currency.symbol);
+            if (!searchQuery) {
+                return true;
+            }
 
-                return (
-                    <TouchableOpacity
-                        key={currency.symbol}
-                        className="px-4 py-2"
-                        onPress={() => {
-                            setActiveSymbol(currency.symbol)
-                            handleModalClose();
-                        }}
-                        accessible={true}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Select ${currency.symbol}, current price ${currency.marketPrice}`}
-                    >
-                        <View className="flex-row items-center gap-2">
-                            <View className="w-8 items-center">
-                                <StarIcon
-                                    filled={isStarred}
-                                    onPress={() => handleToggleFavorite(currency.symbol)}
-                                />
-                            </View>
-                            <View className="flex-1 flex-row items-center gap-2 overflow-hidden">
-                                <View className="flex-row w-11">
-                                    <Image
-                                        source={fromFlagImage}
-                                        style={{ width: 18, height: 18 }}
-                                    />
-                                    <Image
-                                        source={toFlagImage}
-                                        style={{ width: 18, height: 18, marginLeft: -6 }}
-                                    />
-                                </View>
-                                <Text className="font-semibold text-sm text-white" numberOfLines={1}>
-                                    {currency.symbol}
-                                </Text>
-                            </View>
-                            <View className="flex-1 items-center">
-                                <Text className="font-semibold text-sm text-red-500">
-                                    {currency.marketPrice.toLocaleString('en-US', {
-                                        maximumFractionDigits: currency.marketPrice.toString().length
-                                    })}
-                                </Text>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                )
-            })
+            return (
+                currency.symbol === searchQuery ||
+                currency.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+        });
+
+        // Different sorting based on tab
+        if (activeTab === 'favorites') {
+            // In favorites tab: show only favorites, sorted alphabetically
+            return symbolsToFilter.sort((a, b) => a.symbol.localeCompare(b.symbol));
+        } else {
+            // In all assets tab: show all symbols alphabetically (no favorites priority)
+            return symbolsToFilter.sort((a, b) => a.symbol.localeCompare(b.symbol));
+        }
     }, [
-        currencySymbols,
+        currentSymbols,
         activeTab,
         favoriteSymbols,
-        searchQuery,
-        handleToggleFavorite,
-        setActiveSymbol,
-        handleModalClose
-    ])
+        searchQuery
+    ]);
 
     const selectedSymbolData = useMemo(() => {
         if (!activeSymbol) {
@@ -212,14 +257,56 @@ export function TradingPrices() {
         )
     }, [activeSymbol, findCurrencyPairBySymbol])
 
-    const tabs = [
-        { id: 'all', label: t('All Assets'), count: currencySymbols.length },
+    const tabs = useMemo(() => [
+        { id: 'all', label: t('All Assets'), count: currentSymbols.length },
         { id: 'favorites', label: t('Favorites'), count: favoriteSymbols.length }
-    ]
+    ], [t, currentSymbols.length, favoriteSymbols.length]);
 
     const clearSearch = useCallback(() => {
         setSearchQuery('');
     }, []);
+
+    // FlatList render item function
+    const renderItem: ListRenderItem<TradingPair> = useCallback(({ item }) => (
+        <CurrencyListItem
+            item={item}
+            favoriteSymbols={favoriteSymbols}
+            onToggleFavorite={handleToggleFavorite}
+            onSelectSymbol={handleSelectSymbol}
+        />
+    ), [favoriteSymbols, handleToggleFavorite, handleSelectSymbol]);
+
+    // FlatList key extractor
+    const keyExtractor = useCallback((item: TradingPair) => item.symbol, []);
+
+    // Empty component for FlatList
+    const renderEmptyComponent = useCallback(() => (
+        <View className="py-8 items-center">
+            <Text className="text-sm text-gray-500 text-center">
+                {activeTab === 'favorites'
+                    ? t('No favorite assets yet. Star some assets to add them here.')
+                    : t('No assets found matching your search.')
+                }
+            </Text>
+        </View>
+    ), [activeTab, t]);
+
+    // Loading component for FlatList
+    const renderLoadingComponent = useCallback(() => (
+        <View className="flex-1 justify-center items-center py-8">
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="text-gray-500 mt-2">{t('Loading all symbols...')}</Text>
+        </View>
+    ), [t]);
+
+    // FlatList header component
+    const renderListHeader = useCallback(() => (
+        <View className="flex-row items-center px-4 py-2 gap-2">
+            <View className="w-8" />
+            <Text className="flex-1 text-xs text-gray-500">{t('Instruments')}</Text>
+            <Text className="flex-1 text-xs text-gray-500 text-center">{t('Market Price')}</Text>
+        </View>
+    ), [t]);
 
     const modalContent = (
         <>
@@ -282,33 +369,49 @@ export function TradingPrices() {
                 </View>
             </View>
 
-            {/* Header Row */}
-            <View className="flex-row items-center px-4 py-2 gap-2">
-                <View className="w-8" />
-                <Text className="flex-1 text-xs text-gray-500">{t('Instruments')}</Text>
-                <Text className="flex-1 text-xs text-gray-500 text-center">{t('Market Price')}</Text>
-            </View>
-
-            {/* Currency List */}
-            <ScrollView className="flex-1">
-                {isLoading ? (
-                    <View className="flex-1 justify-center items-center py-8">
-                        <ActivityIndicator size="large" color="#3B82F6" />
-                        <Text className="text-gray-500 mt-2">{t('Loading...')}</Text>
-                    </View>
-                ) : filteredCurrencySymbols.length > 0 ? (
-                    filteredCurrencySymbols
+            {/* FlatList with Header and Loading States */}
+            <View className="flex-1">
+                {isLoadingAll && allSymbols.length === 0 ? (
+                    renderLoadingComponent()
                 ) : (
-                    <View className="py-8 items-center">
-                        <Text className="text-sm text-gray-500 text-center">
-                            {activeTab === 'favorites'
-                                ? t('No favorite assets yet. Star some assets to add them here.')
-                                : t('No assets found matching your search.')
+                    <FlatList
+                        ref={flatListRef}
+                        data={filteredSymbols}
+                        renderItem={renderItem}
+                        keyExtractor={keyExtractor}
+                        ListHeaderComponent={renderListHeader}
+                        ListEmptyComponent={renderEmptyComponent}
+                        
+                        // Performance optimizations
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={15}
+                        windowSize={8}
+                        initialNumToRender={12}
+                        updateCellsBatchingPeriod={50}
+                        getItemLayout={(data, index) => ({
+                            length: 48, // Approximate height of each item
+                            offset: 48 * index,
+                            index,
+                        })}
+                        
+                        // Style and behavior
+                        className="flex-1"
+                        showsVerticalScrollIndicator={true}
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={{ flexGrow: 1 }}
+                        
+                        // Scroll to top when data changes
+                        onContentSizeChange={() => {
+                            if (searchQuery || activeTab === 'favorites') {
+                                flatListRef.current?.scrollToOffset({ animated: false, offset: 0 });
                             }
-                        </Text>
-                    </View>
+                        }}
+                        
+                        // Enhanced performance for live data
+                        extraData={`${favoriteSymbols.join(',')}-${Date.now()}`}
+                    />
                 )}
-            </ScrollView>
+            </View>
         </>
     )
 

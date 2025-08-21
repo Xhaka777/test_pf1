@@ -36,7 +36,12 @@ export const WinLossStats = ({
   // Format currency amounts
   const formatAmount = (amount: number) => {
     if (isLoading) return '--';
-    return `${currency} ${Math.abs(amount).toLocaleString()}`;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(amount));
   };
 
   // Handle loading state
@@ -72,7 +77,7 @@ export const WinLossStats = ({
 
   return (
     <View
-      className="bg-propfirmone-300 rounded-lg px-5 py-3 mx-2"
+      className="bg-propfirmone-300 rounded-lg px-5 py-3 mx-2 mt-3"
       onLayout={(event) => {
         const { width } = event.nativeEvent.layout;
         setContainerWidth(width);

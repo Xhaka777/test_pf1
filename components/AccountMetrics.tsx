@@ -96,14 +96,14 @@ export function AccountMetrics({
                 <View className="flex-1">
                     <View className="bg-propfirmone-300 rounded-lg p-2">
                         <View className="flex-row items-center justify-between mb-2">
-                            <Text className="text-gray-400 text-xs font-medium">
+                            <Text className="text-gray-400 text-sm font-InterMedium">
                                 {t('Daily Loss')}
                             </Text>
                             <View className="flex-row items-center">
-                                <Text className="text-red-500 text-xs font-medium">
+                                <Text className="text-red-500 text-xs font-InterMedium">
                                     -5%
                                 </Text>
-                                <Text className="text-gray-400 text-xs ml-1">
+                                <Text className="text-gray-400 text-xs font-InterMedium ml-1">
                                     0%
                                 </Text>
                             </View>
@@ -124,14 +124,14 @@ export function AccountMetrics({
                 <View className="flex-1">
                     <View className="bg-propfirmone-300 rounded-lg p-2">
                         <View className="flex-row items-center justify-between mb-2">
-                            <Text className="text-gray-400 text-xs font-medium">
+                            <Text className="text-gray-400 text-sm font-InterMedium">
                                 {t('Max Drawdown')}
                             </Text>
                             <View className="flex-row items-center">
-                                <Text className="text-red-500 text-xs font-medium">
+                                <Text className="text-red-500 text-xs font-InterMedium">
                                     -${Math.abs(netPlInUnits).toLocaleString()}
                                 </Text>
-                                <Text className="text-green-500 text-xs ml-1">
+                                <Text className="text-green-500 text-xs font-InterMedium ml-1">
                                     ${profitTargetInUnits.toLocaleString()}
                                 </Text>
                             </View>
@@ -153,20 +153,20 @@ export function AccountMetrics({
             <View className="flex-row gap-2 mt-2 px-2">
                 <View className="flex-1">
                     <View className="bg-propfirmone-300 rounded-lg p-2">
-                        <Text className="text-gray-400 text-xs font-medium mb-1">
+                        <Text className="text-gray-400 text-sm font-InterMedium mb-1">
                             {t('Daily P/L')}
                         </Text>
-                        <Text className={`text-lg font-bold ${dailyPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <Text className={`text-sm font-InterBold ${dailyPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                             {dailyPL >= 0 ? '' : '-'}${Math.abs(dailyPL).toLocaleString()}
                         </Text>
                     </View>
                 </View>
                 <View className="flex-1">
                     <View className="bg-propfirmone-300 rounded-lg p-2">
-                        <Text className="text-gray-400 text-xs font-medium mb-1">
+                        <Text className="text-gray-400 text-sm font-InterMedium mb-1">
                             {t('Total P/L')}
                         </Text>
-                        <Text className={`text-lg font-bold ${totalPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <Text className={`text-sm font-InterBold ${totalPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                             {totalPL >= 0 ? '' : '-'}${Math.abs(totalPL).toLocaleString()}
                         </Text>
                     </View>

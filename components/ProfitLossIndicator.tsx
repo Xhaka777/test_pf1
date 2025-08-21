@@ -2,140 +2,388 @@ import React from "react";
 import { View, Text } from 'react-native';
 import { LinearGradient } from "expo-linear-gradient";
 
-interface ProfitLossIndicatorProps {
-    companyName?: string;
-    totalValue?: number;
-    percentageChange?: number;
-    dailyPL?: number;
-    iconComponent?: React.ReactNode;
-    // Additional props for broker accounts
-    startingBalance?: number;
-    currency?: string;
-    showLabels?: boolean;
+export enum ValuePositionEnum {
+    Top = 'top',
+    Bottom = 'bottom',
+    Inline = 'inline',
 }
 
-const ProfitLossIndicator = ({
-    companyName,
-    totalValue = 0,
-    percentageChange,
-    dailyPL = 0,
-    iconComponent,
-    startingBalance,
-    currency = 'USD',
-    showLabels = true
-}: ProfitLossIndicatorProps) => {
-    
-    // Calculate percentage change if not provided
-    const calculatedPercentageChange = React.useMemo(() => {
-        if (percentageChange !== undefined) {
-            return percentageChange;
-        }
-        
-        // If we have starting balance and daily P/L, calculate percentage
-        if (startingBalance && startingBalance > 0) {
-            return (dailyPL / startingBalance) * 100;
-        }
-        
-        // If we have total value and daily P/L, calculate percentage
-        if (totalValue && totalValue > 0) {
-            return (dailyPL / totalValue) * 100;
-        }
-        
-        return 0;
-    }, [percentageChange, dailyPL, startingBalance, totalValue]);
+interface ProfitLossIndicatorProps {
+    value: number;
+    minimumLimit: number;
+    maximumLimit: number;
+    valueLabel: string;
+    showMinimumLimit?: boolean;
+    valuePosition?: ValuePositionEnum;
+    limitPrefix?: string;
+    limitSuffix?: string;
+    positiveValueLabel?: string | null;
+    variant?: 'orangeToGreenGradient' | 'greenToOrangeGradient' | 'greenToRedGradient' | 'pfmGradient' | 'default';
+    size?: 'lg' | 'default' | 'sm' | 'xs' | 'xxs' | '3xs';
+    rounded?: boolean;
+}
 
-    // Clamp percentage to reasonable range for display (-10% to +10%)
-    const clampedPercentage = Math.min(Math.max(calculatedPercentageChange, -10), 10);
-    
-    // Calculate indicator position (0% to 100% across the bar)
-    const indicatorPosition = ((clampedPercentage + 10) / 20) * 100;
-    
-    // Determine if we're in profit or loss
-    const isProfit = calculatedPercentageChange >= 0;
+// Utility function matching the web version
+const valueAsPercentage = ({ value, minLimit, maxLimit }: { value: number; minLimit: number; maxLimit: number }) => {
+    if (maxLimit === minLimit) return 0;
+    const clampedValue = Math.max(minLimit, Math.min(maxLimit, value));
+    return ((clampedValue - minLimit) / (maxLimit - minLimit)) * 100;
+};
+
+// ProgressLinear component equivalent for React Native
+const ProgressLinear = ({
+    value,
+    minLimit = 0,
+    maxLimit,
+    variant = 'orangeToGreenGradient',
+    size = 'xs',
+    opacity = 1,
+    customTransform,
+    backgroundColor = 'transparent'
+}: {
+    value: number;
+    minLimit?: number;
+    maxLimit?: number;
+    variant?: string;
+    size?: string;
+    opacity?: number;
+    customTransform?: number;
+    backgroundColor?: string;
+}) => {
+    const percentage = valueAsPercentage({ value, minLimit, maxLimit });
+
+    // Get gradient colors and locations based on variant - matching web exactly
+    const getGradientData = () => {
+        switch (variant) {
+            case 'orangeToGreenGradient':
+                return {
+                    colors: ['#ec6652', '#f2a94d', '#f5d451', '#74d5a0'], // highlight-red -> yellow -> yellow-light -> green
+                    locations: [0, 0.35, 0.65, 1.0] // 0%, 35%, 65%, 100%
+                };
+            case 'greenToOrangeGradient':
+                return {
+                    colors: ['#74d5a0', '#f5d451', '#f2a94d', '#ec6652'], // green -> yellow-light -> yellow -> red (reversed)
+                    locations: [0, 0.35, 0.65, 1.0]
+                };
+            case 'greenToRedGradient':
+                return {
+                    colors: ['#74d5a0', '#f5d451', '#f2a94d', '#ec6652', '#ff323e'], // green -> yellow-light -> yellow -> red -> red-darker
+                    locations: [0, 0.25, 0.50, 0.75, 1.0] // 0%, 25%, 50%, 75%, 100%
+                };
+            case 'pfmGradient':
+                return {
+                    colors: ['#8B5CF6', '#06B6D4'], // purple -> cyan
+                    locations: [0, 1]
+                };
+            default:
+                return {
+                    colors: ['#3B82F6'], // primary blue
+                    locations: [0]
+                };
+        }
+    };
+
+    // Get height based on size
+    const getHeight = () => {
+        switch (size) {
+            case 'lg': return 24;
+            case 'default': return 16;
+            case 'sm': return 12;
+            case 'xs': return 8;
+            case 'xxs': return 6;
+            case '3xs': return 4;
+            default: return 8;
+        }
+    };
+
+    const gradientData = getGradientData();
+    const height = getHeight();
 
     return (
-        <View style={{ marginTop: 8 }}>
-            {/* Performance Summary */}
-            {showLabels && (
-                <View style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    marginBottom: 8 
-                }}>
-                    <Text style={{ 
-                        color: '#9CA3AF', 
-                        fontSize: 12, 
-                        fontWeight: '400' 
-                    }}>
-                        Performance
-                    </Text>
-                </View>
-            )}
-
-            {/* Progress Track Container */}
-            <View style={{ position: 'relative', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                {/* Background Gradient */}
+        <View style={{
+            width: '100%',
+            height: height,
+            borderRadius: height / 2,
+            overflow: 'hidden',
+            backgroundColor: backgroundColor === 'transparent' ? 'transparent' : '#1F2937',
+            position: 'relative'
+        }}>
+            <View style={{
+                width: '100%',
+                height: '100%',
+                transform: [{
+                    translateX: customTransform !== undefined ? customTransform : -(100 - percentage)
+                }]
+            }}>
                 <LinearGradient
-                    colors={['#EF4444', '#F59E0B', '#10B981']}
-                    locations={[0, 0.5, 1]}
+                    colors={gradientData.colors}
+                    locations={gradientData.locations}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={{
                         width: '100%',
                         height: '100%',
-                        opacity: 0.6
+                        opacity: opacity
                     }}
                 />
+            </View>
+        </View>
+    );
+};
 
-                {/* Indicator - White dot */}
-                <View
-                    style={{
+const ProfitLossIndicator = ({
+    value = 0,
+    minimumLimit = 0,
+    maximumLimit = 0,
+    valueLabel,
+    showMinimumLimit = true,
+    valuePosition = ValuePositionEnum.Top,
+    limitPrefix = '$',
+    limitSuffix = '',
+    positiveValueLabel = null,
+    variant = 'orangeToGreenGradient',
+    size = 'xs',
+    rounded = true
+}: ProfitLossIndicatorProps) => {
+
+    return (
+        <View style={{
+            gap: 8,
+            overflow: 'hidden',
+            ...(valuePosition === ValuePositionEnum.Inline ? {
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 0
+            } : {})
+        }}>
+
+            {/* Inline Position - Left Labels */}
+            {valuePosition === ValuePositionEnum.Inline && (
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 4
+                }}>
+                    {showMinimumLimit && (
+                        <Text style={{
+                            color: '#EF4444', // text-red-theme
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            ${minimumLimit.toLocaleString()}
+                        </Text>
+                    )}
+                </View>
+            )}
+
+            {/* Progress Bar Container - Exact Web Implementation */}
+            <View style={{ position: 'relative', width: '100%', marginTop: 8 }}>
+                {/* Background Progress Bar (opacity 20%) - Matches web exactly */}
+                <ProgressLinear
+                    value={100}
+                    minLimit={0}
+                    maxLimit={100}
+                    variant={variant}
+                    size={size}
+                    opacity={0.2}
+                />
+
+                {/* Negative Value Progress (right-aligned from center) */}
+                {value < 0 && (
+                    <View style={{
                         position: 'absolute',
-                        top: -4,
-                        left: `${indicatorPosition}%`,
-                        width: 16,
-                        height: 16,
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: 8,
-                        transform: [{ translateX: -8 }],
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 3.84,
-                        elevation: 5,
-                    }}
-                />
+                        top: 0,
+                        right: '50%', // absolute top-0 right-1/2
+                        width: '100%', // w-full
+                        overflow: 'hidden' // overflow-hidden
+                    }}>
+                        <ProgressLinear
+                            value={value}
+                            minLimit={0}
+                            maxLimit={minimumLimit * -1}
+                            variant="orangeToGreenGradient"
+                            size={size}
+                            backgroundColor="transparent"
+                            customTransform={
+                                maximumLimit > 0
+                                    ? (100 - ((Math.max(value, minimumLimit) / minimumLimit) * 100) / 2)
+                                    : 0
+                            }
+                        />
+                    </View>
+                )}
+
+                {/* Positive Value Progress (left-aligned from center) */}
+                {value >= 0 && (
+                    <View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: '50%', // absolute top-0 left-1/2
+                        width: '100%', // w-full
+                        overflow: 'hidden' // overflow-hidden
+                    }}>
+                        <ProgressLinear
+                            value={value}
+                            minLimit={minimumLimit}
+                            maxLimit={maximumLimit}
+                            variant="orangeToGreenGradient"
+                            size="xxs" // Note: web uses xxs for positive values
+                            backgroundColor="transparent"
+                            customTransform={
+                                maximumLimit > 0
+                                    ? -(100 - ((Math.min(value, maximumLimit) / maximumLimit) * 100) / 2)
+                                    : 0
+                            }
+                        />
+                    </View>
+                )}
+
+                {/* Center Line Indicator - Exact web positioning */}
+                <Text style={{
+                    position: 'absolute',
+                    top: -9, // -top-[9px]
+                    left: '50%', // left-1/2
+                    color: '#FFFFFF', // text-white
+                    fontSize: 16,
+                    fontFamily: 'Inter',
+                    transform: [{ translateX: -4 }] // -translate-x-1/2
+                }}>
+                    |
+                </Text>
             </View>
 
-            {/* Percentage scale labels */}
-            <View style={{ 
-                flexDirection: 'row', 
-                justifyContent: 'space-between', 
-                marginTop: 4 
-            }}>
-                <Text style={{ 
-                    fontSize: 10, 
-                    color: '#6B7280', 
-                    fontWeight: '400' 
+            {/* Inline Position - Right Labels */}
+            {valuePosition === ValuePositionEnum.Inline && (
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 4
                 }}>
-                    -10%
-                </Text>
-                <Text style={{ 
-                    fontSize: 10, 
-                    color: '#6B7280', 
-                    fontWeight: '400' 
+                    <View style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        gap: 4
+                    }}>
+                        <Text style={{
+                            color: '#9CA3AF',
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            {valueLabel}
+                        </Text>
+                        {positiveValueLabel ? (
+                            <Text style={{
+                                color: '#10B981', // text-green-theme
+                                fontSize: 14, // text-sm
+                                fontFamily: 'Inter'
+                            }}>
+                                {positiveValueLabel}
+                            </Text>
+                        ) : (
+                            <Text style={{
+                                color: '#10B981', // text-green-theme
+                                fontSize: 12,
+                                fontFamily: 'Inter'
+                            }}>
+                                ${maximumLimit.toLocaleString()}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            )}
+
+            {/* Bottom Position Labels */}
+            {valuePosition === ValuePositionEnum.Bottom && (
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 4
                 }}>
-                    0%
-                </Text>
-                <Text style={{ 
-                    fontSize: 10, 
-                    color: '#6B7280', 
-                    fontWeight: '400' 
+                    {showMinimumLimit && (
+                        <Text style={{
+                            color: '#EF4444', // text-red-theme
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            {limitPrefix}{minimumLimit.toLocaleString()}{limitSuffix}
+                        </Text>
+                    )}
+                    <View style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        gap: 4
+                    }}>
+                        <Text style={{
+                            color: '#9CA3AF',
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            {valueLabel}
+                        </Text>
+                        {positiveValueLabel ? (
+                            <Text style={{
+                                color: '#10B981', // text-green-theme
+                                fontSize: 14, // text-sm
+                                fontFamily: 'Inter'
+                            }}>
+                                {positiveValueLabel}
+                            </Text>
+                        ) : (
+                            <Text style={{
+                                color: '#10B981', // text-green-theme
+                                fontSize: 12,
+                                fontFamily: 'Inter'
+                            }}>
+                                {limitPrefix}{maximumLimit.toLocaleString()}{limitSuffix}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            )}
+            {/* Top Position Labels */}
+            {valuePosition === ValuePositionEnum.Top && (
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 4
                 }}>
-                    +10%
-                </Text>
-            </View>
+                    {showMinimumLimit && (
+                        <Text style={{
+                            color: '#EF4444', // text-red-theme
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            ${minimumLimit.toLocaleString()}
+                        </Text>
+                    )}
+                    <View style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        gap: 4
+                    }}>
+                        <Text style={{
+                            color: '#9CA3AF',
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            {valueLabel}
+                        </Text>
+                        <Text style={{
+                            color: '#10B981', // text-green-theme
+                            fontSize: 12,
+                            fontFamily: 'Inter'
+                        }}>
+                            ${maximumLimit.toLocaleString()}
+                        </Text>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }

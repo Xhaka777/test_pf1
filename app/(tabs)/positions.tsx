@@ -1,4 +1,4 @@
-// app/(tabs)/positions.tsx - Fixed version with proper ref handling
+// app/(tabs)/positions.tsx - Production version with mock data removed
 import React, { useCallback, useRef, useMemo, useEffect, useState, forwardRef } from "react";
 import Header from "@/components/Header/header";
 import { useAccounts } from "@/providers/accounts"; 
@@ -7,7 +7,7 @@ import { X } from "lucide-react-native";
 import BottomSheet, { BottomSheetModal } from "@gorhom/bottom-sheet";
 import EditPositionBottomSheet from "@/components/EditPositionBottomSheet";
 import ClosePositionBottomSheet from "@/components/ClosePositionBottomSheet";
-import CloseOrderBottomSheet from "@/components/CloseOrderBottomSheet"; // NEW IMPORT
+import CloseOrderBottomSheet from "@/components/CloseOrderBottomSheet";
 import PositionCard from "@/components/positions/PositionCard";
 import OrderCard from "@/components/positions/OrderCard";
 import HistoryCard from "@/components/positions/HistoryCard";
@@ -20,7 +20,6 @@ import { CloseTypeEnum, OpenTradesData } from "@/api/schema";
 import { StatusEnum } from "@/api/services/api";
 import { parseOrdersArray, parseTradesArray } from "@/utils/data-parsing";
 import { useOpenTradesManager } from "@/api/hooks/use-open-trades-manager";
-import { createMockOpenPositions, createMockTradeHistory } from "@/utils/mock-data"; // Import both mock functions
 
 enum TabId {
   OpenPositions = 'open-positions',
@@ -38,19 +37,16 @@ const Positions = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string>('');
 
-  // 🧪 TESTING MODE - Toggle this to enable/disable mock data
-  const [useMockData, setUseMockData] = useState(true); // Set to false to use real data
-
-  // Bottom sheet visibility states - matching web pattern
+  // Bottom sheet visibility states
   const [editPositionDialogVisible, setEditPositionDialogVisible] = useState(false);
   const [closePositionDialogVisible, setClosePositionDialogVisible] = useState(false);
-  const [closeOrderDialogVisible, setCloseOrderDialogVisible] = useState(false); // NEW STATE
+  const [closeOrderDialogVisible, setCloseOrderDialogVisible] = useState(false);
   const [screenshotPositionDialogVisible, setScreenshotPositionDialogVisible] = useState(false);
 
   // Current selected items for bottom sheets
   const [currentPosition, setCurrentPosition] = useState<OpenTradesData['open_trades'][number] | null>(null);
   const [currentOrder, setCurrentOrder] = useState<OpenTradesData['open_orders'][number] | null>(null);
-  const [currentOrderForClose, setCurrentOrderForClose] = useState<OpenTradesData['open_orders'][number] | null>(null); // NEW STATE
+  const [currentOrderForClose, setCurrentOrderForClose] = useState<OpenTradesData['open_orders'][number] | null>(null);
   const [currentHistory, setCurrentHistory] = useState<any>(null);
 
   const { selectedAccountId, selectedPreviewAccountId } = useAccounts();
@@ -75,31 +71,11 @@ const Positions = () => {
   // Bottom sheet refs
   const editBottomSheetRef = useRef<BottomSheetModal>(null);
   const closeBottomSheetRef = useRef<BottomSheetModal>(null);
-  const closeOrderBottomSheetRef = useRef<BottomSheetModal>(null); // NEW REF
+  const closeOrderBottomSheetRef = useRef<BottomSheetModal>(null);
   const screenShotBottomSheetRef = useRef<BottomSheetModal>(null);
 
-  // 🧪 Create mock data
-  const mockData = useMemo(() => {
-    if (!useMockData) return null;
-    const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
-    return createMockOpenPositions(currentAccountId || 1); // Use account ID or default to 1
-  }, [useMockData, selectedAccountId, selectedPreviewAccountId]);
-
-  // 🧪 Create mock trade history data
-  const mockTradeHistory = useMemo(() => {
-    if (!useMockData) return null;
-    const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
-    return createMockTradeHistory(currentAccountId || 1);
-  }, [useMockData, selectedAccountId, selectedPreviewAccountId]);
-
-  // Table data logic - same as web version but with mock data option
+  // Table data logic - using real data only
   const tableData: OpenTradesData | null = useMemo(() => {
-    // 🧪 Use mock data if testing mode is enabled
-    if (useMockData && mockData) {
-      console.log('🧪 [TESTING] Using mock data with', mockData.open_trades.length, 'trades');
-      return mockData;
-    }
-
     const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
     if (!openTrades) {
@@ -149,12 +125,10 @@ const Positions = () => {
     }
 
     return openTrades;
-  }, [data, openTrades, selectedAccountId, selectedPreviewAccountId, useMockData, mockData]);
+  }, [data, openTrades, selectedAccountId, selectedPreviewAccountId]);
 
-  // Refetch logic - same as web version (but skip when using mock data)
+  // Refetch logic when positions/orders count changes
   useEffect(() => {
-    if (useMockData) return; // Skip refetch logic when using mock data
-
     const currentTrades = tableData?.open_trades?.length ?? 0;
     const currentOrders = tableData?.open_orders?.length ?? 0;
     const prevTrades = prevCountsRef.current.trades;
@@ -174,7 +148,6 @@ const Positions = () => {
     tableData?.open_orders?.length,
     refetchOpenTrades,
     refetchTradeHistory,
-    useMockData, // Add dependency
   ]);
 
   useEffect(() => {
@@ -201,23 +174,9 @@ const Positions = () => {
     setAlertTimeoutId(timeoutId);
   }, [clearAlertTimeout]);
 
-  // Trade actions - same logic as web
+  // Trade actions
   const handleSyncTrades = useCallback(async () => {
     if (isLoading) return;
-
-    // 🧪 Mock the sync action when using mock data
-    if (useMockData) {
-      setIsLoading(true);
-      setLoadingAction('syncing');
-      
-      // Simulate API delay
-      setTimeout(() => {
-        setIsLoading(false);
-        setLoadingAction('');
-        showAlert('sync', 5000);
-      }, 1500);
-      return;
-    }
 
     setIsLoading(true);
     setLoadingAction('syncing');
@@ -239,7 +198,7 @@ const Positions = () => {
       setIsLoading(false);
       setLoadingAction('');
     }
-  }, [isLoading, showAlert, syncTrades, selectedAccountId, selectedPreviewAccountId, useMockData]);
+  }, [isLoading, showAlert, syncTrades, selectedAccountId, selectedPreviewAccountId]);
 
   const handleCloseTrades = useCallback(async (closeType: CloseTypeEnum) => {
     if (isLoading) return;
@@ -285,19 +244,6 @@ const Positions = () => {
                 closeType === CloseTypeEnum.PROFIT ? 'closing_profits' : 'closing_losses'
             );
 
-            // 🧪 Mock the close action when using mock data
-            if (useMockData) {
-              setTimeout(() => {
-                setIsLoading(false);
-                setLoadingAction('');
-                const alertType =
-                  closeType === CloseTypeEnum.ALL ? 'closeAll' :
-                    closeType === CloseTypeEnum.PROFIT ? 'closeProfits' : 'closeLosses';
-                showAlert(alertType);
-              }, 2000);
-              return;
-            }
-
             try {
               const response = await closeAllTrades({
                 account: selectedPreviewAccountId ?? selectedAccountId,
@@ -325,13 +271,13 @@ const Positions = () => {
         }
       ]
     );
-  }, [isLoading, closeAllTrades, selectedAccountId, selectedPreviewAccountId, showAlert, useMockData]);
+  }, [isLoading, closeAllTrades, selectedAccountId, selectedPreviewAccountId, showAlert]);
 
   const handleCloseProfits = useCallback(() => handleCloseTrades(CloseTypeEnum.PROFIT), [handleCloseTrades]);
   const handleCloseLosses = useCallback(() => handleCloseTrades(CloseTypeEnum.LOSS), [handleCloseTrades]);
   const handleCloseAll = useCallback(() => handleCloseTrades(CloseTypeEnum.ALL), [handleCloseTrades]);
 
-  // Bottom sheet handlers - using refs directly
+  // Bottom sheet handlers
   const openEditModal = useCallback((position: OpenTradesData['open_trades'][number]) => {
     setCurrentPosition(position);
     setEditPositionDialogVisible(true);
@@ -354,7 +300,6 @@ const Positions = () => {
     }, 100);
   }, []);
 
-  // NEW HANDLER for close order bottom sheet
   const openCloseOrderModal = useCallback((order: OpenTradesData['open_orders'][number]) => {
     setCurrentOrderForClose(order);
     setCloseOrderDialogVisible(true);
@@ -371,7 +316,7 @@ const Positions = () => {
     }, 100);
   }, []);
 
-  // Back handler - UPDATED to include new bottom sheet
+  // Back handler
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
@@ -385,7 +330,7 @@ const Positions = () => {
           closeBottomSheetRef.current?.dismiss();
           return true;
         }
-        if (closeOrderDialogVisible) { // NEW BACK HANDLER
+        if (closeOrderDialogVisible) {
           setCloseOrderDialogVisible(false);
           closeOrderBottomSheetRef.current?.dismiss();
           return true;
@@ -400,7 +345,7 @@ const Positions = () => {
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [editPositionDialogVisible, closePositionDialogVisible, closeOrderDialogVisible, screenshotPositionDialogVisible]) // UPDATED dependencies
+    }, [editPositionDialogVisible, closePositionDialogVisible, closeOrderDialogVisible, screenshotPositionDialogVisible])
   );
 
   useEffect(() => {
@@ -409,12 +354,12 @@ const Positions = () => {
     };
   }, [clearAlertTimeout]);
 
-  // Tab data - dynamic based on tableData and with mock history support
+  // Tab data - using real data only
   const tabData = useMemo(() => ({
     openPositions: tableData?.open_trades ?? [],
     openOrders: tableData?.open_orders ?? [],
-    orderHistory: useMockData && mockTradeHistory ? mockTradeHistory.all_trades : (tradeHistory?.all_trades ?? [])
-  }), [tableData, tradeHistory, useMockData, mockTradeHistory]);
+    orderHistory: tradeHistory?.all_trades ?? []
+  }), [tableData, tradeHistory]);
 
   // Render functions
   const renderTabs = useMemo(() => (
@@ -425,7 +370,6 @@ const Positions = () => {
       >
         <Text className={`text-center font-medium ${activeTab === TabId.OpenPositions ? 'text-white' : 'text-gray-400'}`}>
           Open Positions {tabData.openPositions.length}
-          {useMockData && <Text className="text-yellow-400"> 🧪</Text>}
         </Text>
       </TouchableOpacity>
 
@@ -435,7 +379,6 @@ const Positions = () => {
       >
         <Text className={`text-center font-medium ${activeTab === TabId.OpenOrders ? 'text-white' : 'text-gray-400'}`}>
           Open Orders {tabData.openOrders.length}
-          {useMockData && <Text className="text-yellow-400"> 🧪</Text>}
         </Text>
       </TouchableOpacity>
 
@@ -444,25 +387,14 @@ const Positions = () => {
         onPress={() => setActiveTab(TabId.OrderHistory)}
       >
         <Text className={`text-center font-medium ${activeTab === TabId.OrderHistory ? 'text-white' : 'text-gray-400'}`}>
-          Order History {useMockData && mockTradeHistory ? mockTradeHistory.total_count : (tradeHistory?.total_count ?? 0)}
-          {useMockData && <Text className="text-yellow-400"> 🧪</Text>}
+          Order History {tradeHistory?.total_count ?? 0}
         </Text>
       </TouchableOpacity>
     </View>
-  ), [activeTab, tabData, tradeHistory?.total_count, useMockData]);
+  ), [activeTab, tabData, tradeHistory?.total_count]);
 
   const renderActionButtons = useMemo(() => (
     <View className="flex-row px-1 py-1 mt-1 bg-[#100E0F]">
-      {/* 🧪 Testing mode toggle button */}
-      <TouchableOpacity
-        className={`flex-1 py-1 px-1 mr-1 rounded-md border ${useMockData ? 'border-yellow-500 bg-yellow-900' : 'border-gray-500'}`}
-        onPress={() => setUseMockData(!useMockData)}
-      >
-        <Text className={`text-center text-sm font-InterSemiBold ${useMockData ? 'text-yellow-400' : 'text-gray-400'}`}>
-          {useMockData ? '🧪 MOCK' : '📡 LIVE'}
-        </Text>
-      </TouchableOpacity>
-
       <TouchableOpacity
         className="flex-1 py-1 px-1 mr-1 rounded-md border border-green-500"
         onPress={handleSyncTrades}
@@ -503,7 +435,7 @@ const Positions = () => {
         </Text>
       </TouchableOpacity>
     </View>
-  ), [isLoading, loadingAction, handleSyncTrades, handleCloseProfits, handleCloseLosses, handleCloseAll, useMockData]);
+  ), [isLoading, loadingAction, handleSyncTrades, handleCloseProfits, handleCloseLosses, handleCloseAll]);
 
   const renderContent = useCallback(() => {
     switch (activeTab) {
@@ -522,7 +454,7 @@ const Positions = () => {
           <ScrollView className="flex-1">
             <OrderCard
               openOrders={tabData.openOrders}
-              onClose={openCloseOrderModal} // UPDATED to use new handler
+              onClose={openCloseOrderModal}
             />
           </ScrollView>
         );
@@ -533,7 +465,7 @@ const Positions = () => {
               orderHistory={tabData.orderHistory}
               page={page}
               setPage={setPage}
-              total={useMockData && mockTradeHistory ? mockTradeHistory.total_count : (tradeHistory?.total_count ?? 0)}
+              total={tradeHistory?.total_count ?? 0}
               onScreenShot={openScreenShotModal}
             />
           </ScrollView>
@@ -541,7 +473,7 @@ const Positions = () => {
       default:
         return null;
     }
-  }, [activeTab, tabData, page, tradeHistory, openEditModal, openCloseModal, openCloseOrderModal, openScreenShotModal]); // UPDATED dependencies
+  }, [activeTab, tabData, page, tradeHistory, openEditModal, openCloseModal, openCloseOrderModal, openScreenShotModal]);
 
   const renderAlert = useCallback(() => {
     if (!currentAlert) return null;
@@ -551,22 +483,22 @@ const Positions = () => {
         case 'sync':
           return {
             title: 'Trades synced successfully',
-            message: useMockData ? 'Mock trades synced (testing mode)' : 'All trades are synced'
+            message: 'All trades are synced'
           };
         case 'closeProfits':
           return {
             title: 'Trades closed successfully',
-            message: useMockData ? 'Mock profit trades closed (testing mode)' : 'All profit trades closed'
+            message: 'All profit trades closed'
           };
         case 'closeLosses':
           return {
             title: 'Trades closed successfully',
-            message: useMockData ? 'Mock loss trades closed (testing mode)' : 'All loss trades closed'
+            message: 'All loss trades closed'
           };
         case 'closeAll':
           return {
             title: 'Trades closed successfully',
-            message: useMockData ? 'All mock trades closed (testing mode)' : 'All trades closed'
+            message: 'All trades closed'
           };
         default:
           return { title: '', message: '' };
@@ -591,7 +523,7 @@ const Positions = () => {
         </View>
       </View>
     );
-  }, [currentAlert, useMockData]);
+  }, [currentAlert]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#100E0F]">
@@ -600,7 +532,7 @@ const Positions = () => {
       {activeTab === TabId.OpenPositions && renderActionButtons}
       {renderContent()}
 
-      {/* Bottom Sheets - using refs directly */}
+      {/* Bottom Sheets */}
       {currentPosition && (
         <EditPositionBottomSheet
           ref={editBottomSheetRef}
@@ -630,7 +562,6 @@ const Positions = () => {
         />
       )}
 
-      {/* NEW BOTTOM SHEET - CloseOrderBottomSheet */}
       {currentOrderForClose && (
         <CloseOrderBottomSheet
           ref={closeOrderBottomSheetRef}
@@ -669,10 +600,10 @@ const Positions = () => {
               <View className="absolute inset-0 rounded-full border-2 border-purple-500 opacity-30" />
             </View>
             <Text className="text-white text-lg font-InterSemiBold">
-              {loadingAction === 'syncing' && (useMockData ? 'Syncing mock trades...' : 'Syncing trades...')}
-              {loadingAction === 'closing_profits' && (useMockData ? 'Closing mock profitable trades...' : 'Closing profitable trades...')}
-              {loadingAction === 'closing_losses' && (useMockData ? 'Closing mock losing trades...' : 'Closing losing trades...')}
-              {loadingAction === 'closing_all' && (useMockData ? 'Closing all mock trades...' : 'Closing all trades...')}
+              {loadingAction === 'syncing' && 'Syncing trades...'}
+              {loadingAction === 'closing_profits' && 'Closing profitable trades...'}
+              {loadingAction === 'closing_losses' && 'Closing losing trades...'}
+              {loadingAction === 'closing_all' && 'Closing all trades...'}
             </Text>
           </View>
         </View>

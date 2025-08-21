@@ -1,4 +1,3 @@
-// app/_layout.tsx - Updated without WebSocketManager
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +16,7 @@ import { CurrencySymbolProvider } from '@/providers/currency-symbols';
 import { AccountDetailsProvider } from '@/providers/account-details';
 import { OpenPositionsProvider } from '@/providers/open-positions';
 import { AppState } from 'react-native';
+import { clerkTokenManager } from '@/utils/clerk-token-manager';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -38,6 +38,16 @@ const tokenCache = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+
+  useEffect(() => {
+    clerkTokenManager.initialize().then(() => {
+      console.log('[App] Token manager ready');
+    }).catch((error) => {
+      console.error('[App] Token manager initialization failed:', error);
+    });
+  }, []);
+
+
   const [loaded] = useFonts({
     "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
     "Inter-ExtraBold": require("../assets/fonts/Inter-ExtraBold.ttf"),
@@ -63,6 +73,8 @@ export default function RootLayout() {
         console.log('[App] App becoming active')
       }
     }
+
+
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 

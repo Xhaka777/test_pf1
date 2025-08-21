@@ -1,4 +1,4 @@
-import { View, Text, SafeAreaView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useUser } from '@clerk/clerk-expo';
@@ -88,7 +88,7 @@ const Menu = () => {
         startingBalance: account.starting_balance,
         maxTotalDD: account.max_total_dd,
         profitTarget: account.profit_target,
-        status: account.status, 
+        status: account.status,
         originalData: account,
       };
     });
@@ -124,7 +124,7 @@ const Menu = () => {
         firm: account.firm,
         exchange: account.exchange,
         server: account.server,
-        status: account.status, 
+        status: account.status,
         totalPL: account.total_pl,
         startingBalance: account.starting_balance,
         originalData: account,
@@ -141,7 +141,7 @@ const Menu = () => {
 
   const filteredActiveAccounts = useMemo(() => {
     let allAccounts = [];
-    
+
     // Get all accounts based on selected type
     if (selectedAccountType === 'propFirm') {
       allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
@@ -152,7 +152,7 @@ const Menu = () => {
     }
 
     // Filter by ACTIVE status first (like web teammate's logic)
-    const activeAccounts = allAccounts.filter((account) => 
+    const activeAccounts = allAccounts.filter((account) =>
       account.status === AccountStatusEnum.ACTIVE
     );
 
@@ -174,7 +174,7 @@ const Menu = () => {
 
   const filteredArchivedAccounts = useMemo(() => {
     let allAccounts = [];
-    
+
     // Get all accounts based on selected type
     if (selectedAccountType === 'propFirm') {
       allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
@@ -213,17 +213,17 @@ const Menu = () => {
     if (selectedAccountType === 'propFirm') {
       const activeEvaluation = filteredActiveAccounts.filter(acc => acc.type === 'Challenge');
       const activeFunded = filteredActiveAccounts.filter(acc => acc.type === 'Funded');
-      
+
       if (activeOnly) {
         return { evaluation: activeEvaluation, funded: activeFunded };
       } else {
         // Include archived accounts too
         const archivedEvaluation = filteredArchivedAccounts.filter(acc => acc.type === 'Challenge');
         const archivedFunded = filteredArchivedAccounts.filter(acc => acc.type === 'Funded');
-        
-        return { 
-          evaluation: [...activeEvaluation, ...archivedEvaluation], 
-          funded: [...activeFunded, ...archivedFunded] 
+
+        return {
+          evaluation: [...activeEvaluation, ...archivedEvaluation],
+          funded: [...activeFunded, ...archivedFunded]
         };
       }
     } else {
@@ -279,18 +279,62 @@ const Menu = () => {
 
   // Handle account press - opens account details bottom sheet
   const handleAccountPress = useCallback((account: any) => {
-    console.log('[Menu] Account pressed:', account.id, account.name, account.type);
+    console.log('[Menu] Account pressed:', {
+      id: account.id,
+      name: account.name,
+      type: account.type,
+      pressArea: 'full-account-area'
+    });
+
     setSelectedAccount(account);
-    
-    // ✅ FIXED: Use appropriate bottom sheet based on account type
-    if (account.type === 'Challenge' || account.type === 'Funded') {
-      // Use AccountBottomSheet for prop firm accounts
-      demoBottomSheetRef.current?.present();
-    } else if (account.type === 'Live' || account.type === 'Demo') {
-      // Use BrokerBottomSheet for broker accounts
+
+    // Add small delay to ensure state is set
+    setTimeout(() => {
+      if (account.type === 'Challenge' || account.type === 'Funded') {
+        console.log('[Menu] Opening AccountBottomSheet for prop firm account');
+        demoBottomSheetRef.current?.present();
+      } else if (account.type === 'Live' || account.type === 'Demo') {
+        console.log('[Menu] Opening BrokerBottomSheet for broker account');
+        accountBottomSheetRef.current?.present();
+      } else {
+        console.log('[Menu] Unknown account type, using default AccountBottomSheet');
+        demoBottomSheetRef.current?.present();
+      }
+    }, 100);
+  }, []);
+
+  const handleBrokerAccountPress = useCallback((account: any) => {
+    console.log('[Menu] Broker account pressed - full area touch:', {
+      id: account.id,
+      name: account.name,
+      type: account.type,
+      originalData: !!account.originalData
+    });
+
+    // Create enhanced account data immediately
+    const enhancedAccountData = {
+      id: account.id,
+      name: account.name,
+      balance: `${account.currency || 'USD'} ${account.balance.toLocaleString()}`,
+      dailyPL: `${account.dailyPL >= 0 ? '+' : ''}${account.currency || 'USD'} ${Math.abs(account.dailyPL).toLocaleString()}`,
+      changePercentage: `${account.changePercentage >= 0 ? '+' : ''}${account.changePercentage.toFixed(2)}%`,
+      type: account.type,
+      originalData: account.originalData,
+      currency: account.currency,
+      firm: account.firm,
+      exchange: account.exchange,
+      server: account.server,
+      status: account.status,
+      totalPL: account.totalPL,
+      startingBalance: account.startingBalance,
+    };
+
+    setSelectedAccount(enhancedAccountData);
+
+    // Use immediate presentation for better responsiveness
+    if (account.type === 'Live' || account.type === 'Demo') {
       accountBottomSheetRef.current?.present();
     } else {
-      // Fallback to AccountBottomSheet
       demoBottomSheetRef.current?.present();
     }
   }, []);
@@ -314,7 +358,7 @@ const Menu = () => {
             showTimePeriods={false}
             showMetrics={false}
             isMenuScreen={true}
-            hideTabBar={false} 
+            hideTabBar={false}
             // ✅ Pass filtered data instead of original data
             accountData={finalAccountsToShow}
             isLoading={propFirmAccountsLoading}
@@ -361,6 +405,7 @@ const Menu = () => {
             brokerAccountsLoading={brokerAccountsLoading}
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
+            onAccountPress={handleBrokerAccountPress}
           />
         );
 
@@ -423,17 +468,20 @@ const Menu = () => {
           </View>
 
           {/* Account Content */}
-          <View className='flex-1'>
+          <ScrollView
+            className='flex-1'
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
             {renderAccountContent()}
-          </View>
+          </ScrollView>
         </View>
 
         {/* Profile at bottom */}
         <View>
           <View className="h-0.5 bg-propfirmone-100 mx-4" />
           <Profile
-            onProfilePress={handleProfilePress}
-            planName="Free Plan" />
+            onProfilePress={handleProfilePress}/>
         </View>
 
         <ProfileBottomSheet
@@ -470,12 +518,19 @@ const Menu = () => {
         {selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') && (
           <BrokerBottomSheet
             bottomSheetRef={accountBottomSheetRef}
-            accountData={{
+            context="menu"
+            accountData={selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') ? {
               id: selectedAccount.id,
               name: selectedAccount.name,
-              balance: `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
-              dailyPL: `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
-              changePercentage: `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
+              balance: typeof selectedAccount.balance === 'string'
+                ? selectedAccount.balance
+                : `${selectedAccount.currency || 'USD'} ${selectedAccount.balance.toLocaleString()}`,
+              dailyPL: typeof selectedAccount.dailyPL === 'string'
+                ? selectedAccount.dailyPL
+                : `${selectedAccount.dailyPL >= 0 ? '+' : ''}${selectedAccount.currency || 'USD'} ${Math.abs(selectedAccount.dailyPL).toLocaleString()}`,
+              changePercentage: typeof selectedAccount.changePercentage === 'string'
+                ? selectedAccount.changePercentage
+                : `${selectedAccount.changePercentage >= 0 ? '+' : ''}${selectedAccount.changePercentage.toFixed(2)}%`,
               type: selectedAccount.type,
               originalData: selectedAccount.originalData,
               currency: selectedAccount.currency,
@@ -485,7 +540,7 @@ const Menu = () => {
               status: selectedAccount.status,
               totalPL: selectedAccount.totalPL,
               startingBalance: selectedAccount.startingBalance,
-            }}
+            } : undefined}
           />
         )}
 

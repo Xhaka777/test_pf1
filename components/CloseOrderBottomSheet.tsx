@@ -22,7 +22,7 @@ const CloseOrderBottomSheet = forwardRef<BottomSheetModal, CloseOrderBottomSheet
         // API mutation
         const { mutateAsync: cancelOrder } = useCancelOrderMutation();
 
-        const snapPoints = useMemo(() => ['18%'], []);
+        const snapPoints = useMemo(() => ['20%'], []);
 
         const handleSheetChanges = useCallback((index: number) => {
             if (index === -1) {
@@ -113,7 +113,7 @@ const CloseOrderBottomSheet = forwardRef<BottomSheetModal, CloseOrderBottomSheet
                     </View>
 
                     {/* Action Buttons */}
-                    <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-row items-center justify-between mb-10">
                         <SelectableButton
                             text='Cancel'
                             isSelected={''}

@@ -72,7 +72,7 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       
       console.log('[OpenPositions] Connecting with cached/new token...');
       
-      // ✅ Try different endpoint patterns to fix HTTP 200 error
+      
       const wsUrl = `wss://staging-server.propfirmone.com/get_open_trades?auth_key=${wsToken}&account=${accountId}`;
       const origin = 'https://staging.propfirmone.com';
       

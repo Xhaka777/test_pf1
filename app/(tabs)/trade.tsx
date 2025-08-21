@@ -16,45 +16,82 @@ type TradeProps = {
 };
 
 const Trade = ({ navigation }: TradeProps) => {
-  
-  const { accountDetails } = useAccountDetails();
-  const { selectedAccountId } = useAccounts();
-  const [activeSymbol] = useActiveSymbol();
-  const details = useUser();
 
-  if (!details.isLoaded || !details.user) {
-    return null;
+  const { accountDetails, isLoading: accountDetailsLoading } = useAccountDetails();
+  const { selectedAccountId, isLoading: accountsLoading } = useAccounts();
+  const [activeSymbol] = useActiveSymbol();
+  const { isLoaded: userLoaded, user } = useUser();
+
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  const isLoading = useMemo(() => {
+    return !userLoaded || !user || accountsLoading || accountDetailsLoading || !selectedAccountId;
+  }, [userLoaded, user, accountsLoading, accountDetailsLoading, selectedAccountId]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        setIsInitializing(false);
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
+  if (isLoading || isInitializing) {
+    let loadingMessage = 'Loading trading interface';
+
+    if (!userLoaded || !user) {
+      loadingMessage = 'Authenticating user...';
+    } else if (accountsLoading) {
+      loadingMessage = 'Loading accounts...';
+    } else if (!selectedAccountId) {
+      loadingMessage = 'Selecting account...';
+    } else if (accountDetailsLoading) {
+      loadingMessage = 'Loading account details...';
+    }
+
+    return (
+      <SafeAreaView className='flex-1 bg-[#100E0F]'>
+        <Header />
+        <View className='flex-1 flex justify-center items-center'>
+          <ActivityIndicator size="large" color='#00d4aa' />
+          <Text className="text-white mt-3 text-base">{loadingMessage}</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
+
+  // Minimal logging for debugging (instead of massive data dumps)
+  console.log('[Trade] Rendering with:', {
+    selectedAccountId,
+    activeSymbol,
+    hasAccountDetails: !!accountDetails,
+    hasUser: !!user
+  });
+
 
   console.log('selectedAccountId', selectedAccountId)
   console.log('activeSymbol', activeSymbol)
   console.log('accountDetails', accountDetails)
-  console.log('details.isLoaded', details.isLoaded)
-  console.log('details.user', details.user)
 
-  // Add validation like your web teammates
-  if (!selectedAccountId || !accountDetails || !details.isLoaded || !details.user) {
-    return (
-      <View className='flex-1 flex justify-center items-center bg-[#100E0F]'>
-        <Loader size={20} color='#00d4aa' />
-        <Text className="text-white mt-2">Loading trading interface...</Text>
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView className='flex-1 bg-[#100E0F]'>
       <Header />
+
       <TradingWidget />
-      
+
       {/* Use the enhanced TradingViewChart with provider-like logic */}
-      <TradingViewChart 
-        symbol={activeSymbol}
-        selectedAccountId={selectedAccountId}
-        accountDetails={accountDetails}
-        userId={`${details.user.id}`}
-      />
-      
+      {selectedAccountId && accountDetails && user && (
+        <TradingViewChart
+          symbol={activeSymbol || 'BTCUSD'}
+          selectedAccountId={selectedAccountId}
+          accountDetails={accountDetails}
+          userId={user.id}
+        />
+      )}
+
       <TradingButtons />
     </SafeAreaView>
   );

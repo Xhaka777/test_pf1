@@ -230,25 +230,25 @@ export default function TradingViewChart({
   //           // Get chart container
   //           const chartContainer = document.querySelector('#tradingview_chart');
   //           if (!chartContainer) return null;
-            
+
   //           const rect = chartContainer.getBoundingClientRect();
   //           const relativeY = ${locationY};
-            
+
   //           // Calculate price based on Y position (this is a simplified calculation)
   //           // In a real implementation, you'd need to access TradingView's price scale API
   //           const chartHeight = rect.height;
   //           const priceRange = 1000; // Approximate price range visible on chart
   //           const midPrice = 118900; // Current approximate price (you'd get this dynamically)
-            
+
   //           // Calculate estimated price at this Y position
   //           const priceOffset = ((chartHeight / 2) - relativeY) / chartHeight * priceRange;
   //           const estimatedPrice = midPrice + priceOffset;
-            
+
   //           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
   //             type: 'priceAtPosition',
   //             price: estimatedPrice.toFixed(2)
   //           }));
-            
+
   //           return estimatedPrice;
   //         } catch (error) {
   //           console.error('Error calculating price:', error);
@@ -452,122 +452,150 @@ export default function TradingViewChart({
   }, [injectPositionLines, relevantTrades, relevantOrders]);
 
   const getTradingViewHTML = (symbol: string) => `
-    <!DOCTYPE html>
-    <html style="height: 100%; margin: 0; padding: 0;">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            html, body {
-                height: 100%;
-                width: 100%;
-                overflow: hidden;
-                background-color: #0f0f0f;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
-            .tradingview-widget-container {
-                height: 100%;
-                width: 100%;
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-            }
-            #tradingview_chart {
-                height: 100% !important;
-                width: 100% !important;
-                position: relative;
-            }
-            /* Styles for custom position lines */
-            .custom-position-line {
-                position: absolute !important;
-                z-index: 1000 !important;
-                pointer-events: none !important;
-            }
-            /* Fix for loading spinner */
-            .loading-spinner {
-                width: 32px;
-                height: 32px;
-                border: 2px solid #6b7280;
-                border-top: 2px solid #ffffff;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="tradingview-widget-container">
-            <div id="tradingview_chart"></div>
-        </div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-            let chartWidget = null;
-            
-            function initChart() {
-                chartWidget = new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": "${symbol}",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "en",
-                    "toolbar_bg": "#1a1a1a",
-                    "enable_publishing": false,
-                    "backgroundColor": "#0f0f0f",
-                    "gridColor": "#2a2a2a",
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "container_id": "tradingview_chart",
-                    "autosize": true,
-                    "overrides": {
-                        "paneProperties.background": "#0f0f0f",
-                        "paneProperties.backgroundType": "solid",
-                        "paneProperties.backgroundGradientStartColor": "#0f0f0f",
-                        "paneProperties.backgroundGradientEndColor": "#0f0f0f",
-                        "paneProperties.vertGridProperties.color": "#2a2a2a",
-                        "paneProperties.horzGridProperties.color": "#2a2a2a",
-                        "symbolWatermarkProperties.transparency": 90,
-                        "scalesProperties.textColor": "#9ca3af",
-                        "scalesProperties.backgroundColor": "#1a1a1a"
-                    }
-                });
+  <!DOCTYPE html>
+  <html style="height: 100%; margin: 0; padding: 0;">
+  <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+      <style>
+          * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+          }
+          html, body {
+              height: 100%;
+              width: 100%;
+              overflow: hidden;
+              background-color: #0f0f0f;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          .tradingview-widget-container {
+              height: 100%;
+              width: 100%;
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+          }
+          #tradingview_chart {
+              height: 100% !important;
+              width: 100% !important;
+              position: relative;
+          }
+          /* Styles for custom position lines */
+          .custom-position-line {
+              position: absolute !important;
+              z-index: 1000 !important;
+              pointer-events: none !important;
+          }
+          /* Hide symbol info elements */
+          .chart-markup-table.pane {
+              display: none !important;
+          }
+          .layout__area--center .pane-legend {
+              display: none !important;
+          }
+          [data-name="legend"] {
+              display: none !important;
+          }
+          /* Fix for loading spinner */
+          .loading-spinner {
+              width: 32px;
+              height: 32px;
+              border: 2px solid #6b7280;
+              border-top: 2px solid #ffffff;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+          }
+          @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+          }
+      </style>
+  </head>
+  <body>
+      <div class="tradingview-widget-container">
+          <div id="tradingview_chart"></div>
+      </div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+          let chartWidget = null;
+          
+          function initChart() {
+              chartWidget = new TradingView.widget({
+                  "width": "100%",
+                  "height": "100%",
+                  "symbol": "${symbol}",
+                  "timezone": "Etc/UTC",
+                  "theme": "dark",
+                  "style": "1",
+                  "locale": "en",
+                  "toolbar_bg": "#1a1a1a",
+                  "enable_publishing": false,
+                  "backgroundColor": "#0f0f0f",
+                  "gridColor": "#2a2a2a",
+                  "hide_top_toolbar": false,
+                  "hide_legend": true,
+                  "save_image": false,
+                  "container_id": "tradingview_chart",
+                  "autosize": true,
+                  "disabled_features": [
+                      "symbol_info",
+                      "display_market_status"
+                  ],
+                  "overrides": {
+                      "paneProperties.background": "#0f0f0f",
+                      "paneProperties.backgroundType": "solid",
+                      "paneProperties.backgroundGradientStartColor": "#0f0f0f",
+                      "paneProperties.backgroundGradientEndColor": "#0f0f0f",
+                      "paneProperties.vertGridProperties.color": "#2a2a2a",
+                      "paneProperties.horzGridProperties.color": "#2a2a2a",
+                      "symbolWatermarkProperties.transparency": 100,
+                      "scalesProperties.textColor": "#9ca3af",
+                      "scalesProperties.backgroundColor": "#1a1a1a"
+                  }
+              });
 
-                // Notify React Native when chart is ready
-                chartWidget.onChartReady(() => {
-                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                        type: 'chartReady'
-                    }));
-                });
-            }
-            
-            if (typeof TradingView !== 'undefined') {
-                initChart();
-            } else {
-                window.addEventListener('load', initChart);
-            }
+              // Notify React Native when chart is ready
+              chartWidget.onChartReady(() => {
+                  // Hide symbol info elements after chart loads
+                  setTimeout(() => {
+                      const symbolElements = document.querySelectorAll([
+                          '.chart-markup-table',
+                          '.pane-legend',
+                          '[data-name="legend"]',
+                          '.legend-source-item'
+                      ].join(', '));
+                      
+                      symbolElements.forEach(el => {
+                          if (el) el.style.display = 'none';
+                      });
 
-            // Function to be called by React Native to update symbol
-            window.updateSymbol = function(newSymbol) {
-                if (chartWidget && chartWidget.setSymbol) {
-                    chartWidget.setSymbol(newSymbol, chartWidget.activeChart().resolution());
-                }
-            };
-        </script>
-    </body>
-    </html>
-  `;
+                      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                          type: 'chartReady'
+                      }));
+                  }, 1000);
+              });
+          }
+          
+          if (typeof TradingView !== 'undefined') {
+              initChart();
+          } else {
+              window.addEventListener('load', initChart);
+          }
+
+          // Function to be called by React Native to update symbol
+          window.updateSymbol = function(newSymbol) {
+              if (chartWidget && chartWidget.setSymbol) {
+                  chartWidget.setSymbol(newSymbol, chartWidget.activeChart().resolution());
+              }
+          };
+      </script>
+  </body>
+  </html>
+`;
 
   // Handle messages from WebView
   const onMessage = (event: any) => {
@@ -606,27 +634,27 @@ export default function TradingViewChart({
           onTouchStart={handleChartTouch}
           onTouchMove={handleChartTouch}
         > */}
-          <WebView
-            ref={setWebViewRef}
-            key={chartSymbol} // Force re-render when symbol changes
-            source={{ html: getTradingViewHTML(chartSymbol) }}
-            className="flex-1 bg-[#0f0f0f]"
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            onMessage={onMessage}
-            renderLoading={() => (
-              <View className="absolute inset-0 justify-center items-center bg-[#0f0f0f] gap-3">
-                <TrendingUp size={32} color="#00d4aa" />
-                <Text className="text-base text-gray-400 font-medium">
-                  Loading {chartSymbol} chart...
-                </Text>
-              </View>
-            )}
-            onError={(error) => {
-              console.log('WebView error:', error);
-            }}
-          />
+        <WebView
+          ref={setWebViewRef}
+          key={chartSymbol} // Force re-render when symbol changes
+          source={{ html: getTradingViewHTML(chartSymbol) }}
+          className="flex-1 bg-[#0f0f0f]"
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          onMessage={onMessage}
+          renderLoading={() => (
+            <View className="absolute inset-0 justify-center items-center bg-[#0f0f0f] gap-3">
+              <TrendingUp size={32} color="#00d4aa" />
+              <Text className="text-base text-gray-400 font-medium">
+                Loading {chartSymbol} chart...
+              </Text>
+            </View>
+          )}
+          onError={(error) => {
+            console.log('WebView error:', error);
+          }}
+        />
         {/* </View> */}
 
         {/* {plusButtonPosition.visible && (

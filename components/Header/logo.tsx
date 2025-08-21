@@ -10,7 +10,6 @@ import { useGetAccountDetails } from "@/api/hooks/account-details";
 import { useOpenPositionsWS } from "@/providers/open-positions";
 import { PlatformImage } from "../PlatformImage";
 
-
 //Define your navigation param list type
 type RootStackParamList = {
     '(tabs)': undefined;
@@ -18,6 +17,16 @@ type RootStackParamList = {
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
+
+// Helper function to format currency
+const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+};
 
 export function Logo() {
     const navigation = useNavigation<NavigationProp>();
@@ -95,16 +104,14 @@ export function Logo() {
                 </View>
             </View>
 
-
-
             {/* Right side - Values and profile dropdown (pushed to end) */}
             <View className="flex-row items-center">
                 <View className="mr-3">
                     <Text className="text-sm font-Inter text-white">
-                        {Number(accountDetails?.balance.toFixed(2))}
+                        {accountDetails?.balance ? formatCurrency(accountDetails.balance) : '$0.00'}
                     </Text>
                     <Text className="text-sm font-Inter text-white text-right">
-                        {Number(openProfitLoss.toFixed(2))}
+                        {formatCurrency(openProfitLoss)}
                     </Text>
                 </View>
 

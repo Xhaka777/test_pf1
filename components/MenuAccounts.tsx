@@ -1,5 +1,4 @@
-// Updated MenuAccounts.tsx
-import { TouchableOpacity, View } from "react-native";
+import { Pressable, View } from "react-native";
 import React from "react";
 import PropFirmPLCard from "./PropFirmPLCard";
 import BrokeragePracticePLCard from "./BokerPLCard";
@@ -69,6 +68,20 @@ const MenuAccounts = ({
         }
     };
 
+    // ✅ IMPROVED: Enhanced press handler with immediate response
+    const handleAccountPress = (account: any) => {
+        console.log('[MenuAccounts] Account pressed - Full area touch:', {
+            id: account.id,
+            name: account.name,
+            type: account.type || specificAccountType,
+            accountType,
+            activeTab
+        });
+
+        // Call parent handler immediately
+        onAccountPress(account);
+    };
+
     const renderAccountCard = (account: any) => {
         // Format balance for display
         const formattedBalance = `${account.currency || 'USD'} ${account.balance.toLocaleString()}`;
@@ -90,6 +103,7 @@ const MenuAccounts = ({
                     accountBalance={formattedBalance}
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
+                    onPress={null}
                 />
             );
         } 
@@ -104,6 +118,7 @@ const MenuAccounts = ({
                     accountBalance={formattedBalance}
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
+                    onPress={null} 
                 />
             );
         }
@@ -112,12 +127,18 @@ const MenuAccounts = ({
     return (
         <View className="mt-2">
             {accounts.map((account: any) => (
-                <TouchableOpacity
+                <Pressable
                     key={account.id}
-                    onPress={() => onAccountPress(account)}
+                    onPress={() => handleAccountPress(account)}
+                    style={({ pressed }) => [
+                        {
+                            opacity: pressed ? 0.7 : 1,
+                            transform: [{ scale: pressed ? 0.98 : 1 }],
+                        }
+                    ]}
                 >
                     {renderAccountCard(account)}
-                </TouchableOpacity>
+                </Pressable>
             ))}
         </View>
     );

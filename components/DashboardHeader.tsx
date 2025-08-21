@@ -52,12 +52,18 @@ export function DashboardHeaderMobile({
         [AccountTypeEnum.COMPETITION]: { bg: 'bg-purple-800', text: 'text-purple-400' },
     };
 
+    // Helper function to get firm initials
+    const getFirmInitials = (firmName: string | undefined): string => {
+        if (!firmName) return '?';
+        return firmName.toUpperCase().slice(0, 2);
+    };
+
     if (!accountDetails) {
         return (
             <View className="flex-row items-center justify-between py-5 px-2">
                 <View className="flex-row items-center">
                     <View className="border border-gray-800 w-12 h-12 items-center justify-center rounded-lg mr-4 bg-gray-800">
-                        <Text className="text-gray-400 text-lg">?</Text>
+                        <Text className="text-gray-400 text-lg font-InterBold">?</Text>
                     </View>
                     <View className="flex-shrink">
                         <Text className="text-white text-lg font-InterBold">Loading...</Text>
@@ -77,22 +83,21 @@ export function DashboardHeaderMobile({
 
     const accountTypeLabel = typeLabelMap[accountDetails.account_type] || 'Unknown';
     const accountTypeColors = typeColorMap[accountDetails.account_type] || { bg: 'bg-gray-800', text: 'text-gray-400' };
+    const firmName = accountDetails.firm || accountDetails.name;
 
     return (
         <View className="flex-row items-center justify-between py-5 px-2">
             <View className="flex-row items-center">
-                <View className="border border-gray-800 w-12 h-12 items-center justify-center rounded-lg mr-4 bg-gray-800">
-                    <Image
-                        // source={getFirmLogo()}
-                        resizeMode="contain"
-                        className="w-7 h-7"
-                    />
+                <View className="border border-gray-800 w-12 h-12 items-center justify-center rounded-lg mr-4 bg-[#2F2C2D]">
+                    <Text className="text-white text-lg font-InterBold">
+                        {getFirmInitials(firmName)}
+                    </Text>
                 </View>
                 <View className="flex-shrink">
                     <Text className="text-white text-lg font-InterBold">
-                        {accountDetails.firm || accountDetails.name}
+                        {firmName}
                     </Text>
-                    <View className="flex-row items-center mt-1">
+                    <View className="flex-row items-center">
                         <PlatformImage
                             exchange={selectedAccount?.exchange}
                             className="w-3 h-3 rounded-full mr-1"

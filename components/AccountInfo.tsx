@@ -175,14 +175,14 @@ export function AccountInfo({
                 <View className="space-y-3 mt-2">
                     <View className="flex-row justify-between">
                         <Text className="text-gray-400 text-sm mb-1 font-Inter">Program:</Text>
-                        <Text className="text-white text-base font-Inter">1 Step</Text>
+                        <Text className="text-white text-sm font-Inter">1 Step</Text>
                     </View>
                     <View className="flex-row justify-between">
                         <Text className="text-gray-400 text-sm mb-1 font-Inter">Trading Days:</Text>
                         <View className="flex-row">
                             <Text className="text-white text-base font-Inter">{metricsData.trading_days}&nbsp;</Text>
                             {metricsData.min_trading_days > 0 && (
-                                <Text className="text-gray-400 text-base font-Inter">
+                                <Text className="text-gray-400 text-sm font-Inter">
                                     / {metricsData.min_trading_days}
                                 </Text>
                             )}
@@ -209,7 +209,7 @@ export function AccountInfo({
                     <View className="space-y-3 mt-2">
                         <View className="flex-row justify-between">
                             <Text className="text-gray-400 text-sm mb-1 font-Inter">Leverage:</Text>
-                            <Text className="text-white text-base font-Inter">{accountLeverage ?? 1}X</Text>
+                            <Text className="text-white text-sm font-Inter">{accountLeverage ?? 1}X</Text>
                         </View>
                     </View>
                     {/* Daily Loss */}
@@ -275,12 +275,11 @@ export function AccountInfo({
                     <View className="flex-1 bg-propfirmone-300 py-3 px-2 rounded-lg justify-center">
                         <Text className="text-gray-400 text-xs ml-1 font-Inter">Progress:</Text>
                         <ProfitLossIndicator
-                            companyName=""
-                            totalValue={netPlInUnits}
-                            percentageChange={12}
-                            dailyPL={12}
-                            startingBalance={metricsData.starting_balance}
+                            value={netPlInUnits}
+                            minimumLimit={-maxDrawdownInUnits}
+                            maximumLimit={profitTargetInUnits}
                             showLabels={false}
+                            isCompetition={accountDetails.account_type === AccountTypeEnum.COMPETITION}
                         />
                     </View>
                 </View>

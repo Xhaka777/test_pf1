@@ -61,7 +61,7 @@ const ClosePositionBottomSheet = forwardRef<BottomSheetModal, ClosePositionBotto
         // API mutation
         const { mutateAsync: closeTrade } = useCloseTradeMutation();
 
-        const snapPoints = useMemo(() => ['35%'], []);
+        const snapPoints = useMemo(() => ['40%'], []);
 
         // Notify parent of loading state changes
         useEffect(() => {
@@ -410,7 +410,7 @@ const ClosePositionBottomSheet = forwardRef<BottomSheetModal, ClosePositionBotto
 
                     {/* Dynamic Close Button */}
                     <TouchableOpacity
-                        className={`rounded-lg py-4 mb-4 flex-row items-center justify-center ${buttonColor} ${
+                        className={`rounded-lg py-4 mb-10 flex-row items-center justify-center ${buttonColor} ${
                             (isLoading || errors.amount) ? 'opacity-50' : ''
                         }`}
                         onPress={onSubmit}
