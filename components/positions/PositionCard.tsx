@@ -40,18 +40,25 @@ const DirectionValue: React.FC<{
     ? (isPositive ? 'text-success-main' : 'text-red-500')
     : 'text-white';
 
+  const displayValue = isPositive
+    ? `${prefix}${value.toFixed(decimals)}${suffix}`
+    : `-${prefix}${Math.abs(value).toFixed(decimals)}${suffix}`;
+
   return (
     <Text className={`font-InterRegular ${colorClass}`}>
-      {prefix}{value.toFixed(decimals)} {suffix}
+      {displayValue}
     </Text>
   )
 }
 
 const PositionTypeValue: React.FC<{ type: 'LONG' | 'SHORT' }> = ({ type }) => {
-  const colorClass = type === 'LONG' ? 'text-success-main' : 'text-red-500';
+  const upperCaseType = type.toUpperCase();
+  const colorClass = upperCaseType === 'LONG' || upperCaseType === 'BUY' || upperCaseType.includes('LONG') || upperCaseType.includes('BUY')
+    ? 'text-success-main'
+    : 'text-red-500';
   return (
     <Text className={`font-InterRegular ${colorClass}`}>
-      {type}
+      {upperCaseType}
     </Text>
   )
 }

@@ -1,3 +1,4 @@
+// app/_layout.tsx - FIXED VERSION (No Hook Order Changes)
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -38,7 +39,8 @@ const tokenCache = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-
+  // ⚠️ KEEP ALL EXISTING HOOKS IN THE SAME ORDER - DON'T ADD NEW ONES HERE!
+  
   useEffect(() => {
     clerkTokenManager.initialize().then(() => {
       console.log('[App] Token manager ready');
@@ -46,7 +48,6 @@ export default function RootLayout() {
       console.error('[App] Token manager initialization failed:', error);
     });
   }, []);
-
 
   const [loaded] = useFonts({
     "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
@@ -74,8 +75,6 @@ export default function RootLayout() {
       }
     }
 
-
-
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
     // Simple cleanup
@@ -95,7 +94,6 @@ export default function RootLayout() {
         <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
           <ClerkLoaded>
             <QueryProvider>
-              {/* Clean provider hierarchy - no more WebSocketManager! */}
               <AccountsProvider>
                 <AccountDetailsProvider>
                   <CurrencySymbolProvider>

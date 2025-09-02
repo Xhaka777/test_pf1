@@ -8,22 +8,21 @@ import {
     Alert,
     Image,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { ChevronDown, Eye, EyeOff } from 'lucide-react-native';
 import { Link, router } from 'expo-router';
 import OAuth from '@/components/OAuth'; // Ensure OAuth component accepts the 'entry' prop
 import { useOAuth, useSignIn } from '@clerk/clerk-expo';
 import { useWarmUpBrowser } from '@/lib/useWarmUpBrowser';
-import icons from '@/constants/icons';
-import * as WebBrowser from 'expo-web-browser';
+import { LogoDropdown } from '@/components/LogoDropdown';
 
-// WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
-    
+
     const { signIn, setActive, isLoaded } = useSignIn();
     //Warm up the browser for OAuth (improves performance)
-    useWarmUpBrowser();    
+    useWarmUpBrowser();
 
     const [form, setForm] = useState({
         email: "",
@@ -37,15 +36,15 @@ export default function LoginScreen() {
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
-    const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google'});
+    const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
 
     const onGoogleSignInPress = useCallback(async () => {
         if (!isLoaded) return;
-        
+
         setGoogleLoading(true);
         try {
             const { createdSessionId, setActive } = await startOAuthFlow();
-            
+
             if (createdSessionId) {
                 await setActive({ session: createdSessionId });
                 router.replace('/(tabs)/overview');
@@ -58,9 +57,9 @@ export default function LoginScreen() {
         }
     }, [isLoaded]);
 
-    
+
     const onSignInPress = useCallback(async () => {
-        if(!isLoaded) return;
+        if (!isLoaded) return;
         console.log('po hin mrena!')
         try {
             console.log('form.email', form.email)
@@ -71,10 +70,10 @@ export default function LoginScreen() {
                 password: form.password,
             });
 
-            if(signInAttempt.status === 'complete') {
+            if (signInAttempt.status === 'complete') {
                 await setActive({ session: signInAttempt.createdSessionId });
                 router.replace('/(tabs)/overview');
-            }else {
+            } else {
                 console.log(JSON.stringify(signInAttempt, null, 2));
                 Alert.alert("Error", "Log in failed. Please try again.")
             }
@@ -84,9 +83,22 @@ export default function LoginScreen() {
         }
     }, [isLoaded, form])
 
+    const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+
+    const toggleDropdown = () => {
+        setIsDropdownVisible(!isDropdownVisible);
+    };
+
+    const closeDropdown = () => {
+        setIsDropdownVisible(false);
+    }
+
     return (
         <View className="flex-1 bg-black px-5">
-            <View className="mt-14 mb-8">
+            <View className="pt-12">
+                <LogoDropdown />
+            </View>
+            <View className="mt-5 mb-8">
                 <Text className="text-2xl font-InterBold text-white mb-2">Login</Text>
                 <Text className="text-base text-gray-500 font-InterSemiBold">
                     Welcome back!
@@ -103,7 +115,7 @@ export default function LoginScreen() {
                         keyboardType="email-address"
                         autoCapitalize="none"
                         value={form.email}
-                        onChangeText={(value) => setForm({...form, email: value})}
+                        onChangeText={(value) => setForm({ ...form, email: value })}
                     />
                 </View>
 
@@ -150,8 +162,8 @@ export default function LoginScreen() {
                     </Link>
                 </View>
 
-                <TouchableOpacity className='bg-primary-100 rounded-lg px-4 py-4 items-center mb-2'
-                    // onPress={() => router.push('/(tabs)/overview')}
+                <TouchableOpacity
+                    className='bg-primary-100 rounded-lg px-4 py-4 items-center mb-2'
                     onPress={onSignInPress}
                 >
                     <Text className='text-base text-black font-InterSemiBold'>Log in</Text>

@@ -6,20 +6,25 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#100E0F"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.altinxhaka.trading-app",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "PropFirmOne needs access to your photo library to save trading screenshots.",
-        "NSPhotoLibraryAddUsageDescription": "PropFirmOne needs permission to save trading screenshots to your photo library."
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save trading screenshots to your photo library",
+        "NSPhotoLibraryUsageDescription": "This app needs access to save trading screenshots to your photo library"
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundImage": "./assets/images/adaptive-icon-background.png"
       },
       "package": "com.altinxhaka.trading_app",
       "permissions": [
@@ -27,6 +32,7 @@
         "READ_EXTERNAL_STORAGE",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
+        "ACCESS_MEDIA_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_MEDIA_LOCATION"

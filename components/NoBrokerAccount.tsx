@@ -341,7 +341,7 @@ function NoBrokerAccount({
 
         {/* Accounts Section with Count - only show when hideTabBar is true AND not in menu screen */}
         {hideTabBar && !isMenuScreen && (
-          <View className='px-6 mb-4'>
+          <View className='px-2 mb-4'>
             <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
               Accounts <Text style={{ color: '#E74694' }}>{currentAccountCount}</Text>
             </Text>

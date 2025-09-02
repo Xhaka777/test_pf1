@@ -4,6 +4,7 @@ import { Camera, ChevronDown, ChevronUp } from "lucide-react-native";
 import images from "@/constants/images";
 import { TradeHistoryData } from "@/api/schema/trade-history";
 import { getCurrencyFlags, CurrencyCodeEnum } from "@/api/utils/currency-trade";
+import { useGetJournalTags } from "@/api/hooks/hournal-service";
 
 export type HistoryCardProps = {
     orderHistory: TradeHistoryData['all_trades'];
@@ -42,65 +43,169 @@ const DirectionValue: React.FC<{
         ? (isPositive ? 'text-success-main' : 'text-red-500')
         : 'text-white';
 
+    // Handle negative values properly with prefix
+    const displayValue = isPositive 
+        ? `${prefix}${value.toFixed(decimals)}${suffix}`
+        : `-${prefix}${Math.abs(value).toFixed(decimals)}${suffix}`;
+
     return (
-        <Text className={`font-InterRegular ${colorClass}`}>
-            {prefix}{value.toFixed(decimals)} {suffix}
+        <Text className={`font-font-InterMedium text-base ${colorClass}`}>
+            {displayValue}
         </Text>
     );
 };
 
 const PositionTypeValue: React.FC<{ type: string }> = ({ type }) => {
-    const colorClass = type === 'LONG' || type === 'BUY' || type.toLowerCase().includes('long') || type.toLowerCase().includes('buy')
+    const upperCaseType = type.toUpperCase();
+    const colorClass = upperCaseType === 'LONG' || upperCaseType === 'BUY' || upperCaseType.includes('LONG') || upperCaseType.includes('BUY')
         ? 'text-success-main'
         : 'text-red-500';
     return (
         <Text className={`font-InterRegular ${colorClass}`}>
-            {type}
+            {upperCaseType}
         </Text>
     );
 };
 
-const formatDateTime = (dateString: string): string => {
+const formatDateTime = (dateString: string): { date: string; time: string } => {
     try {
-        const date = new Date(dateString);
-        return date.toLocaleString('en-US', {
+        const dateObj = new Date(dateString);
+        const date = dateObj.toLocaleDateString('en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
+        });
+        const time = dateObj.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false,
         });
+        return { date, time };
     } catch (error) {
-        return dateString;
+        return { date: dateString, time: '' };
     }
 };
 
-const TagsList: React.FC<{ tags: string[] }> = ({ tags }) => {
+// Component for displaying date and time with different colors
+const DateTimeDisplay: React.FC<{ dateString: string }> = ({ dateString }) => {
+    const { date, time } = formatDateTime(dateString);
+    
+    return (
+        <View className="flex-row items-center">
+            <Text className="text-white font-InterMedium text-sm">
+                {date}
+            </Text>
+            {time && (
+                <>
+                    <Text className="text-white font-InterMedium text-sm">, </Text>
+                    <Text className="text-[#898587] font-InterMedium text-sm">
+                        {time}
+                    </Text>
+                </>
+            )}
+        </View>
+    );
+};
+
+// Updated TagsList component to use dynamic colors from API
+const TagsList: React.FC<{ 
+    tags: string[]; 
+    journalTagsData?: { tags: Array<{ tag: string; colour: string }> }; 
+}> = ({ tags, journalTagsData }) => {
+    // Fallback colors if API data is not available
+    const fallbackColors = [
+        '#362F78', // Indigo
+        '#4A1D96', // Purple  
+        '#2F2C2D', // Dark
+        '#45152C', // Primary
+        '#233876', // Blue
+        '#F05252', // Red
+        '#E74694', // Primary-theme
+        '#63311240' // Yellow (with opacity)
+    ];
+
     const getTagBackgroundColor = (tag: string, index: number) => {
-        const colors = [
-            'bg-[#362F78]',
-            'bg-[#4A1D96]',
-            'bg-[#252223]',
-            'bg-[#45152C]',
-            'bg-[#233876]'
-        ];
-        return colors[index % colors.length];
+        if (journalTagsData?.tags) {
+            // Try to find the tag in the API data
+            const apiTag = journalTagsData.tags.find(apiTag => 
+                apiTag.tag.toLowerCase() === tag.toLowerCase()
+            );
+            
+            if (apiTag) {
+                // Map the exact API color strings to your specified hex colors
+                const colorMapping: { [key: string]: { background: string; text: string } } = {
+                    'bg-primary-theme text-foreground hover:bg-primary-hover': {
+                        background: '#E74694',
+                        text: '#FFF'
+                    },
+                    'bg-primary text-primary-foreground hover:bg-primary/80': {
+                        background: '#45152C',
+                        text: '#F190BF'
+                    },
+                    'border-transparent bg-dark text-foreground-secondary hover:bg-dark/80': {
+                        background: '#2F2C2D',
+                        text: '#C3C1C1'
+                    },
+                    'bg-blue text-blue-foreground hover:bg-blue/80': {
+                        background: '#233876',
+                        text: '#76A9FA'
+                    },
+                    'border-transparent bg-red-theme text-red-foreground hover:bg-red-theme/80': {
+                        background: '#F05252',
+                        text: '#F8B4B4'
+                    },
+                    'bg-indigo text-indigo-foreground hover:bg-indigo/80': {
+                        background: '#362F78',
+                        text: '#B4C6FC'
+                    },
+                    'bg-purple text-purple-foreground hover:bg-purple/80': {
+                        background: '#4A1D96',
+                        text: '#CABFFD'
+                    },
+                    'bg-yellow/30 text-yellow-foreground hover:bg-yellow/80': {
+                        background: '#6331124C', // With opacity
+                        text: '#FACA15'
+                    }
+                };
+                
+                const colorData = colorMapping[apiTag.colour];
+                if (colorData) {
+                    return {
+                        backgroundColor: colorData.background,
+                        color: colorData.text
+                    };
+                }
+            }
+        }
+        
+        // Fallback to index-based color selection
+        return {
+            backgroundColor: fallbackColors[index % fallbackColors.length],
+            color: '#FFF' // Default white text
+        };
     };
 
     return (
         <View className="flex-row flex-wrap">
-            {tags.map((tag, index) => (
-                <View
-                    key={`${tag}-${index}`} // Use tag and index to ensure uniqueness
-                    className={`${getTagBackgroundColor(tag, index)} px-2 py-1 rounded mr-1 mb-1`}
-                >
-                    <Text className="text-white font-InterMedium text-xs">
-                        {tag}
-                    </Text>
-                </View>
-            ))}
+            {tags.map((tag, index) => {
+                const { backgroundColor, color } = getTagBackgroundColor(tag, index);
+                
+                return (
+                    <View
+                        key={`${tag}-${index}`}
+                        className="px-2 py-1 rounded mr-1 mb-1"
+                        style={{ backgroundColor }}
+                    >
+                        <Text 
+                            className="font-InterMedium text-xs"
+                            style={{ color }}
+                        >
+                            {tag}
+                        </Text>
+                    </View>
+                );
+            })}
         </View>
     );
 };
@@ -115,6 +220,9 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
     const [expandedTrades, setExpandedTrades] = useState<Record<string, boolean>>({});
     const [currentPosition, setCurrentPosition] = useState<TradeHistoryData['all_trades'][number] | null>(null);
     const currentPositionRef = useRef<TradeHistoryData['all_trades'][number] | null>(null);
+
+    // Get journal tags data for dynamic colors
+    const { data: journalTagsData, isLoading: isLoadingTags } = useGetJournalTags();
 
     // Same logic as web version for maintaining current position
     useEffect(() => {
@@ -167,7 +275,10 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 const { from, to } = getCurrencyFlags(trade.symbol);
                 const fromFlagImage = getCurrencyFlagImage(from);
                 const toFlagImage = getCurrencyFlagImage(to);
-                
+
+                console.log('trade.tags', trade.tags);
+                console.log('journalTagsData', journalTagsData);
+
                 // Create unique key for this trade
                 const uniqueKey = createUniqueKey(trade, index);
                 const isExpanded = expandedTrades[uniqueKey];
@@ -247,70 +358,37 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
 
                         {/* Enhanced Expanded Details */}
                         {isExpanded && (
-                            <View className="px-4 pb-4 bg-gray-850 border-t border-gray-700">
-                                <View className="mt-3 space-y-3">
+                            <View className="px-4 pb-4 bg-gray-850">
+                                <View className="mt-2 space-y-3">
                                     <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Entry:</Text>
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Entry:</Text>
                                         <DirectionValue
                                             value={trade.entry}
-                                            prefix="$"
+                                            prefix=""
                                             decimals={2}
                                         />
                                     </View>
 
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Entry (GMT):</Text>
-                                        <Text className="text-white font-InterMedium text-sm">
-                                            {formatDateTime(trade.open_time)}
-                                        </Text>
+                                    <View className="flex-row justify-between items-center mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Open (GMT):</Text>
+                                        <DateTimeDisplay dateString={trade.open_time} />
                                     </View>
 
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Exit:</Text>
+                                    <View className="flex-row justify-between items-center mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Exit:</Text>
                                         <DirectionValue
                                             value={trade.exit}
-                                            prefix="$"
+                                            prefix=""
                                             decimals={2}
                                         />
                                     </View>
 
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Exit (GMT):</Text>
-                                        <Text className="text-white font-InterMedium text-sm">
-                                            {formatDateTime(trade.exit_time)}
-                                        </Text>
+                                    <View className="flex-row justify-between items-center mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Exit (GMT):</Text>
+                                        <DateTimeDisplay dateString={trade.exit_time} />
                                     </View>
-
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Fees:</Text>
-                                        <DirectionValue
-                                            value={trade.fees}
-                                            prefix="$"
-                                            colorized
-                                            decimals={2}
-                                        />
-                                    </View>
-
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">TP:</Text>
-                                        <Text className="text-white font-InterMedium text-sm">
-                                            {trade.tp ? trade.tp.toFixed(2) : (
-                                                <Text className="text-gray-400">-</Text>
-                                            )}
-                                        </Text>
-                                    </View>
-
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">SL:</Text>
-                                        <Text className="text-white font-InterMedium text-sm">
-                                            {trade.sl ? trade.sl.toFixed(2) : (
-                                                <Text className="text-gray-400">-</Text>
-                                            )}
-                                        </Text>
-                                    </View>
-
-                                    <View className="flex-row justify-between items-center">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">ROI:</Text>
+                                    <View className="flex-row justify-between items-center mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">ROI:</Text>
                                         <DirectionValue
                                             value={trade.roi}
                                             suffix="%"
@@ -319,10 +397,23 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                                         />
                                     </View>
 
-                                    <View className="flex-row justify-between items-start">
-                                        <Text className="text-gray-400 font-InterMedium text-sm">Tags:</Text>
+                                    <View className="flex-row justify-between items-center mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Fees:</Text>
+                                        <DirectionValue
+                                            value={trade.fees}
+                                            prefix="$"
+                                            colorized
+                                            decimals={2}
+                                        />
+                                    </View>
+
+                                    <View className="flex-row justify-between items-start mt-1">
+                                        <Text className="text-[#898587] font-InterMedium text-sm">Tags:</Text>
                                         {trade.tags?.length ? (
-                                            <TagsList tags={trade.tags} />
+                                            <TagsList 
+                                                tags={trade.tags} 
+                                                journalTagsData={journalTagsData}
+                                            />
                                         ) : (
                                             <Text className="text-gray-400 font-InterMedium text-sm">-</Text>
                                         )}

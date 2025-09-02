@@ -89,17 +89,17 @@ const ResetPasswordScreen = ({ navigation }) => {
           />
           <Text className='text-white text-base flex-1 text-center font-Inter'>Back to Login</Text>
         </TouchableOpacity>
-        <Text className='text-white text-2xl font-InterBold mb-2'>Reset Your Password</Text>
+        <Text className='text-white text-3xl font-InterBold mb-2'>Reset Your Password</Text>
       </View>
 
       {activeStep === 1 ? (
         //Step 1: Email input
         <>
-          <Text className='text-gray-400 text-sm mb-6 font-Inter'>
+          <Text className='text-gray-400 text-base mb-6 font-Inter'>
             Enter the email associated with your account to receive a verification code.
           </Text>
           <View className='mb-5'>
-            <Text className='text-sm text-white mb-2 font-Inter'>Email Address</Text>
+            <Text className='text-base text-white mb-2 font-Inter'>Email Address</Text>
             <TextInput
               className='bg-zinc-900 text-white rounded-lg px-4 py-3'
               value={email}
@@ -111,14 +111,14 @@ const ResetPasswordScreen = ({ navigation }) => {
             />
           </View>
           <TouchableOpacity
-            className='bg-primary rounded-lg px-4 py-4 items-center mb-4'
+            className='bg-primary-100 rounded-lg px-4 py-4 items-center mb-4'
             onPress={onRequestReset}
             disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color='#000' />
             ) : (
-              <Text className='text-black font-bold'>Send Verification Code</Text>
+              <Text className='text-black font-bold'>Send Reset Link</Text>
             )}
           </TouchableOpacity>
         </>
@@ -181,7 +181,7 @@ const ResetPasswordScreen = ({ navigation }) => {
           </View>
 
           <TouchableOpacity
-            className='bg-primary rounded-lg px-4 py-4 items-center mb-4'
+            className='bg-primary-100 rounded-lg px-4 py-4 items-center mb-4'
             onPress={onReset}
             disabled={isLoading}
           >
@@ -195,7 +195,7 @@ const ResetPasswordScreen = ({ navigation }) => {
           <TouchableOpacity
             onPress={() => setActiveStep(1)}
           >
-            <Text className='text-primary text-center font-InterSemiBold'>
+            <Text className='text-primary-100 text-center font-InterSemiBold'>
               Didn't receive a code? Resend
             </Text>
           </TouchableOpacity>

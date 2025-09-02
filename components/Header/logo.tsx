@@ -1,3 +1,4 @@
+// components/Header/logo.tsx - CLEAN VERSION
 import images from "@/constants/images";
 import { ChevronDown } from "lucide-react-native";
 import { useMemo, useState } from "react";
@@ -32,7 +33,6 @@ export function Logo() {
     const navigation = useNavigation<NavigationProp>();
     const { selectedAccountId, allAccounts } = useAccounts();
     const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
-
     const { data: openTrades } = useOpenPositionsWS();
 
     const selectedAccount = useMemo(() => {
@@ -53,12 +53,12 @@ export function Logo() {
     ]);
 
     const openProfitLoss = useMemo(() => {
-        if (!openTrades) {
+        if (!openTrades?.open_trades) {
             return 0;
         }
 
         return openTrades.open_trades.reduce((acc, trade) => {
-            return acc + trade.pl;
+            return acc + (trade.pl || 0);
         }, 0);
     }, [openTrades]);
 
@@ -104,13 +104,16 @@ export function Logo() {
                 </View>
             </View>
 
-            {/* Right side - Values and profile dropdown (pushed to end) */}
+            {/* Right side - Values and profile dropdown */}
             <View className="flex-row items-center">
                 <View className="mr-3">
                     <Text className="text-sm font-Inter text-white">
                         {accountDetails?.balance ? formatCurrency(accountDetails.balance) : '$0.00'}
                     </Text>
-                    <Text className="text-sm font-Inter text-white text-right">
+                    <Text className={`text-sm font-Inter text-right ${
+                        openProfitLoss > 0 ? 'text-green-400' : 
+                        openProfitLoss < 0 ? 'text-red-400' : 'text-white'
+                    }`}>
                         {formatCurrency(openProfitLoss)}
                     </Text>
                 </View>

@@ -14,8 +14,9 @@ import { Link, router, Stack } from 'expo-router';
 import OAuth from '@/components/OAuth';
 import { useSignIn, useSignUp } from '@clerk/clerk-expo';
 import { ReactNativeModal } from "react-native-modal";
+import { LogoDropdown } from '@/components/LogoDropdown';
 
-export default function SignUp (){
+export default function SignUp() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -90,7 +91,11 @@ export default function SignUp (){
       {/* Main Sign Up Form */}
       {verification.state !== "pending" && (
         <>
-          <View className="mt-14 mb-8">
+          <View className="pt-12 pb-4">
+            <LogoDropdown />
+          </View>
+
+          <View className="mt-5 mb-8">
             <Text className="text-2xl font-InterBold text-white mb-2">Create Account</Text>
             <Text className="text-base text-gray-500 font-InterSemiBold">
               Unlock limitless trading opportunities.
@@ -150,31 +155,31 @@ export default function SignUp (){
                 className="w-5 h-5 border-2 border-gray-500 rounded mr-2.5 mt-0.5"
                 onPress={() => setAgreedToTerms(!agreedToTerms)}>
                 <View
-                  className={`flex-1 m-0.5 rounded ${agreedToTerms ? 'bg-primary' : ''
+                  className={`flex-1 m-0.5 rounded ${agreedToTerms ? 'bg-primary-100' : ''
                     }`}
                 />
               </Pressable>
               <Text className="flex-1 text-gray-500 leading-5 font-InterSemiBold">
                 By signing up, you agree to our{' '}
-                <Text className="text-primary font-Inter">Terms of Use</Text> and{' '}
-                <Text className="text-primary font-Inter">Privacy Policy</Text>.
+                <Text className="text-primary-100 font-Inter">Terms of Use</Text> and{' '}
+                <Text className="text-primary-100 font-Inter">Privacy Policy</Text>.
               </Text>
             </View>
 
-            <TouchableOpacity 
-              className="bg-primary rounded-lg px-4 py-4 items-center mb-2" 
+            <TouchableOpacity
+              className="bg-primary-100 rounded-lg px-4 py-4 items-center mb-2"
               onPress={onSignUpPress}
             >
               <Text className="text-base font-InterBold text-black">Sign Up</Text>
             </TouchableOpacity>
             <View className='items-center'>
-              <Text className='text-white font-InterBold'>Already have an account?<Link href='/(auth)/login' className='text-primary font-InterBold'> Log in</Link></Text>
+              <Text className='text-white font-InterBold'>Already have an account?<Link href='/(auth)/login' className='text-primary-100 font-InterBold'> Log in</Link></Text>
             </View>
 
             <View className='flex-1' />
 
             <View className='mb-7'>
-              <OAuth isSignUp={true}/>
+              <OAuth isSignUp={true} />
             </View>
           </View>
         </>
@@ -203,8 +208,8 @@ export default function SignUp (){
               {verification.error}
             </Text>
           )}
-          <TouchableOpacity 
-            className="bg-primary rounded-lg px-4 py-4 items-center mt-5" 
+          <TouchableOpacity
+            className="bg-primary-100 rounded-lg px-4 py-4 items-center mt-5"
             onPress={onPressVerify}
           >
             <Text className="text-base font-InterBold text-black">Verify Email</Text>
@@ -215,15 +220,15 @@ export default function SignUp (){
       {/* Success Modal */}
       <ReactNativeModal isVisible={showSuccessModal}>
         <View className="bg-zinc-900 px-7 py-9 rounded-2xl min-h-[300px] items-center justify-center">
-          <View className="w-20 h-20 bg-primary rounded-full items-center justify-center mb-5">
+          <View className="w-20 h-20 bg-primary-100 rounded-full items-center justify-center mb-5">
             <Text className="text-4xl">✓</Text>
           </View>
           <Text className="text-3xl font-InterBold text-white text-center mb-2">Verified</Text>
           <Text className="text-base text-gray-400 text-center font-InterSemiBold">
             You have successfully verified your account.
           </Text>
-          <TouchableOpacity 
-            className="bg-primary rounded-lg px-4 py-4 items-center w-full mt-8" 
+          <TouchableOpacity
+            className="bg-primary-100 rounded-lg px-4 py-4 items-center w-full mt-8"
             onPress={() => router.push(`/(tabs)/overview`)}
           >
             <Text className="text-base font-InterBold text-black">Browse Home</Text>

@@ -258,11 +258,6 @@ const Overview = () => {
     fetchData();
   }, []);
 
-  const authTests = testNewWebSocketAuth();
-  authTests.testWebSocketTokenFlow()
-    .then(() => console.log('🎉 New auth system works!'))
-    .catch(error => console.error('❌ Still issues:', error));
-
   // Render the "No Accounts" content for prop firm accounts
   const renderNoPropFirmAccountsContent = () => {
     return (
@@ -441,7 +436,6 @@ const Overview = () => {
         selectedAccountId={selectedAccountType}
       />
 
-      {/* ✅ FIXED: Use bottomSheetAccountData instead of selectedAccount */}
       <AccountBottomSheet
         bottomSheetRef={overviewAccountBottomSheetRef}
         context="overview"

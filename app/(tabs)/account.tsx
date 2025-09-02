@@ -26,26 +26,12 @@ const Account = () => {
     selectedPreviewAccountId
   } = useAccounts();
 
-  // ✅ REMOVED: const { accountId } = useParams<{ accountId: string }>();
-  // ✅ FIXED: Use selectedAccountId from context instead of route params
   const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
   const { data: accountDetails } = useGetAccountDetails(currentAccountId);
 
   const [dashboardAccountType, setDashboardAccountType] =
     useState<DashboardAccountType | null>(null);
-
-  // ✅ REMOVED: This useEffect was causing issues since accountId doesn't exist
-  // useEffect(() => {
-  //   if (accountId !== selectedPreviewAccountId?.toString()) {
-  //     setSelectedPreviewAccountId(accountId ? Number(accountId) : undefined);
-  //   }
-  // }, [
-  //   accountId,
-  //   selectedAccountId,
-  //   selectedPreviewAccountId,
-  //   setSelectedPreviewAccountId
-  // ]);
 
   const { data: metricsData } = useGetMetrics(currentAccountId);
 
@@ -97,40 +83,6 @@ const Account = () => {
       return acc + trade.pl - trade.fees * -1;
     }, 0);
   }, [metricsData]);
-
-
-  // // Show loading state
-  // if (accountDetailsLoading || metricsLoading) {
-  //   return (
-  //     <SafeAreaView className='bg-[#100E0F] h-full'>
-  //       <Header />
-  //       <View className="flex-1 items-center justify-center">
-  //         <Text className="text-white text-lg">Loading account data...</Text>
-  //       </View>
-  //     </SafeAreaView>
-  //   );
-  // }
-
-  // // Show error state
-  // if (accountDetailsError || metricsError) {
-  //   return (
-  //     <SafeAreaView className='bg-[#100E0F] h-full'>
-  //       <Header />
-  //       <View className="flex-1 items-center justify-center px-4">
-  //         <Text className="text-red-500 text-lg mb-4">Error loading account data</Text>
-  //         <Text className="text-gray-400 text-center">
-  //           {accountDetailsError?.message || metricsError?.message || 'Unknown error occurred'}
-  //         </Text>
-  //         <TouchableOpacity
-  //           className="mt-4 bg-primary-100 px-4 py-2 rounded-lg"
-  //           onPress={() => router.back()}
-  //         >
-  //           <Text className="text-white">Go Back</Text>
-  //         </TouchableOpacity>
-  //       </View>
-  //     </SafeAreaView>
-  //   );
-  // }
 
   // Show no data state
   if (!accountDetails || !metricsData) {

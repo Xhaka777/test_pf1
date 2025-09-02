@@ -1,3 +1,4 @@
+// providers/open-positions.tsx - FORCE CONNECTION DEBUG VERSION
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { useAccounts } from './accounts';
@@ -10,13 +11,21 @@ interface OpenPositionsContextType {
   isConnected: boolean;
   error: string | null;
   reconnect: () => void;
+  debug: {
+    accountId: number;
+    connectionAttempts: number;
+    lastMessage: string | null;
+    providerMounted: boolean;
+    authState: string;
+  };
 }
 
 const OpenPositionsContext = createContext<OpenPositionsContextType>({
   data: null,
   isConnected: false,
   error: null,
-  reconnect: () => {}
+  reconnect: () => {},
+  debug: { accountId: 0, connectionAttempts: 0, lastMessage: null, providerMounted: false, authState: 'unknown' }
 });
 
 export function OpenPositionsProvider({ children }: { children: React.ReactNode }) {
@@ -26,62 +35,105 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
   const [data, setData] = useState<OpenTradesData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState({
+    accountId: 0,
+    connectionAttempts: 0,
+    lastMessage: null as string | null,
+    providerMounted: true,
+    authState: 'unknown'
+  });
   
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 3; // ✅ Reduced attempts
+  const maxReconnectAttempts = 3;
   
   // Current account ID to use
   const activeAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
-  const connectWebSocket = useCallback(async () => {
-    if (!isLoaded || !isSignedIn || accountsLoading || isConnectingRef.current) {
-      console.log('[OpenPositions] Not ready for connection:', { 
-        isLoaded, 
-        isSignedIn, 
-        accountsLoading,
-        isConnecting: isConnectingRef.current 
-      });
-      return;
-    }
-
-    const accountId = activeAccountId;
+  // 🔧 DEBUG: Log provider mount
+  useEffect(() => {
+    console.log('[OpenPositions] 🚀 PROVIDER MOUNTED');
+    setDebug(prev => ({ ...prev, providerMounted: true }));
     
-    // Don't connect if no account is selected
-    if (!accountId || accountId <= 0) {
-      console.log('[OpenPositions] No account selected, skipping connection');
-      setIsConnected(false);
-      setData(null);
+    return () => {
+      console.log('[OpenPositions] 💀 PROVIDER UNMOUNTING');
+    };
+  }, []);
+
+  // 🔧 DEBUG: Log all state changes
+  useEffect(() => {
+    const authState = `loaded:${isLoaded},signed:${isSignedIn},accountsLoading:${accountsLoading}`;
+    console.log('[OpenPositions] 📊 STATE CHANGE:', {
+      isLoaded,
+      isSignedIn,
+      accountsLoading,
+      activeAccountId,
+      authState
+    });
+    
+    setDebug(prev => ({ 
+      ...prev, 
+      authState,
+      accountId: activeAccountId || 0
+    }));
+  }, [isLoaded, isSignedIn, accountsLoading, activeAccountId]);
+
+  const connectWebSocket = useCallback(async () => {
+    console.log('[OpenPositions] 🔄 connectWebSocket called - ENTRY POINT');
+    
+    // 🔧 FORCE CONNECTION: Reduce conditions to minimum
+    if (!activeAccountId || activeAccountId <= 0) {
+      console.log('[OpenPositions] ❌ No account ID, cannot connect:', activeAccountId);
       return;
     }
 
-    // Close existing connection gracefully
+    if (isConnectingRef.current) {
+      console.log('[OpenPositions] ⏳ Already connecting, skipping');
+      return;
+    }
+
+    console.log('[OpenPositions] ✅ All conditions met, proceeding with connection');
+
+    // Close existing connection
     if (socketRef.current) {
-      console.log('[OpenPositions] Closing existing connection');
+      console.log('[OpenPositions] 🔄 Closing existing connection');
       socketRef.current.close(1000, 'Reconnecting');
       socketRef.current = null;
     }
 
     isConnectingRef.current = true;
+    setError(null);
+    
+    // Update debug info
+    setDebug(prev => ({
+      ...prev,
+      accountId: activeAccountId,
+      connectionAttempts: prev.connectionAttempts + 1
+    }));
 
     try {
-      console.log('[OpenPositions] Getting WebSocket token for account:', accountId);
+      console.log('[OpenPositions] 🔑 Getting WebSocket token for account:', activeAccountId);
+      
+      // Get token
       const wsToken = await tokenManager.getToken(getToken);
+      console.log('[OpenPositions] ✅ Got WebSocket token:', wsToken ? 'YES' : 'NO');
       
-      console.log('[OpenPositions] Connecting with cached/new token...');
-      
-      
-      const wsUrl = `wss://staging-server.propfirmone.com/get_open_trades?auth_key=${wsToken}&account=${accountId}`;
+      const wsUrl = `wss://staging-server.propfirmone.com/get_open_trades?auth_key=${wsToken}&account=${activeAccountId}`;
       const origin = 'https://staging.propfirmone.com';
+      
+      console.log('[OpenPositions] 🔗 Creating WebSocket connection...');
+      console.log('[OpenPositions] 🔗 URL pattern: wss://staging-server.propfirmone.com/get_open_trades?auth_key=TOKEN&account=' + activeAccountId);
       
       socketRef.current = new WebSocket(wsUrl, undefined, {
         headers: { 'Origin': origin }
       });
 
+      console.log('[OpenPositions] 🔗 WebSocket created, setting up event handlers...');
+
       socketRef.current.onopen = () => {
-        console.log('[OpenPositions] ✅ Connected with token for account:', accountId);
+        console.log('[OpenPositions] ✅ WebSocket OPENED SUCCESSFULLY for account:', activeAccountId);
         setIsConnected(true);
         setError(null);
         isConnectingRef.current = false;
@@ -89,93 +141,101 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       };
 
       socketRef.current.onmessage = (event) => {
+        console.log('[OpenPositions] 📨 MESSAGE RECEIVED:', event.data.substring(0, 200) + '...');
+        
+        setDebug(prev => ({
+          ...prev,
+          lastMessage: event.data.substring(0, 100)
+        }));
+
         try {
           const result = parseWebSocketMessage<OpenTradesData>(event.data);
+          console.log('[OpenPositions] 📊 PARSED RESULT:', {
+            hasResult: !!result,
+            resultType: typeof result,
+            hasOpenTrades: result && 'open_trades' in result,
+            accountInResult: result?.account,
+            expectedAccount: activeAccountId,
+            openTradesCount: result?.open_trades?.length || 0
+          });
           
           if (result && typeof result === 'object' && 'open_trades' in result) {
-            if (result.account === accountId) {
-              console.log(`[OpenPositions] Received data for account ${accountId}:`, {
-                openTrades: result.open_trades?.length || 0,
-                openOrders: result.open_orders?.length || 0,
-                otherOpenTrades: result.other_open_trades?.length || 0,
-                otherOpenOrders: result.other_open_orders?.length || 0
-              });
+            console.log('[OpenPositions] ✅ VALID DATA STRUCTURE RECEIVED');
+            
+            if (result.account === activeAccountId) {
+              console.log('[OpenPositions] ✅ ACCOUNT MATCH - SETTING DATA');
               setData(result);
             } else {
-              console.warn('[OpenPositions] Received data for different account:', 
-                result.account, 'Expected:', accountId);
+              console.warn('[OpenPositions] ⚠️ ACCOUNT MISMATCH:', 
+                'received:', result.account, 'expected:', activeAccountId);
+              // Set data anyway for debugging
+              console.log('[OpenPositions] 🔧 Setting data anyway for debugging purposes');
+              setData(result);
             }
           } else {
-            console.warn('[OpenPositions] Received invalid data structure:', result);
+            console.warn('[OpenPositions] ⚠️ INVALID DATA STRUCTURE');
           }
         } catch (parseError) {
-          console.error('[OpenPositions] Parse error:', parseError);
+          console.error('[OpenPositions] ❌ PARSE ERROR:', parseError);
         }
       };
 
       socketRef.current.onerror = (error) => {
-        console.error('[OpenPositions] WebSocket error:', error);
+        console.error('[OpenPositions] ❌ WebSocket ERROR:', error);
         setIsConnected(false);
-        
-        // ✅ Better error handling for HTTP 200
-        if (error.message.includes('200')) {
-          setError('Server returned HTTP 200 instead of WebSocket upgrade. This endpoint might not support WebSocket connections.');
-        } else {
-          setError(error.message || 'WebSocket connection failed');
-        }
+        setError(error.message || 'WebSocket connection failed');
         isConnectingRef.current = false;
       };
 
       socketRef.current.onclose = (event) => {
-        console.log('[OpenPositions] WebSocket closed:', event.code, event.reason);
+        console.log('[OpenPositions] 🔌 WebSocket CLOSED:', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
+        
         setIsConnected(false);
         isConnectingRef.current = false;
-        
-        // ✅ Don't reconnect if we get HTTP 200 error (endpoint issue)
-        const isEndpointIssue = event.reason?.includes('200') || error?.includes('200');
-        
-        if (!event.wasClean && 
-            isSignedIn && 
-            accountId > 0 &&
-            reconnectAttemptsRef.current < maxReconnectAttempts &&
-            !isEndpointIssue &&
-            event.code !== 1000) {
-          
-          const delay = Math.min(10000 * Math.pow(2, reconnectAttemptsRef.current), 60000); // Longer delays
-          reconnectAttemptsRef.current++;
-          
-          console.log(`[OpenPositions] Scheduling reconnection attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${delay}ms`);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connectWebSocket();
-          }, delay);
-        } else if (isEndpointIssue) {
-          console.log('[OpenPositions] HTTP 200 error - endpoint might not support WebSocket connections');
-          setError('This endpoint might not support WebSocket connections. Please check with backend team.');
-        } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          console.log('[OpenPositions] Max reconnection attempts reached');
-          setError('Max reconnection attempts reached. Please try manual reconnect.');
-        }
       };
 
+      console.log('[OpenPositions] ✅ WebSocket setup complete, waiting for connection...');
+
     } catch (error) {
-      console.error('[OpenPositions] Connection setup failed:', error);
+      console.error('[OpenPositions] ❌ CONNECTION SETUP FAILED:', error);
       setError(error.message);
       setIsConnected(false);
       isConnectingRef.current = false;
-      
-      // Handle rate limiting
-      if (error.message.includes('429') || error.message.includes('Rate limited')) {
-        console.log('[OpenPositions] Rate limited, waiting 60s before retry');
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 60000);
-      }
     }
-  }, [isLoaded, isSignedIn, accountsLoading, activeAccountId, getToken, error]);
+  }, [activeAccountId, getToken]);
+
+  // 🔧 FORCE: Try connection immediately when account is available
+  useEffect(() => {
+    console.log('[OpenPositions] 🔄 MAIN CONNECTION EFFECT TRIGGERED:', {
+      activeAccountId,
+      hasAccount: !!activeAccountId && activeAccountId > 0
+    });
+
+    if (activeAccountId && activeAccountId > 0) {
+      console.log('[OpenPositions] 🚀 FORCING CONNECTION ATTEMPT');
+      
+      // Small delay to ensure everything is ready
+      const timeout = setTimeout(() => {
+        connectWebSocket();
+      }, 2000);
+
+      return () => {
+        console.log('[OpenPositions] 🧹 Cleaning up connection timeout');
+        clearTimeout(timeout);
+      };
+    } else {
+      console.log('[OpenPositions] ⏸️ No account ID, not connecting');
+    }
+  }, [activeAccountId, connectWebSocket]);
 
   const reconnect = useCallback(() => {
-    console.log('[OpenPositions] Manual reconnection requested');
+    console.log('[OpenPositions] 🔄 MANUAL RECONNECT REQUESTED');
     reconnectAttemptsRef.current = 0;
-    setError(null); // Clear previous errors
+    setError(null);
     
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -184,55 +244,10 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
     connectWebSocket();
   }, [connectWebSocket]);
 
-  // ✅ Only connect when account actually changes
-  const previousAccountIdRef = useRef<number>(0);
-  
-  useEffect(() => {
-    if (activeAccountId !== previousAccountIdRef.current) {
-      console.log('[OpenPositions] Account changed from', previousAccountIdRef.current, 'to', activeAccountId);
-      previousAccountIdRef.current = activeAccountId;
-      
-      setData(null);
-      setIsConnected(false);
-      setError(null);
-      reconnectAttemptsRef.current = 0;
-      
-      if (socketRef.current) {
-        socketRef.current.close(1000, 'Account change');
-      }
-      
-      // Small delay to prevent rapid connections
-      const timeout = setTimeout(() => {
-        connectWebSocket();
-      }, 2000); // ✅ 2 second delay
-
-      return () => clearTimeout(timeout);
-    }
-  }, [activeAccountId, connectWebSocket]);
-
-  // Clear state on sign out
-  useEffect(() => {
-    if (!isSignedIn) {
-      console.log('[OpenPositions] User signed out, cleaning up');
-      setData(null);
-      setIsConnected(false);
-      setError(null);
-      reconnectAttemptsRef.current = 0;
-      previousAccountIdRef.current = 0;
-      
-      if (socketRef.current) {
-        socketRef.current.close(1000, 'User signed out');
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    }
-  }, [isSignedIn]);
-
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
-      console.log('[OpenPositions] Component unmounting, cleaning up');
+      console.log('[OpenPositions] 🧹 CLEANUP - Component unmounting');
       if (socketRef.current) {
         socketRef.current.close(1000, 'Component unmount');
       }
@@ -243,11 +258,19 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const value = {
-    data: isSignedIn ? data : null,
+    data: data,  // Return data regardless of sign-in status for debugging
     isConnected,
     error,
-    reconnect
+    reconnect,
+    debug
   };
+
+  console.log('[OpenPositions] 🔄 PROVIDER RENDER:', {
+    hasData: !!data,
+    isConnected,
+    error: !!error,
+    debugInfo: debug
+  });
 
   return (
     <OpenPositionsContext.Provider value={value}>
@@ -259,12 +282,13 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
 export const useOpenPositionsWS = (): OpenPositionsContextType => {
   const context = useContext(OpenPositionsContext);
   if (!context) {
-    console.warn('useOpenPositions must be used within a OpenPositionsProvider');
+    console.warn('[OpenPositions] ⚠️ Hook used outside provider!');
     return {
       data: null,
       isConnected: false,
-      error: null,
-      reconnect: () => {}
+      error: 'Hook used outside provider',
+      reconnect: () => {},
+      debug: { accountId: 0, connectionAttempts: 0, lastMessage: null, providerMounted: false, authState: 'no-context' }
     };
   }
   return context;
