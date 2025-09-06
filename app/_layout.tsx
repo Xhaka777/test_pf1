@@ -18,6 +18,8 @@ import { AccountDetailsProvider } from '@/providers/account-details';
 import { OpenPositionsProvider } from '@/providers/open-positions';
 import { AppState } from 'react-native';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
+import { NetworkProvider, useNetwork } from '@/providers/network';
+import ConnectionErrorScreen from '@/components/ConnectionErrorScreen';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -39,8 +41,8 @@ const tokenCache = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // ⚠️ KEEP ALL EXISTING HOOKS IN THE SAME ORDER - DON'T ADD NEW ONES HERE!
-  
+  const { hasNetworkError } = useNetwork();
+
   useEffect(() => {
     clerkTokenManager.initialize().then(() => {
       console.log('[App] Token manager ready');
@@ -88,41 +90,47 @@ export default function RootLayout() {
     return null;
   }
 
+  if (hasNetworkError) {
+    return <ConnectionErrorScreen />;
+  }
+
   return (
     <GestureHandlerRootView className='flex-1'>
       <BottomSheetModalProvider>
-        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-          <ClerkLoaded>
-            <QueryProvider>
-              <AccountsProvider>
-                <AccountDetailsProvider>
-                  <CurrencySymbolProvider>
-                    <OpenPositionsProvider>
-                      <Stack>
-                        <Stack.Screen name='index' options={{ headerShown: false }} />
-                        <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-                        <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-                        <Stack.Screen name='menu'
-                          options={{
-                            headerShown: false,
-                            animation: 'slide_from_right',
-                          }}
-                        />
-                        <Stack.Screen name='assets'
-                          options={{
-                            headerShown: false,
-                            animationTypeForReplace: 'push'
-                          }}
-                        />
-                      </Stack>
-                    </OpenPositionsProvider>
-                  </CurrencySymbolProvider>
-                </AccountDetailsProvider>
-              </AccountsProvider>
-              <StatusBar style="auto" />
-            </QueryProvider>
-          </ClerkLoaded>
-        </ClerkProvider>
+        <NetworkProvider>
+          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+            <ClerkLoaded>
+              <QueryProvider>
+                <AccountsProvider>
+                  <AccountDetailsProvider>
+                    <CurrencySymbolProvider>
+                      <OpenPositionsProvider>
+                        <Stack>
+                          <Stack.Screen name='index' options={{ headerShown: false }} />
+                          <Stack.Screen name='(auth)' options={{ headerShown: false }} />
+                          <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+                          <Stack.Screen name='menu'
+                            options={{
+                              headerShown: false,
+                              animation: 'slide_from_right',
+                            }}
+                          />
+                          <Stack.Screen name='assets'
+                            options={{
+                              headerShown: false,
+                              animationTypeForReplace: 'push'
+                            }}
+                          />
+                        </Stack>
+                      </OpenPositionsProvider>
+                    </CurrencySymbolProvider>
+                  </AccountDetailsProvider>
+                </AccountsProvider>
+                <StatusBar style="auto" />
+              </QueryProvider>
+            </ClerkLoaded>
+          </ClerkProvider>
+        </NetworkProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );

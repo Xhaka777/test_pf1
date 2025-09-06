@@ -4,22 +4,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 interface AccountBalanceCardProps {
   accountType: string;
-  balance: string;
-  totalPL: string;
-  totalPLPercentage: string;
-  dailyPL: string;
-  dailyPLPercentage: string;
+  balance: number;
+  totalPL: number;
+  totalPLPercentage: number;
+  dailyPL: number;
+  dailyPLPercentage: number;
 }
 
 const AccountBalanceCard = ({
   accountType,
-  balance = '0.00',
-  totalPL = '0.00',
-  totalPLPercentage = '0.00%',
-  dailyPL = '0.00',
-  dailyPLPercentage = '0.00%',
+  balance = 0,
+  totalPL = 0,
+  totalPLPercentage = 0,
+  dailyPL = 0,
+  dailyPLPercentage = 0,
 }: AccountBalanceCardProps) => {
-
 
   // Format account type for display
   const getFormattedAccountType = (type: string) => {
@@ -36,6 +35,16 @@ const AccountBalanceCard = ({
         return 'Evaluation';
     }
   };
+
+  const formatCurrency = (value: number) => {
+    return `${Math.abs(value).toLocaleString()}`;
+  };
+
+  // Format percentage values
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+  };
+
 
   return (
     <View className="px-2 mt-2">
@@ -85,7 +94,7 @@ const AccountBalanceCard = ({
               marginBottom: 24,
             }}
           >
-            {balance}
+            {formatCurrency(balance)}
           </Text>
 
           {/* Bottom Row - Total P/L and Daily P/L */}
@@ -111,11 +120,11 @@ const AccountBalanceCard = ({
               <Text
                 style={{
                   color: (totalPL ?? '').toString().startsWith('-') ? '#EF4444' : '#10B981',
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: '600',
                 }}
               >
-                {totalPLPercentage ?? '0.00%'}
+                {totalPL >= 0 ? '' : '-'}${Math.abs(totalPL).toLocaleString()}
               </Text>
 
             </View>
@@ -144,12 +153,12 @@ const AccountBalanceCard = ({
               </Text>
               <Text
                 style={{
-                  color: dailyPL.startsWith('-') ? '#EF4444' : '#10B981',
-                  fontSize: 13,
+                  color: dailyPLPercentage < 0 ? '#EF4444' : '#10B981',
+                  fontSize: 16,
                   fontWeight: '600',
                 }}
               >
-                {dailyPLPercentage}
+                {formatPercentage(dailyPLPercentage)}
               </Text>
             </View>
           </View>

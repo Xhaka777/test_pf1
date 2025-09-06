@@ -22,52 +22,22 @@ import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet';
 import AccountBottomSheet from '@/components/AccountBottomSheet';
 import { useGetMetrics } from '@/api/hooks/metrics';
+import { useAccounts } from '@/providers/accounts';
+import { useGetAccountDetails } from '@/api/hooks/account-details';
 
-interface ActivityData {
-  time: string;
-  value: number;
-  isHourMark?: boolean;
-}
-
-const calculateWinLossStats = (metrics: any) => {
-  if (!metrics) {
-    return {
-      winPercentage: 0,
-      lossPercentage: 0,
-      winAmount: 0,
-      lossAmount: 0
-    }
-  }
-
-  const totalTrades = metrics.total_trades || 0;
-  const winningTrades = metrics.winning_trades || 0;
-  const losingTrades = metrics.losing_trades || 0;
-
-  const winPercentage = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-  const lossPercentage = totalTrades > 0 ? (losingTrades / totalTrades) * 100 : 0;
-
-  const winAmount = metrics.average_profit || 0;
-  const lossAmount = Math.abs(metrics.average_loss || 0);
-
-  return {
-    winPercentage,
-    lossPercentage,
-    winAmount,
-    lossAmount
-  }
-
+export enum DashboardAccountType {
+  PROP_FIRM = 'propfirm',
+  OWN_BROKER = 'ownbroker',
 }
 
 const Overview = () => {
   const { user } = useUser();
   const bottomSheetRef = useRef<AccountSelectorRef>(null);
 
-  // ✅ FIXED: Keep account type as string, separate from selected account data
   const [selectedAccountType, setSelectedAccountType] = useState<'evaluation' | 'funded' | 'live' | 'demo'>('evaluation');
   const [selectedSubAccount, setSelectedSubAccount] = useState<'evaluation' | 'funded'>('evaluation');
   const [selectedAccountTypeCategory, setSelectedAccountTypeCategory] = useState<'propFirm' | 'brokerage' | 'practice'>('propFirm');
 
-  // ✅ FIXED: Separate state for bottom sheet account data
   const [bottomSheetAccountData, setBottomSheetAccountData] = useState<any>(null);
 
   const overviewAccountBottomSheetRef = useRef<BottomSheetModal>(null);
@@ -75,7 +45,6 @@ const Overview = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 🔄 Sync selectedAccountTypeCategory when selectedAccountType changes
   useEffect(() => {
     if (selectedAccountType === 'evaluation' || selectedAccountType === 'funded') {
       setSelectedAccountTypeCategory('propFirm');
@@ -86,7 +55,6 @@ const Overview = () => {
     }
   }, [selectedAccountType]);
 
-  // 📡 Fetch accounts based on selected type
   const {
     data: propFirmAccountsData,
     isLoading: propFirmAccountsLoading,
@@ -102,6 +70,119 @@ const Overview = () => {
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
   } = useGetBrokerAccounts();
+
+  const {
+    selectedAccountId,
+    setSelectedPreviewAccountId,
+    selectedPreviewAccountId
+  } = useAccounts();
+
+  const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
+
+  const { data: accountDetails } = useGetAccountDetails(currentAccountId);
+  const { data: metricsData } = useGetMetrics(currentAccountId);
+
+  const [dashboardAccountType, setDashboardAccountType] =
+    useState<DashboardAccountType | null>(null);
+
+  const dailyLoss = useMemo(() => {
+    const starting_day_balance =
+      (metricsData?.starting_balance ?? 0) - (metricsData?.daily_pl ?? 0);
+    return (metricsData?.daily_pl ?? 0) > 0
+      ? 0
+      : ((metricsData?.daily_pl ?? 0) / starting_day_balance) * 100;
+  }, [metricsData?.daily_pl, metricsData?.starting_balance]);
+
+  const maxDailyLoss = useMemo(() => {
+    const maxDailyLossInUnits =
+      ((metricsData?.max_daily_dd ?? 0) / 100) *
+      (metricsData?.starting_balance ?? 0);
+    return Number(maxDailyLossInUnits.toFixed(2));
+  }, [metricsData?.max_daily_dd, metricsData?.starting_balance]);
+
+  const closedProfitLoss = useMemo(() => {
+    if (!metricsData) {
+      return 0;
+    }
+
+    return metricsData.trades_summary.reduce((acc, trade) => {
+      return acc + trade.pl - trade.fees * -1;
+    }, 0);
+  }, [metricsData]);
+
+  // Add AccountMetrics calculations (same as in AccountMetrics.tsx):
+  const maxDrawdownInUnits = useMemo(() => {
+    return ((metricsData?.max_total_dd ?? 0) / 100) * (metricsData?.starting_balance ?? 0);
+  }, [metricsData?.max_total_dd, metricsData?.starting_balance]);
+
+  const profitTargetInUnits = useMemo(() => {
+    const profitTarget = metricsData?.profit_target ?? 0;
+    return ((profitTarget > 0 ? profitTarget : 15) / 100) * (metricsData?.starting_balance ?? 0);
+  }, [metricsData?.profit_target, metricsData?.starting_balance]);
+
+  const netPlInUnits = useMemo(() => {
+    let result = ((metricsData?.net_pl ?? 0) / 100) * (metricsData?.starting_balance ?? 0);
+
+    if (result === 0) {
+      return result;
+    }
+
+    if (result > 0) {
+      result = Math.min(result, profitTargetInUnits);
+    } else {
+      result = Math.max(result, -maxDrawdownInUnits);
+    }
+    return result;
+  }, [maxDrawdownInUnits, metricsData?.net_pl, profitTargetInUnits, metricsData?.starting_balance]);
+
+  const convertedDailyLoss = useMemo(() => {
+    const dailyPL = metricsData?.daily_pl ?? 0;
+    const dailyLossCalc =
+      ((dailyPL < 0 ? dailyPL : 0) / Number(maxDailyLoss)) * 100 * -1;
+
+    return dailyLossCalc <= 100 ? dailyLossCalc : 100;
+  }, [metricsData?.daily_pl, maxDailyLoss]);
+
+  // Win/Loss rate calculations
+  const lossRate = useMemo(() => {
+    return 100 - (metricsData?.win_rate ?? 0);
+  }, [metricsData?.win_rate]);
+
+  // Calculate daily PL percentage
+  const dailyPLPercentage = useMemo(() => {
+    if (!metricsData?.starting_balance || metricsData.starting_balance === 0) return 0;
+    return ((metricsData?.daily_pl ?? 0) / metricsData.starting_balance) * 100;
+  }, [metricsData?.daily_pl, metricsData?.starting_balance]);
+
+  // Calculate total PL percentage
+  const totalPLPercentage = useMemo(() => {
+    if (!metricsData?.starting_balance || metricsData.starting_balance === 0) return 0;
+    return (closedProfitLoss / metricsData.starting_balance) * 100;
+  }, [closedProfitLoss, metricsData?.starting_balance]);
+
+  useEffect(() => {
+    if (!accountDetails?.account_type) {
+      return;
+    }
+
+    if (
+      [AccountTypeEnum.DEMO, AccountTypeEnum.LIVE].includes(
+        accountDetails?.account_type,
+      )
+    ) {
+      setDashboardAccountType(DashboardAccountType.OWN_BROKER);
+    }
+
+    if (
+      [
+        AccountTypeEnum.EVALUATION,
+        AccountTypeEnum.FUNDED,
+        AccountTypeEnum.COMPETITION,
+      ].includes(accountDetails?.account_type)
+    ) {
+      setDashboardAccountType(DashboardAccountType.PROP_FIRM);
+    }
+  }, [accountDetails]);
 
   // ⚙️ Process prop firm accounts like in Menu.tsx
   const processedPropFirmAccounts = useMemo(() => {
@@ -153,28 +234,6 @@ const Overview = () => {
   };
 
   const currentAccountData = getAccountData(selectedAccountType);
-
-  const {
-    data: metricsData,
-    isLoading: metricsLoading,
-    error: metricsError
-  } = useGetMetrics(
-    currentAccountData?.id || 0,
-    {
-      enabled: Boolean(currentAccountData?.id)
-    }
-  )
-
-  const winLossStats = useMemo(() => {
-    return calculateWinLossStats(metricsData);
-  }, [metricsData]);
-
-  const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => Alert.alert("Signed out successfully!") }
-    ]);
-  };
 
   // ✅ FIXED: Handle account selection properly
   const handleAccountSelect = (accountId: string) => {
@@ -318,7 +377,7 @@ const Overview = () => {
       edges={Platform.OS === 'ios' ? ['bottom'] : []}
     >
       <ScrollView>
-        <Header onSignOut={handleSignOut} />
+        <Header />
 
         {/* Account Selector Header */}
         <View className='px-6 pb-2'>
@@ -359,23 +418,23 @@ const Overview = () => {
           <>
             <AccountBalanceCard
               accountType={selectedAccountType}
-              balance={currentAccountData.balance}
-              totalPL={currentAccountData.totalPL}
-              totalPLPercentage={currentAccountData.changePercentage}
-              dailyPL={currentAccountData.dailyPL}
-              dailyPLPercentage={currentAccountData.dailyPLPercentage}
+              balance={metricsData?.starting_balance ?? 0}
+              totalPL={closedProfitLoss}
+              totalPLPercentage={totalPLPercentage}
+              dailyPL={metricsData?.daily_pl ?? 0}
+              dailyPLPercentage={dailyPLPercentage}
             />
 
             <WinLossStats
-              winPercentage={winLossStats.winPercentage}
-              lossPercentage={winLossStats.lossPercentage}
-              winAmount={winLossStats.winAmount}
-              lossAmount={winLossStats.lossAmount}
+              winPercentage={metricsData?.win_rate ?? 0}
+              lossPercentage={lossRate}
+              winAmount={Math.abs(metricsData?.average_profit ?? 0)}
+              lossAmount={Math.abs(metricsData?.average_loss ?? 0)}
             />
 
             <AdditionalStats
-              winRate={currentAccountData.winRate}
-              profitFactor={currentAccountData.profitFactor}
+              winRate={metricsData?.win_rate ?? 0}
+              profitFactor={metricsData?.profit_factor ?? 0}
             />
           </>
         )}
