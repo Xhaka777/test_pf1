@@ -226,7 +226,6 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
                     </View>
                 </View>
 
-                {/* ✅ FIXED: Prop firm specific metrics */}
                 {accountData?.type && (accountData.type === 'Challenge' || accountData.type === 'Funded') && (
                     <View className="mb-4">
                         {/* Progress toward profit target */}

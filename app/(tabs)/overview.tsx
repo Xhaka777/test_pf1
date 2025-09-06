@@ -184,6 +184,27 @@ const Overview = () => {
     }
   }, [accountDetails]);
 
+  const getBrokerMetricsData = useCallback(() => {
+    if (bottomSheetAccountData?.originalData?.id && bottomSheetAccountData.originalData.id === currentAccountId) {
+      return metricsData;
+    }
+    return null;
+  }, [bottomSheetAccountData?.originalData?.id, currentAccountId, metricsData]);
+
+  const getBrokerTotalPL = useCallback(() => {
+    const brokerMetrics = getBrokerMetricsData();
+    if (!brokerMetrics) return 0;
+
+    return brokerMetrics.trades_summary?.reduce((acc, trade) => {
+      return acc + trade.pl - trade.fees * -1;
+    }, 0) || 0;
+  }, [getBrokerMetricsData]);
+
+  const getBrokerLossRate = useCallback(() => {
+    const brokerMetrics = getBrokerMetricsData();
+    return 100 - (brokerMetrics?.win_rate ?? 0);
+  }, [getBrokerMetricsData]);
+
   // ⚙️ Process prop firm accounts like in Menu.tsx
   const processedPropFirmAccounts = useMemo(() => {
     if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
@@ -224,7 +245,6 @@ const Overview = () => {
     return processedPropFirmAccounts.evaluation.length > 0 || processedPropFirmAccounts.funded.length > 0;
   }, [processedPropFirmAccounts]);
 
-  // ✅ FIXED: Get account data based on string account type, not object
   const getAccountData = (type: string) => {
     if (type === 'evaluation') return processedPropFirmAccounts.evaluation?.[0] ?? {};
     if (type === 'funded') return processedPropFirmAccounts.funded?.[0] ?? {};
@@ -235,7 +255,6 @@ const Overview = () => {
 
   const currentAccountData = getAccountData(selectedAccountType);
 
-  // ✅ FIXED: Handle account selection properly
   const handleAccountSelect = (accountId: string) => {
     console.log('[Overview] Account selected:', accountId);
     setSelectedAccountType(accountId as 'evaluation' | 'funded' | 'live' | 'demo');
@@ -286,15 +305,17 @@ const Overview = () => {
 
   const accountDisplayInfo = getAccountDisplayInfo();
 
-  // ✅ FIXED: Handle account press for bottom sheet
   const handleOverviewAccountPress = useCallback((account: any) => {
     console.log('[Overview] Account pressed for trading:', account.id, account.name, account.type);
 
-    // Set the account data for the bottom sheet WITHOUT changing selectedAccountType
+    // Set the account data for the bottom sheet
     setBottomSheetAccountData({
       ...account,
       type: account.type || selectedAccountType
     });
+
+    // ADD THIS LINE - Set preview account for ALL account types, not just prop firm
+    setSelectedPreviewAccountId(account.id);
 
     // Open the appropriate bottom sheet based on account type
     if (account.type === 'Challenge' || account.type === 'Funded') {
@@ -302,7 +323,7 @@ const Overview = () => {
     } else if (account.type === 'Live' || account.type === 'Demo') {
       overviewBrokerBottomSheetRef.current?.present();
     }
-  }, [selectedAccountType]); // Remove selectedAccount from dependency
+  }, [selectedAccountType, setSelectedPreviewAccountId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -351,7 +372,6 @@ const Overview = () => {
     );
   };
 
-  // ✅ FIXED: Determine what content to show based on current state
   const shouldShowAccountCards = () => {
     if (selectedAccountType === 'evaluation' || selectedAccountType === 'funded') {
       return hasPropFirmAccounts && !propFirmAccountsLoading && !propFirmAccountsError;
@@ -443,8 +463,8 @@ const Overview = () => {
             />
 
             <AdditionalStats
-              winRate={metricsData?.win_rate ?? 0}
-              profitFactor={metricsData?.profit_factor ?? 0}
+              metricsData={metricsData}
+              isLoading={!metricsData}
             />
           </>
         )}
@@ -553,6 +573,8 @@ const Overview = () => {
           totalPL: bottomSheetAccountData.totalPL,
           startingBalance: bottomSheetAccountData.startingBalance,
         } : undefined}
+        metricsData={metricsData}
+        lossRate={lossRate}
       />
 
     </SafeAreaView>

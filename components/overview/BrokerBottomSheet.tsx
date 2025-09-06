@@ -39,9 +39,18 @@ interface BrokerBottomSheetProps {
     bottomSheetRef: React.RefObject<BottomSheetModal>;
     accountData?: BrokerAccountData;
     context?: 'menu' | 'overview';
+    //
+    metricsData?: any;
+    lossRate?: number;
 }
 
-const BrokerBottomSheet = ({ bottomSheetRef, accountData, context = 'menu' }: BrokerBottomSheetProps) => {
+const BrokerBottomSheet = ({
+    bottomSheetRef,
+    accountData,
+    context = 'menu',
+    metricsData,
+    lossRate
+}: BrokerBottomSheetProps) => {
 
     const navigation = useNavigation();
     const { selectedAccountId, setSelectedAccountId } = useAccounts();
@@ -234,18 +243,7 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData, context = 'menu' }: Br
         return getNumericValue(accountData?.changePercentage || '0');
     };
 
-    const getAccountStats = () => {
-        return {
-            winPercentage: 64.68,
-            lossPercentage: 33.32,
-            avgWinAmount: '$129',
-            avgLossAmount: '-$29.85',
-            winRate: '13.79%',
-            profitFactor: '0.04'
-        };
-    };
-
-    const currentAccountData = getAccountStats();
+    console.log('metricsData', metricsData)
 
     return (
         <BottomSheetModal
@@ -302,16 +300,15 @@ const BrokerBottomSheet = ({ bottomSheetRef, accountData, context = 'menu' }: Br
 
                 {/* Win/Loss Statistics */}
                 <WinLossStats
-                    winPercentage={currentAccountData.winPercentage}
-                    lossPercentage={currentAccountData.lossPercentage}
-                    avgWinAmount={currentAccountData.avgWinAmount}
-                    avgLossAmount={currentAccountData.avgLossAmount}
+                    winPercentage={metricsData?.win_rate ?? 0}
+                    lossPercentage={lossRate ?? 0}
+                    winAmount={Math.abs(metricsData?.average_profit ?? 0)}
+                    lossAmount={Math.abs(metricsData?.average_loss ?? 0)}
                 />
 
-                {/* Additional Statistics */}
                 <AdditionalStats
-                    winRate={currentAccountData.winRate}
-                    profitFactor={currentAccountData.profitFactor}
+                    metricsData={metricsData}
+                    isLoading={!metricsData}
                 />
 
                 {/* Action Button */}

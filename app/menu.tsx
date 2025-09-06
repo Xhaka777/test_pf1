@@ -21,6 +21,8 @@ import AccountIcon from '@/components/icons/AccountIcon';
 import { PracticeIcon } from '@/components/icons/PracticeIcon';
 import { useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
 import { AccountStatusEnum } from '@/constants/enums';
+import { useAccounts } from '@/providers/accounts';
+import { useGetMetrics } from '@/api/hooks/metrics';
 
 const Menu = () => {
   const { user } = useUser();
@@ -36,6 +38,12 @@ const Menu = () => {
   const confirmSignOutSheetRef = useRef<BottomSheet>(null);
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
   const accountBottomSheetRef = useRef<BottomSheetModal>(null);
+
+  const {
+    selectedAccountId,
+    setSelectedPreviewAccountId,
+    selectedPreviewAccountId
+  } = useAccounts();
 
   const {
     data: propFirmAccountsData,
@@ -60,6 +68,13 @@ const Menu = () => {
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
   } = useGetBrokerAccounts();
+
+  const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
+  const { data: metricsData } = useGetMetrics(currentAccountId);
+
+  const lossRate = useMemo(() => {
+    return 100 - (metricsData?.win_rate ?? 0);
+  }, [metricsData?.win_rate]);
 
   const processedPropFirmAccounts = useMemo(() => {
     if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
@@ -311,6 +326,9 @@ const Menu = () => {
       originalData: !!account.originalData
     });
 
+    // ADD THIS LINE - Set preview account for metrics
+    setSelectedPreviewAccountId(account.id);
+
     // Create enhanced account data immediately
     const enhancedAccountData = {
       id: account.id,
@@ -337,7 +355,7 @@ const Menu = () => {
     } else {
       demoBottomSheetRef.current?.present();
     }
-  }, []);
+  }, [setSelectedPreviewAccountId]); // Add dependency
 
   // Handle trade press from bottom sheet
   const handleTradePress = useCallback((accountData: any) => {
@@ -481,7 +499,7 @@ const Menu = () => {
         <View>
           <View className="h-0.5 bg-propfirmone-100 mx-4" />
           <Profile
-            onProfilePress={handleProfilePress}/>
+            onProfilePress={handleProfilePress} />
         </View>
 
         <ProfileBottomSheet
@@ -541,6 +559,8 @@ const Menu = () => {
               totalPL: selectedAccount.totalPL,
               startingBalance: selectedAccount.startingBalance,
             } : undefined}
+            metricsData={metricsData}
+            lossRate={lossRate}
           />
         )}
 

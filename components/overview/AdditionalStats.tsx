@@ -3,34 +3,43 @@ import { View, Text, Image } from 'react-native';
 import icons from '@/constants/icons';
 
 interface AdditionalStatsProps {
-  winRate: number;
-  profitFactor: number;
+  metricsData?: any;
   isLoading?: boolean;
 }
 
 const AdditionalStats = ({
-  winRate = 0,
-  profitFactor = 0,
+  metricsData,
   isLoading = false,
 }: AdditionalStatsProps) => {
 
-  const formatWinRate = (rate: number) => {
+  const formatAccountSize = (balance: number) => {
     if (isLoading) return '--';
 
-    if (rate === null || rate === undefined || isNaN(rate)) {
+    if (balance === null || balance === undefined || isNaN(balance)) {
       return '--';
     }
 
-    return `${rate.toFixed(2)}%`;
+    return `$${balance.toLocaleString()}`;
   };
 
-  const formatProfitFactor = (factor: number | null | undefined) => {
+  const formatDailyPL = (dailyPL: number) => {
     if (isLoading) return '--';
-  
-    const safeValue = typeof factor === "number" && !isNaN(factor) ? factor : 0;
-    return safeValue.toFixed(2);
+
+    if (dailyPL === null || dailyPL === undefined || isNaN(dailyPL)) {
+      return '--';
+    }
+
+    const sign = dailyPL >= 0 ? '+' : '';
+    return `${sign}$${Math.abs(dailyPL).toLocaleString()}`;
   };
-  
+
+  const getDailyPLColor = (dailyPL: number) => {
+    if (isLoading) return 'text-gray-400';
+    if (dailyPL >= 0) return 'text-green-400';
+    return 'text-red-400';
+  };
+
+  console.log('metricsData?.starting_balance', metricsData?.starting_balance)
 
   return (
     <View className="px-2 mt-2 mb-2">
@@ -40,16 +49,16 @@ const AdditionalStats = ({
       }}>
         {/* Win Rate Card */}
         <View className='flex-1 bg-propfirmone-300 rounded-lg p-3 mr-2'>
-          <Text className='text-gray-400 text-base font-Inter'>Win Rate</Text>
+          <Text className='text-gray-400 text-base font-Inter'>Account Size</Text>
           <Text className={`text-base font-InterSemiBold ${isLoading ? 'text-gray-400' : 'text-white'}`}>
-            {formatWinRate(winRate)}</Text>
+            {formatAccountSize(metricsData?.starting_balance)}</Text>
         </View>
 
         {/* Profit Factor Card */}
         <View className='flex-1 bg-propfirmone-300 rounded-lg p-3'>
-          <Text className='text-gray-400 text-base font-Inter'>Profit Factor</Text>
+          <Text className='text-gray-400 text-base font-Inter'>Daily P/L</Text>
           <Text className={`text-base font-InterSemiBold ${isLoading ? 'text-gray-400' : 'text-white'}`}>
-            {formatProfitFactor(profitFactor)}</Text>
+            {formatAccountSize(metricsData?.daily_pl)}</Text>
         </View>
       </View>
     </View>
