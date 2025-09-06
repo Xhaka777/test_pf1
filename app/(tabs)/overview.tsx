@@ -418,7 +418,17 @@ const Overview = () => {
           <>
             <AccountBalanceCard
               accountType={selectedAccountType}
-              balance={metricsData?.starting_balance ?? 0}
+              accounts={
+                selectedAccountType === 'evaluation'
+                  ? processedPropFirmAccounts.evaluation
+                  : selectedAccountType === 'funded'
+                    ? processedPropFirmAccounts.funded
+                    : selectedAccountType === 'live'
+                      ? brokerAccountsData?.broker_accounts?.filter(acc => acc.account_type === 'live') || []
+                      : selectedAccountType === 'demo'
+                        ? brokerAccountsData?.broker_accounts?.filter(acc => acc.account_type === 'demo') || []
+                        : []
+              }
               totalPL={closedProfitLoss}
               totalPLPercentage={totalPLPercentage}
               dailyPL={metricsData?.daily_pl ?? 0}
