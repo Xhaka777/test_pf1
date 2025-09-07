@@ -19,10 +19,12 @@ import { EvaluatedAccountIcon } from '@/components/icons/EvaluatedAccountIcon';
 import { FundedAccountIcon } from '@/components/icons/FundedAccountIcon';
 import AccountIcon from '@/components/icons/AccountIcon';
 import { PracticeIcon } from '@/components/icons/PracticeIcon';
-import { useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
+import { useArchiveAccountMutation, useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
 import { AccountStatusEnum } from '@/constants/enums';
 import { useAccounts } from '@/providers/accounts';
 import { useGetMetrics } from '@/api/hooks/metrics';
+import { set } from 'date-fns';
+import { ArchiveAccountModal } from '@/components/ArchiveAccountModal';
 
 const Menu = () => {
   const { user } = useUser();
@@ -30,6 +32,9 @@ const Menu = () => {
   // Updated state to use the three account types
   const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
   const [selectedAccount, setSelectedAccount] = useState(null); // For bottom sheet
+
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [accountToArchive, setAccountToArchive] = useState<any>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeOnly, setActiveOnly] = useState(true); // Default to true like web
@@ -68,6 +73,10 @@ const Menu = () => {
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
   } = useGetBrokerAccounts();
+
+  const archiveAccountMutation = useArchiveAccountMutation();
+
+  console.log('archiveAccountMutation', archiveAccountMutation)
 
   const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
   const { data: metricsData } = useGetMetrics(currentAccountId);
@@ -256,6 +265,56 @@ const Menu = () => {
     activeOnly
   ]);
 
+  const handleArchivePress = useCallback((account: any) => {
+    setAccountToArchive(account);
+    setArchiveModalVisible(true);
+  }, []);
+
+  const handleArchiveAccount = useCallback(async (
+    status: AccountStatusEnum.PASSED | AccountStatusEnum.FAILED | AccountStatusEnum.DISCONNECTED | AccountStatusEnum.SUBSCRIPTION_ENDED
+  ) => {
+    if (!accountToArchive) return;
+
+    try {
+      await archiveAccountMutation.mutateAsync({
+        account: accountToArchive.id,
+        account_status: status,
+      });
+
+      Alert.alert(
+        "Success",
+        `"${accountToArchive.name}" has been archived successfully.`,
+        [{ text: "OK" }]
+      );
+
+      if (selectedAccountId === accountToArchive.id) {
+        //
+      }
+
+      if (selectedAccountType === 'propFirm') {
+        refetchPropFirmAccounts();
+      } else {
+        refetchBrokerAccounts();
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "An error occurred while trying to archive the account. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setArchiveModalVisible(false);  // This will close the modal
+      setAccountToArchive(null);      // Clear the account to archive
+    }
+  }, [
+    accountToArchive,
+    archiveAccountMutation,
+    selectedAccountId,
+    selectedAccountType,
+    refetchPropFirmAccounts,
+    refetchBrokerAccounts
+  ]);
+
   // Handle sign out
   const handleSignOut = () => {
     Alert.alert(
@@ -383,6 +442,10 @@ const Menu = () => {
             error={propFirmAccountsError}
             onAccountPress={handleAccountPress}
             onRefresh={refetchPropFirmAccounts}
+            //
+            currentAccountId={selectedAccountId}
+            onArchivePress={handleArchivePress}
+
           />
         );
 
@@ -403,6 +466,9 @@ const Menu = () => {
             brokerAccountsLoading={brokerAccountsLoading}
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
+            //
+            currentAccountId={selectedAccountId}
+            onAccountPress={handleArchivePress}
           />
         );
 
@@ -424,6 +490,9 @@ const Menu = () => {
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
             onAccountPress={handleBrokerAccountPress}
+            //
+            currentAccountId={selectedAccountId}
+            onArchivePress={handleArchivePress}
           />
         );
 
@@ -439,6 +508,9 @@ const Menu = () => {
             error={propFirmAccountsError}
             onAccountPress={handleAccountPress}
             onRefresh={refetchPropFirmAccounts}
+            //
+            currentAccountId={selectedAccountId}
+            onArchivePress={handleArchivePress}
           />
         );
     }
@@ -496,21 +568,25 @@ const Menu = () => {
         </View>
 
         {/* Profile at bottom */}
-        <View>
-          <View className="h-0.5 bg-propfirmone-100 mx-4" />
-          <Profile
-            onProfilePress={handleProfilePress} />
-        </View>
+        {!archiveModalVisible && (
+          <>
+            <View>
+              <View className="h-0.5 bg-propfirmone-100 mx-4" />
+              <Profile
+                onProfilePress={handleProfilePress} />
+            </View>
 
-        <ProfileBottomSheet
-          bottomSheetRef={bottomSheetRef}
-          onSignOutPress={handleConfirmSignOutPress}
-        />
+            <ProfileBottomSheet
+              bottomSheetRef={bottomSheetRef}
+              onSignOutPress={handleConfirmSignOutPress}
+            />
 
-        <ConfirmBottomSheet
-          bottomSheetRef={bottomSheetRef}
-          confirmSignOutSheetRef={confirmSignOutSheetRef}
-        />
+            <ConfirmBottomSheet
+              bottomSheetRef={bottomSheetRef}
+              confirmSignOutSheetRef={confirmSignOutSheetRef}
+            />
+          </>
+        )}
 
         <DemoAccBottomSheet
           bottomSheetRef={demoBottomSheetRef}
@@ -561,8 +637,16 @@ const Menu = () => {
             } : undefined}
             metricsData={metricsData}
             lossRate={lossRate}
+            onArchivePress={handleArchivePress}
           />
         )}
+
+
+        <ArchiveAccountModal
+          open={archiveModalVisible}  // Changed from 'visible' to 'open'
+          onOpenChange={setArchiveModalVisible}  // Changed from 'onClose' to 'onOpenChange'
+          onArchive={handleArchiveAccount}
+        />
 
       </SafeAreaView>
     </GestureHandlerRootView>

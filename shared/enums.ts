@@ -11,6 +11,7 @@ export enum AccountStatusEnum {
   PASSED = 'passed',
   FAILED = 'failed',
   DISCONNECTED = 'disconnected',
+  SUBSCRIPTION_ENDED = 'subscription ended',
 }
 
 export enum OrderTypeEnum {

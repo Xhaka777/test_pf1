@@ -45,6 +45,9 @@ interface NoPropFirmAccountsProps {
   onAccountPress?: (account: PropFirmAccount) => void;
   onRefresh?: () => void;
   context?: 'menu' | 'overview';
+  //
+  currentAccountId?: number;
+  onArchivePress?: (account: PropFirmAccount) => void;
 }
 
 const NoPropFirmAccounts = ({
@@ -63,7 +66,10 @@ const NoPropFirmAccounts = ({
   error: externalError = null,
   onAccountPress,
   onRefresh,
-  context = 'menu'
+  context = 'menu',
+  //
+  currentAccountId,
+  onArchivePress
 }: NoPropFirmAccountsProps) => {
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -248,6 +254,8 @@ const NoPropFirmAccounts = ({
           onAccountPress={onAccountPress || handleAccountPress}
           accountType="propFirm"
           activeTab={activeTab}
+          currentAccountId={currentAccountId}
+          onArchivePress={onAccountPress}
         />
       );
     } else {
@@ -263,6 +271,8 @@ const NoPropFirmAccounts = ({
           <ChallengeAccounts
             accounts={filteredChallengeAccounts}
             onAccountPress={onAccountPress || handleAccountPress}
+            currentAccountId={currentAccountId}
+            onArchivePress={onArchivePress}
           />
         );
       } else if (activeTab === 'Funded') {
@@ -277,6 +287,8 @@ const NoPropFirmAccounts = ({
           <FundedAccounts
             accounts={filteredFundedAccounts}
             onAccountPress={onAccountPress || handleAccountPress}
+            currentAccountId={currentAccountId}
+            onArchivePress={onAccountPress}
           />
         );
       }

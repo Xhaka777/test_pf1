@@ -24,11 +24,16 @@ interface PropFirmAccount {
 interface FundedAccountsProps {
     accounts: PropFirmAccount[];
     onAccountPress: (account: PropFirmAccount) => void;
+    // New props for current account and archive functionality
+    currentAccountId?: number;
+    onArchivePress?: (account: any) => void;
 }
 
 const FundedAccounts = ({
     accounts,
-    onAccountPress
+    onAccountPress,
+    currentAccountId,
+    onArchivePress
 }: FundedAccountsProps) => {
 
     return (
@@ -45,6 +50,8 @@ const FundedAccounts = ({
                         accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
                         icon={FundedAccountIcon}
+                        isCurrentAccount={currentAccountId === account.id}
+                        onArchivePress={onArchivePress}
                     />
                 </TouchableOpacity>
             ))}

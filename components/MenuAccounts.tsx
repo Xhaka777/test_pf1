@@ -28,14 +28,20 @@ interface MenuAccountsProps {
     }>,
     onAccountPress: (account: any) => void;
     accountType: 'propFirm' | 'brokerage' | 'practice';
-    activeTab?: string; // For determining specific account type within category
+    activeTab?: string;
+    // 
+    currentAccountId?: number;
+    onArchivePress?: (account: any) => void;
 }
 
 const MenuAccounts = ({
     accounts,
     onAccountPress,
     accountType,
-    activeTab
+    activeTab,
+    //
+    currentAccountId,
+    onArchivePress
 }: MenuAccountsProps) => {
 
     // Determine the specific account type based on accountType and activeTab
@@ -85,12 +91,14 @@ const MenuAccounts = ({
     const renderAccountCard = (account: any) => {
         // Format balance for display
         const formattedBalance = `${account.currency || 'USD'} ${account.balance.toLocaleString()}`;
-        
+
         // Add type to account if not present
         const accountWithType = {
             ...account,
             type: account.type || specificAccountType
         };
+
+        const isCurrentAccount = currentAccountId === account.id;
 
         // Render PropFirmPLCard for Prop Firm accounts
         if (accountType === 'propFirm') {
@@ -104,9 +112,12 @@ const MenuAccounts = ({
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
                     onPress={null}
+                    //
+                    isCurrentAccount={isCurrentAccount}
+                    onArchivePress={onAccountPress}
                 />
             );
-        } 
+        }
         // Render BrokeragePracticePLCard for Brokerage and Practice accounts
         else {
             return (
@@ -118,7 +129,10 @@ const MenuAccounts = ({
                     accountBalance={formattedBalance}
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
-                    onPress={null} 
+                    onPress={null}
+                    //
+                    isCurrentAccount={isCurrentAccount}
+                    onArchivePress={onArchivePress}
                 />
             );
         }

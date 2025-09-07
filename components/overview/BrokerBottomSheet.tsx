@@ -1,6 +1,6 @@
 import icons from "@/constants/icons";
 import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
-import { X } from "lucide-react-native";
+import { Archive, X } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { BrokerAccount } from "@/types";
@@ -42,6 +42,8 @@ interface BrokerBottomSheetProps {
     //
     metricsData?: any;
     lossRate?: number;
+    //
+    onArchivePress?: (account: any) => void;
 }
 
 const BrokerBottomSheet = ({
@@ -49,7 +51,8 @@ const BrokerBottomSheet = ({
     accountData,
     context = 'menu',
     metricsData,
-    lossRate
+    lossRate,
+    onArchivePress
 }: BrokerBottomSheetProps) => {
 
     const navigation = useNavigation();
@@ -160,6 +163,16 @@ const BrokerBottomSheet = ({
         }
     };
 
+    const handleArchivePress = useCallback(() => {
+        if (!account || !onArchivePress) {
+            return;
+        }
+
+        bottomSheetRef.current?.dismiss();
+
+        onArchivePress(account);
+    }, [account, onArchivePress, bottomSheetRef]);
+
     const getButtonConfig = () => {
         if (context === 'overview') {
             return {
@@ -177,7 +190,7 @@ const BrokerBottomSheet = ({
                 };
             } else {
                 return {
-                    text: 'Activate Account',
+                    text: 'Switch Account',
                     style: 'border border-primary-100',
                     textStyle: 'text-primary-100'
                 };
@@ -320,6 +333,18 @@ const BrokerBottomSheet = ({
                         {buttonConfig.text}
                     </Text>
                 </TouchableOpacity>
+
+                {context === 'menu' && onArchivePress && (
+                    <TouchableOpacity
+                        onPress={handleArchivePress}
+                        className="px-4 py-3 mx-2 mt-2 rounded-lg border border-gray-600 flex-row items-center justify-center"
+                    >
+                        <Archive size={16} color='#fff' />
+                        <Text className="text-white font-InterSemiBold ml-2">
+                            Archive Account
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </BottomSheetView>
         </BottomSheetModal>
     );

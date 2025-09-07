@@ -1,7 +1,5 @@
 import React from "react";
 import { TouchableOpacity, View } from "react-native";
-import BrokerPLCard from "./BokerPLCard";
-import icons from "@/constants/icons";
 import BrokeragePracticePLCard from "./BokerPLCard";
 import AccountIcon from "./icons/AccountIcon";
 
@@ -23,11 +21,16 @@ interface LiveAccountsProps {
         originalData?: any;
     }>,
     onAccountPress: (account: any) => void;
+    // New props for current account and archive functionality
+    currentAccountId?: number;
+    onArchivePress?: (account: any) => void;
 }
 
 const LiveAccounts = ({
     accounts,
-    onAccountPress
+    onAccountPress,
+    currentAccountId,
+    onArchivePress
 }: LiveAccountsProps) => {
 
     return (
@@ -44,6 +47,8 @@ const LiveAccounts = ({
                         accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
                         icon={AccountIcon}
+                        isCurrentAccount={currentAccountId === account.id}
+                        onArchivePress={onArchivePress}
                     />
                 </TouchableOpacity>
             ))}

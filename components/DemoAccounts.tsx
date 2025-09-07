@@ -1,7 +1,5 @@
 import React from "react";
 import { Pressable, TouchableOpacity, View } from "react-native";
-import BrokerPLCard from "./BokerPLCard";
-import icons from "@/constants/icons";
 import BrokeragePracticePLCard from "./BokerPLCard";
 import { PracticeIcon } from "./icons/PracticeIcon";
 
@@ -21,12 +19,19 @@ interface DemoAccountsProps {
         totalPL?: number;
         startingBalance?: number;
         originalData?: any;
-
     }>,
     onAccountPress: (account: any) => void;
+    // New props for current account and archive functionality
+    currentAccountId?: number;
+    onArchivePress?: (account: any) => void;
 }
 
-const DemoAccounts = ({ accounts, onAccountPress }: DemoAccountsProps) => {
+const DemoAccounts = ({ 
+    accounts, 
+    onAccountPress,
+    currentAccountId,
+    onArchivePress 
+}: DemoAccountsProps) => {
 
     const handleAccountPress = (account: any) => {
         console.log('[DemoAccounts] Account pressed - Full area touch:', {
@@ -59,7 +64,9 @@ const DemoAccounts = ({ accounts, onAccountPress }: DemoAccountsProps) => {
                     accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                     dailyPL={account.dailyPL}
                     icon={PracticeIcon}
-                    onPress={null} 
+                    onPress={null}
+                    isCurrentAccount={currentAccountId === account.id}
+                    onArchivePress={onArchivePress}
                 />
             </Pressable>
         ))}

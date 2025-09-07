@@ -32,6 +32,9 @@ interface NoBrokerAccountProps {
   refetchBrokerAccounts?: () => void;
   onAccountPress?: (account: DisplayAccount) => void;
   context?: 'menu' | 'overview';
+  //
+  currentAccountId?: number;
+  onArchivePress?: (account: DisplayAccount) => void;
 }
 
 // Updated interface to match your BrokerPLCard component expectations
@@ -69,7 +72,10 @@ function NoBrokerAccount({
   brokerAccountsError = null,
   refetchBrokerAccounts,
   onAccountPress,
-  context = 'menu'
+  context = 'menu',
+  //
+  currentAccountId,
+  onArchivePress
 }: NoBrokerAccountProps) {
 
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
@@ -204,7 +210,7 @@ function NoBrokerAccount({
 
     // Internal handler for direct usage
     console.log('[NoBrokerAccount] Using internal bottom sheet handler');
-    
+
     const enhancedAccountData = {
       id: account.id,
       name: account.name,
@@ -223,7 +229,7 @@ function NoBrokerAccount({
     };
 
     setSelectedAccount(enhancedAccountData);
-    
+
     // Present bottom sheet immediately
     requestAnimationFrame(() => {
       demoBottomSheetRef.current?.present();
@@ -281,6 +287,8 @@ function NoBrokerAccount({
           onAccountPress={handleAccountPress}
           accountType={presetActiveTab === 'Live' ? 'brokerage' : 'practice'}
           activeTab={activeTab}
+          currentAccountId={currentAccountId}
+          onArchivePress={onArchivePress}
         />
       );
     }
@@ -298,6 +306,8 @@ function NoBrokerAccount({
         <LiveAccounts
           accounts={filteredLiveAccounts}
           onAccountPress={handleAccountPress}
+          currentAccountId={currentAccountId}
+          onArchivePress={onArchivePress}
         />
       );
     } else {
@@ -312,6 +322,8 @@ function NoBrokerAccount({
         <DemoAccounts
           accounts={filteredDemoAccounts}
           onAccountPress={handleAccountPress}
+          currentAccountId={currentAccountId}
+          onArchivePress={onAccountPress}
         />
       );
     }

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from 'react-native';
 import ProfitLossIndicator from "./ProfitLossIndicator";
 import { PlatformImage } from "./PlatformImage";
+import { Archive } from "lucide-react-native";
 
 type BrokeragePracticePLCardProps = {
     account: {
@@ -26,29 +27,11 @@ type BrokeragePracticePLCardProps = {
     accountBalance: string;
     dailyPL: number;
     icon: React.ComponentType<{ size?: number }>;
-    onPress?: ((account: any) => void) | null; // ✅ NEW: Optional onPress prop
+    onPress?: ((account: any) => void) | null;
+    // New props for Current label and Archive functionality
+    isCurrentAccount?: boolean;
+    onArchivePress?: (account: any) => void;
 }
-
-// {
-//     "account_type": "string",
-//     "api_key": "string",
-//     "average_loss": 0,
-//     "average_profit": 0,
-//     "balance": 0,
-//     "currency": "string",
-//     "daily_pl": 0,
-//     "exchange": "string",
-//     "firm": null,
-//     "id": 0,
-//     "name": "string",
-//     "profit_factor": 0,
-//     "secret_key": "string",
-//     "server": "string",
-//     "starting_balance": 0,
-//     "status": "string",
-//     "total_pl": 0,
-//     "win_rate": 0
-//   }
 
 const BrokeragePracticePLCard = ({
     account,
@@ -57,13 +40,14 @@ const BrokeragePracticePLCard = ({
     accountBalance,
     dailyPL,
     icon: IconComponent,
-    onPress = null, // ✅ NEW: Default to null
+    onPress = null,
+    isCurrentAccount = false,
+    onArchivePress,
 }: BrokeragePracticePLCardProps) => {
 
     console.log('[BrokeragePracticePLCard] Rendering account:', account.id, account.name);
-    console.log('account ->>>>>', account)
 
-    // ✅ NEW: Format balance with currency symbol and proper formatting
+    // Format balance with currency symbol and proper formatting
     const formatBalance = (balance: number, currency: string = 'USD') => {
         const symbol = currency === 'USD' ? '$' : currency + ' ';
         const isNegative = balance < 0;
@@ -77,7 +61,7 @@ const BrokeragePracticePLCard = ({
         return isNegative ? `-${symbol}${formattedNumber}` : `${symbol}${formattedNumber}`;
     };
 
-    // ✅ NEW: Format percentage with proper rounding and sign
+    // Format percentage with proper rounding and sign
     const formatPercentage = (value: number) => {
         const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
         const sign = roundedValue >= 0 ? '+' : '';
@@ -86,20 +70,8 @@ const BrokeragePracticePLCard = ({
 
     // Calculate if it's profit or loss
     const isProfit = account.changePercentage >= 0;
-    const isDailyProfit = account.dailyPL >= 0;
 
-    // Format the daily P/L with proper sign and currency
-    const formatDailyPL = (value: number) => {
-        const sign = value >= 0 ? '+' : '';
-        const currency = account.currency || 'USD';
-        const symbol = currency === 'USD' ? '$' : currency + ' ';
-        return `${sign}${symbol}${Math.abs(value).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        })}`;
-    };
-
-    // ✅ IMPROVED: Enhanced press handler
+    // Enhanced press handler
     const handlePress = () => {
         if (onPress) {
             console.log('[BrokeragePracticePLCard] Internal press handler called for:', account.id);
@@ -107,24 +79,34 @@ const BrokeragePracticePLCard = ({
         }
     };
 
-    // ✅ FIXED: Render the card content
+    const handleArchivePress = (e: any) => {
+        e.stopPropagation();
+        if (onArchivePress) {
+            onArchivePress(account);
+            console.log('archived account press', account);
+            console.log('onArchivePress')
+        }
+    };
+
+    // Render the card content
     const cardContent = (
         <View className={`p-4 bg-propfirmone-300 rounded-xl mb-3`}>
-            <View className="flex-row items-center justify-between mb-1">
-                <View className="flex-row items-center flex-1">
+            {/* Main row with account info and right-side controls */}
+            <View className="flex-row items-start justify-between">
+                {/* Left side: Account info */}
+                <View className="flex-row items-center flex-1 mr-3">
                     {/* Account Icon */}
                     <View className="w-12 h-12 border border-gray-800 rounded-lg items-center justify-center mr-3">
                         <IconComponent size={45} />
                     </View>
 
                     {/* Account Info */}
-                    <View className="flex-shrink">
+                    <View className="flex-shrink flex-1">
                         <View className="flex-row items-center">
                             <Text className="text-lg font-InterSemiBold text-white mr-2">
                                 {account.name}
                             </Text>
                         </View>
-
 
                         {/* Platform and ID Row */}
                         <View className="flex-row items-center mt-1">
@@ -136,22 +118,47 @@ const BrokeragePracticePLCard = ({
                                 ID: {account.id}
                             </Text>
                         </View>
+
+                        {/* Balance and Percentage Row - moved under account info */}
+                        <View className="flex-row items-center mt-2">
+                            <Text className="text-sm font-Inter text-white mr-2">
+                                {formatBalance(account.balance, account.currency)}
+                            </Text>
+                            <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
+                                {formatPercentage(account.changePercentage)}
+                            </Text>
+                        </View>
                     </View>
                 </View>
-                {/* Balance and Percentage Row */}
-                <View className="flex-row items-center mt-1">
-                    <Text className="text-sm font-Inter text-white mr-2">
-                        {formatBalance(account.balance, account.currency)}
-                    </Text>
-                    <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-                        {formatPercentage(account.changePercentage)}
-                    </Text>
+
+                {/* Right side: Current label and Archive button */}
+                <View className="items-end mt-3">
+                    {/* Current label - only show for selected account */}
+                    {isCurrentAccount && (
+                        <View className="bg-[#0147374C] px-6 py-1.5 rounded-md mb-2">
+                            <Text className="text-[#31c48D] text-xs font-InterSemiBold">
+                                Current
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Archive button */}
+                    <TouchableOpacity
+                        onPress={handleArchivePress}
+                        className="px-3 py-1.5 rounded-md border border-[#2f2c2d] flex-row items-center"
+                        activeOpacity={0.7}
+                    >
+                        <Archive size={14} color='#fff' />
+                        <Text className="text-white text-xs font-Inter ml-1">
+                            Archive
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>
     );
 
-    // ✅ FIXED: Conditionally wrap with TouchableOpacity only if onPress is provided
+    // Conditionally wrap with TouchableOpacity only if onPress is provided
     if (onPress) {
         return (
             <TouchableOpacity
@@ -163,7 +170,7 @@ const BrokeragePracticePLCard = ({
         );
     }
 
-    // ✅ FIXED: Return plain View when used as child of external Pressable
+    // Return plain View when used as child of external Pressable
     return cardContent;
 }
 

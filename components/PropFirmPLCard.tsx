@@ -16,7 +16,6 @@ type PropFirmPLCardProps = {
         totalPL?: number;
         server?: string;
         exchange?: string;
-
     },
     activeTab: string;
     accountName: string;
@@ -25,30 +24,10 @@ type PropFirmPLCardProps = {
     // Prop firm specific props
     icon: React.ComponentType<{ size?: number }>;
     onPress?: ((account: any) => void) | null;
+    // New props for Current label and Archive functionality
+    isCurrentAccount?: boolean;
+    onArchivePress?: (account: any) => void;
 }
-
-// "account_type": "string",
-// "api_key": "string",
-// "average_loss": 0,
-// "average_profit": 0,
-// "balance": 0,
-// "currency": "string",
-// "daily_pl": 0,
-// "exchange": "string",
-// "firm": "string",
-// "id": 0,
-// "max_total_dd": 0,
-// "name": "string",
-// "net_pl": 0,
-// "profit_factor": 0,
-// "profit_target": 0,
-// "program": "string",
-// "secret_key": "string",
-// "server": "string",
-// "starting_balance": 0,
-// "status": "string",
-// "total_pl": 0,
-// "win_rate": 0
 
 const PropFirmPLCard = ({
     account,
@@ -58,15 +37,16 @@ const PropFirmPLCard = ({
     dailyPL,
     icon: IconComponent,
     onPress = null,
+    isCurrentAccount = false,
+    onArchivePress,
 }: PropFirmPLCardProps) => {
 
     console.log('[PropFirmPLCard] Rendering account:', account.id, account.name);
 
     // Calculate if it's profit or loss
     const isProfit = account.changePercentage >= 0;
-    const isDailyProfit = account.dailyPL >= 0;
 
-    // Format the daily P/L with proper sign and currency
+    // Format the balance with proper sign and currency
     const formatBalance = (balance: number, currency: string = 'USD') => {
         const symbol = currency === 'USD' ? '$' : currency + ' ';
         const isNegative = balance < 0;
@@ -89,26 +69,38 @@ const PropFirmPLCard = ({
 
     const handlePress = () => {
         if (onPress) {
-            console.log('[BrokeragePracticePLCard] Internal press handler called for:', account.id);
+            console.log('[PropFirmPLCard] Internal press handler called for:', account.id);
             onPress(account);
+        }
+    };
+
+    const handleArchivePress = (e: any) => {
+        e.stopPropagation(); // Prevent triggering the main card press
+        if (onArchivePress) {
+            onArchivePress(account);
         }
     };
 
     const cardContent = (
         <View className={`p-4 bg-propfirmone-300 rounded-xl mb-3`}>
-            <View className="flex-row items-center justify-between mb-1">
-                <View className="flex-row items-center flex-1">
+            {/* Main row with account info and right-side controls */}
+            <View className="flex-row items-start justify-between">
+                {/* Left side: Account info */}
+                <View className="flex-row items-center flex-1 mr-3">
+                    {/* Account Icon */}
                     <View className="w-12 h-12 border border-gray-800 rounded-lg items-center justify-center mr-3">
                         <IconComponent size={45} />
                     </View>
 
-                    <View className="flex-shrink">
+                    {/* Account Info */}
+                    <View className="flex-shrink flex-1">
                         <View className="flex-row items-center">
                             <Text className="text-lg font-InterSemiBold text-white mr-2">
                                 {account.name}
                             </Text>
                         </View>
 
+                        {/* Platform and ID Row */}
                         <View className="flex-row items-center mt-1">
                             <PlatformImage
                                 exchange={account?.exchange}
@@ -118,15 +110,40 @@ const PropFirmPLCard = ({
                                 ID: {account.id}
                             </Text>
                         </View>
+
+                        {/* Balance and Percentage Row - moved under account info */}
+                        <View className="flex-row items-center mt-2">
+                            <Text className="text-sm font-Inter text-white mr-2">
+                                {formatBalance(account.balance, account.currency)}
+                            </Text>
+                            <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
+                                {formatPercentage(account.changePercentage)}
+                            </Text>
+                        </View>
                     </View>
                 </View>
-                <View className="flex-row items-center mt-1">
-                    <Text className="text-sm font-Inter text-white mr-2">
-                        {formatBalance(account.balance, account.currency)}
-                    </Text>
-                    <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-                        {formatPercentage(account.changePercentage)}
-                    </Text>
+
+                {/* Right side: Current label and Archive button */}
+                <View className="items-end">
+                    {/* Current label - only show for selected account */}
+                    {isCurrentAccount && (
+                        <View className="bg-green-500 px-2 py-1 rounded-md mb-2">
+                            <Text className="text-white text-xs font-InterSemiBold">
+                                Current
+                            </Text>
+                        </View>
+                    )}
+
+                    {/* Archive button */}
+                    <TouchableOpacity
+                        onPress={handleArchivePress}
+                        className="bg-gray-600 px-3 py-1.5 rounded-md"
+                        activeOpacity={0.7}
+                    >
+                        <Text className="text-white text-xs font-Inter">
+                            Archive
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>

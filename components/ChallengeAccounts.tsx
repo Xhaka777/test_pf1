@@ -22,16 +22,16 @@ interface ChallengeAccountsProps {
         originalData?: any;
     }>,
     onAccountPress: (account: any) => void;
+    // New props for current account and archive functionality
+    currentAccountId?: number;
+    onArchivePress?: (account: any) => void;
 }
-
-// interface ChallengeAccountsProps {
-//     accounts: PropFirmAccount[];
-//     onAccountPress: (account: PropFirmAccount) => void;
-// }
 
 const ChallengeAccounts = ({
     accounts,
-    onAccountPress
+    onAccountPress,
+    currentAccountId,
+    onArchivePress
 }: ChallengeAccountsProps) => {
 
     return (
@@ -48,6 +48,8 @@ const ChallengeAccounts = ({
                         accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
                         dailyPL={account.dailyPL}
                         icon={EvaluatedAccountIcon}
+                        isCurrentAccount={currentAccountId === account.id}
+                        onArchivePress={onArchivePress}
                     />
                 </TouchableOpacity>
             ))}

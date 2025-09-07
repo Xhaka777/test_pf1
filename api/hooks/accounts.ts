@@ -27,6 +27,7 @@ import {
 import { ApiRoutes, QueryKeys } from '../types';
 import { useAuthenticatedApi } from '../services/api';
 import { AccountTypeEnum } from '@/constants/enums';
+import { AccountStatusEnum } from '@/shared/enums';
 
 export function useGetUsers(options?: Partial<UseQueryOptions<Users, Error>>) {
     const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<Users>();
@@ -146,22 +147,22 @@ export function useGetPropFirmAccounts(
     })
 }
 
-export function useGetBrokerAccounts(     
-    options?: Partial<UseQueryOptions<BrokerAccountsSchemaType, Error>>, 
-) {     
-    const { fetchFromApi } = useAuthenticatedApi<BrokerAccountsSchemaType>();      
+export function useGetBrokerAccounts(
+    options?: Partial<UseQueryOptions<BrokerAccountsSchemaType, Error>>,
+) {
+    const { fetchFromApi } = useAuthenticatedApi<BrokerAccountsSchemaType>();
 
-    return useQuery<BrokerAccountsSchemaType>({         
-        queryKey: [QueryKeys.BROKER_ACCOUNTS],         
-        queryFn: () => fetchFromApi(ApiRoutes.BROKER_ACCOUNTS),         
+    return useQuery<BrokerAccountsSchemaType>({
+        queryKey: [QueryKeys.BROKER_ACCOUNTS],
+        queryFn: () => fetchFromApi(ApiRoutes.BROKER_ACCOUNTS),
         staleTime: 0,
         // Filter to show only active accounts
         select: (data) => ({
             ...data,
             broker_accounts: data.broker_accounts.filter(account => account.status === 'active')
         }),
-        ...(options ?? {})     
-    }) 
+        ...(options ?? {})
+    })
 }
 
 export function useGetCopierAccounts(
@@ -330,11 +331,11 @@ export function useActivateAccountMutation() {
             console.log('[ActivateAccount] API Route:', ApiRoutes.ACTIVATE_ACCOUNT);
             const jsonBody = JSON.stringify(variables);
             console.log('[ActivateAccount] JSON body:', jsonBody);
-        
+
 
             return fetchFromApi(ApiRoutes.ACTIVATE_ACCOUNT, {
                 method: 'POST',
-                data: variables, 
+                data: variables,
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -355,16 +356,29 @@ export function useArchiveAccountMutation() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: function (variables: { account: number }) {
+        mutationFn: function (variables: {
+            account: number;
+            account_status?: AccountStatusEnum.PASSED | AccountStatusEnum.FAILED | AccountStatusEnum.DISCONNECTED | AccountStatusEnum.SUBSCRIPTION_ENDED;
+        }) {
             return fetchFromApi(ApiRoutes.ARCHIVE_ACCOUNT, {
                 method: 'POST',
                 body: JSON.stringify(variables),
             })
         },
         onSuccess: () => {
+            // Invalidate multiple query caches to ensure fresh data
             void queryClient.invalidateQueries({
                 queryKey: [QueryKeys.GET_ACCOUNTS]
-            })
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.PROP_FIRM_ACCOUNTS]
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.BROKER_ACCOUNTS]
+            });
+        },
+        onError: (error) => {
+            console.error('[ArchiveAccount] Mutation error:', error);
         }
     })
 }
