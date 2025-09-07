@@ -1,4 +1,3 @@
-// components/Header/logo.tsx - CLEAN VERSION
 import images from "@/constants/images";
 import { ChevronDown } from "lucide-react-native";
 import { useMemo, useState } from "react";
@@ -31,9 +30,11 @@ const formatCurrency = (amount: number): string => {
 
 export function Logo() {
     const navigation = useNavigation<NavigationProp>();
-    const { selectedAccountId, allAccounts } = useAccounts();
+    const { selectedAccountId, selectedPreviewAccountId, allAccounts } = useAccounts();
     const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
     const { data: openTrades } = useOpenPositionsWS();
+
+    const activeAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
     const selectedAccount = useMemo(() => {
         return [
@@ -41,15 +42,15 @@ export function Logo() {
             ...(allAccounts?.prop_firm_accounts ?? []),
             ...(allAccounts?.bt_accounts ?? []),
             ...(allAccounts?.copier_accounts ?? []),
-            ...(allAccounts?.competition_accounts ?? []),  
-        ]?.find((account) => account.id === selectedAccountId);
-    },[
+            ...(allAccounts?.competition_accounts ?? []),
+        ]?.find((account) => account.id === activeAccountId);
+    }, [
         allAccounts?.broker_accounts,
         allAccounts?.bt_accounts,
         allAccounts?.competition_accounts,
         allAccounts?.copier_accounts,
         allAccounts?.prop_firm_accounts,
-        selectedAccountId,
+        activeAccountId,
     ]);
 
     const openProfitLoss = useMemo(() => {
@@ -57,10 +58,16 @@ export function Logo() {
             return 0;
         }
 
-        return openTrades.open_trades.reduce((acc, trade) => {
+        if (openTrades.account !== activeAccountId) {
+            return 0;
+        }
+
+        const totalPl = openTrades.open_trades.reduce((acc, trade) => {
             return acc + (trade.pl || 0);
         }, 0);
-    }, [openTrades]);
+
+        return totalPl;
+    }, [openTrades, activeAccountId]);
 
     const [isDropdownVisible, setIsDropdownVisible] = useState(false);
 
@@ -110,10 +117,9 @@ export function Logo() {
                     <Text className="text-sm font-Inter text-white">
                         {accountDetails?.balance ? formatCurrency(accountDetails.balance) : '$0.00'}
                     </Text>
-                    <Text className={`text-sm font-Inter text-right ${
-                        openProfitLoss > 0 ? 'text-green-400' : 
+                    <Text className={`text-sm font-Inter text-right ${openProfitLoss > 0 ? 'text-green-400' :
                         openProfitLoss < 0 ? 'text-red-400' : 'text-white'
-                    }`}>
+                        }`}>
                         {formatCurrency(openProfitLoss)}
                     </Text>
                 </View>
@@ -123,11 +129,11 @@ export function Logo() {
                     activeOpacity={0.8}
                     onPress={() => navigation.navigate('menu')}
                 >
-                   <PlatformImage 
-                    className="mr-1"
-                    exchange={selectedAccount?.exchange}
-                    size={24}
-                   />
+                    <PlatformImage
+                        className="mr-1"
+                        exchange={selectedAccount?.exchange}
+                        size={24}
+                    />
                     <ChevronDown
                         size={16}
                         color="#fff"

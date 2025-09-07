@@ -75,7 +75,7 @@ const AccountBalanceCard = ({
         {/* Inner container with dark background */}
         <View className="bg-gray-800 rounded-lg p-3">
           {/* Title */}
-          <Text className="text-gray-400 text-sm font-Inter mb-2">
+          <Text className="text-gray-400 text-base font-Inter mb-2">
             Total {getFormattedAccountType(accountType)} Balance
           </Text>
 

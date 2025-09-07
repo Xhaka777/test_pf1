@@ -1,3 +1,4 @@
+// 1. Fix in providers/open-positions.tsx
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
 import { useAccounts } from './accounts';
@@ -51,6 +52,17 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
   // Current account ID to use
   const activeAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
+  // 🔧 FIX 1: Clear data when account changes
+  useEffect(() => {
+    // console.log('[OpenPositions] Account changed to:', activeAccountId);
+    // Clear data when account changes to prevent showing stale data
+    if (data && data.account !== activeAccountId) {
+      // console.log('[OpenPositions] Clearing stale data for old account:', data.account);
+      setData(null);
+    }
+    setError(null);
+  }, [activeAccountId]);
+
   // 🔧 DEBUG: Log provider mount
   useEffect(() => {
     setDebug(prev => ({ ...prev, providerMounted: true }));
@@ -81,13 +93,17 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       return;
     }
 
-    // Close existing connection
+    // 🔧 FIX 2: Properly close existing connection when switching accounts
     if (socketRef.current) {
-      socketRef.current.close(1000, 'Reconnecting');
+      console.log('[OpenPositions] Closing existing connection for account switch from', 
+        data?.account, 'to', activeAccountId);
+      socketRef.current.close(1000, 'Account changed');
       socketRef.current = null;
     }
 
+    // Reset connection state
     isConnectingRef.current = true;
+    setIsConnected(false);
     setError(null);
     
     // Update debug info
@@ -105,11 +121,14 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       const wsUrl = `wss://staging-server.propfirmone.com/get_open_trades?auth_key=${wsToken}&account=${activeAccountId}`;
       const origin = 'https://staging.propfirmone.com';
       
+      console.log('[OpenPositions] Connecting to account:', activeAccountId);
+      
       socketRef.current = new WebSocket(wsUrl, undefined, {
         headers: { 'Origin': origin }
       });
 
       socketRef.current.onopen = () => {
+        // console.log('[OpenPositions] ✅ Connected to account:', activeAccountId);
         setIsConnected(true);
         setError(null);
         isConnectingRef.current = false;
@@ -127,56 +146,73 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
           const result = parseWebSocketMessage<OpenTradesData>(event.data);
           
           if (result && typeof result === 'object' && 'open_trades' in result) {
+            console.log('[OpenPositions] 📊 Received data for account:', result.account, 
+              'expected:', activeAccountId, 'trades:', result.open_trades?.length || 0);
             
+            // 🔧 FIX 3: Only update data if it's for the correct account
             if (result.account === activeAccountId) {
               setData(result);
             } else {
-              // Set data anyway for debugging
-              setData(result);
+              console.warn('[OpenPositions] ⚠️ Received data for wrong account:', 
+                result.account, 'expected:', activeAccountId);
             }
-          } else {
           }
         } catch (parseError) {
+          // console.error('[OpenPositions] Parse error:', parseError);
         }
       };
 
       socketRef.current.onerror = (error) => {
+        // console.error('[OpenPositions] WebSocket error for account', activeAccountId, ':', error);
         setIsConnected(false);
         setError(error.message || 'WebSocket connection failed');
         isConnectingRef.current = false;
       };
 
       socketRef.current.onclose = (event) => {
-        
+        console.log('[OpenPositions] WebSocket closed for account', activeAccountId, 
+          'code:', event.code, 'reason:', event.reason);
         setIsConnected(false);
         isConnectingRef.current = false;
       };
 
     } catch (error) {
+      // console.error('[OpenPositions] Connection error for account', activeAccountId, ':', error);
       setError(error.message);
       setIsConnected(false);
       isConnectingRef.current = false;
     }
-  }, [activeAccountId, getToken]);
+  }, [activeAccountId, getToken, data?.account]); // Added data?.account to dependencies
 
-  // 🔧 FORCE: Try connection immediately when account is available
+  // 🔧 FIX 4: Improved connection trigger
   useEffect(() => {
-
     if (activeAccountId && activeAccountId > 0) {
+      // console.log('[OpenPositions] Triggering connection for account:', activeAccountId);
       
-      // Small delay to ensure everything is ready
+      // Clear any existing timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
+      // Small delay to ensure everything is ready, but shorter delay
       const timeout = setTimeout(() => {
         connectWebSocket();
-      }, 2000);
+      }, 500); // Reduced from 2000ms to 500ms
 
       return () => {
         clearTimeout(timeout);
       };
     } else {
+      // console.log('[OpenPositions] No valid account ID, clearing data');
+      setData(null);
+      setError(null);
+      setIsConnected(false);
     }
-  }, [activeAccountId, connectWebSocket]);
+  }, [connectWebSocket]); // Only depend on connectWebSocket
 
   const reconnect = useCallback(() => {
+    // console.log('[OpenPositions] Manual reconnect requested for account:', activeAccountId);
     reconnectAttemptsRef.current = 0;
     setError(null);
     

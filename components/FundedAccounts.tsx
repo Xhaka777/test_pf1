@@ -27,13 +27,15 @@ interface FundedAccountsProps {
     // New props for current account and archive functionality
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
 const FundedAccounts = ({
     accounts,
     onAccountPress,
     currentAccountId,
-    onArchivePress
+    onArchivePress,
+    context = 'menu',
 }: FundedAccountsProps) => {
 
     return (
@@ -52,6 +54,7 @@ const FundedAccounts = ({
                         icon={FundedAccountIcon}
                         isCurrentAccount={currentAccountId === account.id}
                         onArchivePress={onArchivePress}
+                        context={context}
                     />
                 </TouchableOpacity>
             ))}

@@ -66,7 +66,7 @@ function NoBrokerAccount({
   presetActiveTab = null,
   hideTabBar = false,
   showOnlyPresetTab = false,
-  // ✅ External data props
+  // 
   brokerAccountsData,
   brokerAccountsLoading = false,
   brokerAccountsError = null,
@@ -89,10 +89,6 @@ function NoBrokerAccount({
       setActiveTab(presetActiveTab);
     }
   }, [presetActiveTab]);
-
-  const currentAccountType = useMemo(() => {
-    return activeTab === 'Live' ? AccountTypeEnum.LIVE : AccountTypeEnum.DEMO;
-  }, [activeTab]);
 
   // Other state
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
@@ -289,6 +285,7 @@ function NoBrokerAccount({
           activeTab={activeTab}
           currentAccountId={currentAccountId}
           onArchivePress={onArchivePress}
+          context={context}
         />
       );
     }
@@ -308,6 +305,7 @@ function NoBrokerAccount({
           onAccountPress={handleAccountPress}
           currentAccountId={currentAccountId}
           onArchivePress={onArchivePress}
+          context={context}
         />
       );
     } else {
@@ -324,6 +322,7 @@ function NoBrokerAccount({
           onAccountPress={handleAccountPress}
           currentAccountId={currentAccountId}
           onArchivePress={onAccountPress}
+          context={context}
         />
       );
     }

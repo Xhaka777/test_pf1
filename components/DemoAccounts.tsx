@@ -24,13 +24,15 @@ interface DemoAccountsProps {
     // New props for current account and archive functionality
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
-const DemoAccounts = ({ 
-    accounts, 
+const DemoAccounts = ({
+    accounts,
     onAccountPress,
     currentAccountId,
-    onArchivePress 
+    onArchivePress,
+    context = 'menu',
 }: DemoAccountsProps) => {
 
     const handleAccountPress = (account: any) => {
@@ -46,31 +48,32 @@ const DemoAccounts = ({
 
     return (
         <View className="mt-2">
-        {accounts.map((account) => (
-            <Pressable
-                key={account.id}
-                onPress={() => handleAccountPress(account)}
-                style={({ pressed }) => [
-                    {
-                        opacity: pressed ? 0.7 : 1,
-                        transform: [{ scale: pressed ? 0.98 : 1 }],
-                    }
-                ]}
-            >
-                <BrokeragePracticePLCard
-                    account={account}
-                    activeTab="Demo"
-                    accountName={account.name}
-                    accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
-                    dailyPL={account.dailyPL}
-                    icon={PracticeIcon}
-                    onPress={null}
-                    isCurrentAccount={currentAccountId === account.id}
-                    onArchivePress={onArchivePress}
-                />
-            </Pressable>
-        ))}
-    </View>
+            {accounts.map((account) => (
+                <Pressable
+                    key={account.id}
+                    onPress={() => handleAccountPress(account)}
+                    style={({ pressed }) => [
+                        {
+                            opacity: pressed ? 0.7 : 1,
+                            transform: [{ scale: pressed ? 0.98 : 1 }],
+                        }
+                    ]}
+                >
+                    <BrokeragePracticePLCard
+                        account={account}
+                        activeTab="Demo"
+                        accountName={account.name}
+                        accountBalance={`${account.currency || 'USD'} ${account.balance.toLocaleString()}`}
+                        dailyPL={account.dailyPL}
+                        icon={PracticeIcon}
+                        onPress={null}
+                        isCurrentAccount={currentAccountId === account.id}
+                        onArchivePress={onArchivePress}
+                        context={context}
+                    />
+                </Pressable>
+            ))}
+        </View>
     )
 }
 

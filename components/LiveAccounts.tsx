@@ -24,13 +24,15 @@ interface LiveAccountsProps {
     // New props for current account and archive functionality
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
 const LiveAccounts = ({
     accounts,
     onAccountPress,
     currentAccountId,
-    onArchivePress
+    onArchivePress,
+    context = 'menu'
 }: LiveAccountsProps) => {
 
     return (
@@ -40,7 +42,7 @@ const LiveAccounts = ({
                     key={account.id}
                     onPress={() => onAccountPress(account)}
                 >
-                   <BrokeragePracticePLCard
+                    <BrokeragePracticePLCard
                         account={account}
                         activeTab="Live"
                         accountName={account.name}
@@ -49,6 +51,7 @@ const LiveAccounts = ({
                         icon={AccountIcon}
                         isCurrentAccount={currentAccountId === account.id}
                         onArchivePress={onArchivePress}
+                        context={context}
                     />
                 </TouchableOpacity>
             ))}

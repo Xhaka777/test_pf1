@@ -25,13 +25,15 @@ interface ChallengeAccountsProps {
     // New props for current account and archive functionality
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
 const ChallengeAccounts = ({
     accounts,
     onAccountPress,
     currentAccountId,
-    onArchivePress
+    onArchivePress,
+    context = 'menu',
 }: ChallengeAccountsProps) => {
 
     return (
@@ -50,6 +52,7 @@ const ChallengeAccounts = ({
                         icon={EvaluatedAccountIcon}
                         isCurrentAccount={currentAccountId === account.id}
                         onArchivePress={onArchivePress}
+                        context={context}
                     />
                 </TouchableOpacity>
             ))}

@@ -27,6 +27,7 @@ type PropFirmPLCardProps = {
     // New props for Current label and Archive functionality
     isCurrentAccount?: boolean;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
 const PropFirmPLCard = ({
@@ -39,6 +40,7 @@ const PropFirmPLCard = ({
     onPress = null,
     isCurrentAccount = false,
     onArchivePress,
+    context = 'menu'
 }: PropFirmPLCardProps) => {
 
     console.log('[PropFirmPLCard] Rendering account:', account.id, account.name);
@@ -135,15 +137,17 @@ const PropFirmPLCard = ({
                     )}
 
                     {/* Archive button */}
-                    <TouchableOpacity
-                        onPress={handleArchivePress}
-                        className="bg-gray-600 px-3 py-1.5 rounded-md"
-                        activeOpacity={0.7}
-                    >
-                        <Text className="text-white text-xs font-Inter">
-                            Archive
-                        </Text>
-                    </TouchableOpacity>
+                    {context === 'menu' && onArchivePress && (
+                        <TouchableOpacity
+                            onPress={handleArchivePress}
+                            className="bg-gray-600 px-3 py-1.5 rounded-md"
+                            activeOpacity={0.7}
+                        >
+                            <Text className="text-white text-xs font-Inter">
+                                Archive
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </View>

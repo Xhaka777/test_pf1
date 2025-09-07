@@ -484,6 +484,7 @@ const Overview = () => {
               error={propFirmAccountsError}
               onAccountPress={handleOverviewAccountPress}
               onRefresh={refetchPropFirmAccounts}
+              context='overview'
             />
           </View>
         )}
@@ -499,6 +500,7 @@ const Overview = () => {
               brokerAccountsError={brokerAccountsError}
               refetchBrokerAccounts={refetchBrokerAccounts}
               onAccountPress={handleOverviewAccountPress}
+              context='overview'
             />
           </View>
         )}
@@ -514,6 +516,7 @@ const Overview = () => {
               brokerAccountsError={brokerAccountsError}
               refetchBrokerAccounts={refetchBrokerAccounts}
               onAccountPress={handleOverviewAccountPress}
+              context='overview'
             />
           </View>
         )}

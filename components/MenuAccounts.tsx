@@ -32,6 +32,7 @@ interface MenuAccountsProps {
     // 
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
+    context?: 'menu' | 'overview';
 }
 
 const MenuAccounts = ({
@@ -41,7 +42,8 @@ const MenuAccounts = ({
     activeTab,
     //
     currentAccountId,
-    onArchivePress
+    onArchivePress,
+    context = 'menu'
 }: MenuAccountsProps) => {
 
     // Determine the specific account type based on accountType and activeTab
@@ -115,6 +117,7 @@ const MenuAccounts = ({
                     //
                     isCurrentAccount={isCurrentAccount}
                     onArchivePress={onAccountPress}
+                    context={context}
                 />
             );
         }
@@ -133,6 +136,7 @@ const MenuAccounts = ({
                     //
                     isCurrentAccount={isCurrentAccount}
                     onArchivePress={onArchivePress}
+                    context={context}
                 />
             );
         }
