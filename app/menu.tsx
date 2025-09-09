@@ -46,6 +46,7 @@ const Menu = () => {
 
   const {
     selectedAccountId,
+    setSelectedAccountId,
     setSelectedPreviewAccountId,
     selectedPreviewAccountId
   } = useAccounts();
@@ -377,6 +378,10 @@ const Menu = () => {
     }, 100);
   }, []);
 
+  const handleAccountSelect = useCallback((accountId: number) => {
+    setSelectedAccountId(accountId);
+  }, [setSelectedAccountId])
+
   const handleBrokerAccountPress = useCallback((account: any) => {
     console.log('[Menu] Broker account pressed - full area touch:', {
       id: account.id,
@@ -612,6 +617,7 @@ const Menu = () => {
           } : undefined}
           metricsData={metricsData}
           onArchivePress={handleArchivePress}
+          onAccountSelect={handleAccountSelect}
         />
 
         {selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') && (
@@ -643,6 +649,7 @@ const Menu = () => {
             metricsData={metricsData}
             lossRate={lossRate}
             onArchivePress={handleArchivePress}
+            onAccountSelect={handleAccountSelect}
           />
         )}
 

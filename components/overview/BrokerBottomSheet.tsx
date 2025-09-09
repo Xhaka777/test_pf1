@@ -44,6 +44,7 @@ interface BrokerBottomSheetProps {
     lossRate?: number;
     //
     onArchivePress?: (account: any) => void;
+    onAccountSelect?: (accountId: number) => void;
 }
 
 const BrokerBottomSheet = ({
@@ -52,7 +53,8 @@ const BrokerBottomSheet = ({
     context = 'menu',
     metricsData,
     lossRate,
-    onArchivePress
+    onArchivePress,
+    onAccountSelect
 }: BrokerBottomSheetProps) => {
 
     const navigation = useNavigation();
@@ -77,72 +79,6 @@ const BrokerBottomSheet = ({
         setSelectedAccountId(account.id);
     }, [account?.id, isSelected, setSelectedAccountId]);
 
-    const onActivateAccount = useCallback(async () => {
-        if (!account?.id) {
-            console.error('[BrokerBottomSheet] No account available');
-            return;
-        }
-
-        console.log('[BrokerBottomSheet] Starting activation for account:', account.id);
-
-        const answer = await question({});
-        if (!answer) return;
-
-        if (isSelected) {
-            console.log('[BrokerBottomSheet] Account already selected');
-            return;
-        }
-
-        setOpenAccountInfo(false);
-
-        // Ensure we're passing a number, not a string
-        const accountId = typeof account.id === 'string' ? parseInt(account.id, 10) : account.id;
-
-        console.log('[BrokerBottomSheet] Calling activateAccount with:', { account: accountId });
-
-        void activateAccount(
-            { account: accountId }, // Make sure this is a number
-            {
-                onSuccess: (response) => {
-                    console.log('[BrokerBottomSheet] Activation response:', response);
-
-                    if (response.status === StatusEnum.SUCCESS) {
-                        toast({
-                            title: 'Success',
-                            description: response.message
-                        });
-                        setSelectedAccountId(accountId);
-                        bottomSheetRef.current?.close();
-                    } else {
-                        toast({
-                            title: 'Error',
-                            description: response.message || 'Failed to activate account',
-                            variant: 'destructive',
-                        });
-                    }
-                },
-                onError: (err) => {
-                    console.error('[BrokerBottomSheet] Activation error:', err);
-                    toast({
-                        title: 'Error',
-                        description: err instanceof Error
-                            ? err.message
-                            : 'An error occurred while trying activate account. Please try again.',
-                        variant: 'destructive',
-                    });
-                },
-            },
-        );
-    }, [
-        question,
-        isSelected,
-        setSelectedAccountId,
-        account?.id,
-        activateAccount,
-        toast,
-        bottomSheetRef
-    ]);
-
     const handleActionButtonPress = () => {
         if (!account?.id) {
             console.error('[BrokerBottomSheet] No account ID available');
@@ -154,12 +90,11 @@ const BrokerBottomSheet = ({
             console.log('[BrokerBottomSheet] Overview context: Selecting account and navigating to trade');
             setSelectedAccountId(account.id);
             bottomSheetRef.current?.close();
-            // Navigate to trade screen
             router.push('/trade');
         } else {
-            // For menu: Activate account behavior (existing logic)
-            console.log('[BrokerBottomSheet] Menu context: Activating account');
-            onActivateAccount();
+            console.log('[BrokerBottomSheet] Menu context: Switching account via callback');
+            onAccountSelect?.(account.id);
+            bottomSheetRef.current?.close();
         }
     };
 

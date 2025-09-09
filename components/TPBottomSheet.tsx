@@ -46,11 +46,6 @@ const TPBottomSheet = ({
         onClose();
     };
 
-    const getCurrentSelectionLabel = () => {
-        const selected = typeOptions.find(option => option.value === selectedType);
-        return selected ? selected.label : '';
-    }
-
     return (
         <BottomSheet
             ref={bottomSheetRef}

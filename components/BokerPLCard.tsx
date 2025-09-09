@@ -158,7 +158,7 @@ const BrokeragePracticePLCard = ({
                             {/* Current label - only show for selected account */}
                             {isCurrentAccount && (
                                 <View className="bg-[#0147374C] px-6 py-1.5 rounded-md mb-2">
-                                    <Text className="text-[#31c48D] text-xs font-InterSemiBold">
+                                    <Text className="text-[#31c48D] text-xs font-InterBold">
                                         Current
                                     </Text>
                                 </View>

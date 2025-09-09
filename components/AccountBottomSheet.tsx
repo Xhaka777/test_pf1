@@ -114,10 +114,12 @@ const AccountBottomSheet = ({
             bottomSheetRef.current?.close();
             router.push('/(tabs)/trade')
         } else {
+            console.log('[AccountBottomSheet] Switching to account:', accountData.id, accountData.type);
             onAccountSelect?.(accountData.id);
             bottomSheetRef.current?.close();
         }
     }
+
 
     const handleArchivePress = () => {
         if (!accountData || !onArchivePress) {

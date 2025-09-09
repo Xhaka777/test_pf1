@@ -95,8 +95,6 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
 
     // 🔧 FIX 2: Properly close existing connection when switching accounts
     if (socketRef.current) {
-      console.log('[OpenPositions] Closing existing connection for account switch from', 
-        data?.account, 'to', activeAccountId);
       socketRef.current.close(1000, 'Account changed');
       socketRef.current = null;
     }
@@ -121,7 +119,7 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       const wsUrl = `wss://staging-server.propfirmone.com/get_open_trades?auth_key=${wsToken}&account=${activeAccountId}`;
       const origin = 'https://staging.propfirmone.com';
       
-      console.log('[OpenPositions] Connecting to account:', activeAccountId);
+      // console.log('[OpenPositions] Connecting to account:', activeAccountId);
       
       socketRef.current = new WebSocket(wsUrl, undefined, {
         headers: { 'Origin': origin }
@@ -146,8 +144,8 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
           const result = parseWebSocketMessage<OpenTradesData>(event.data);
           
           if (result && typeof result === 'object' && 'open_trades' in result) {
-            console.log('[OpenPositions] 📊 Received data for account:', result.account, 
-              'expected:', activeAccountId, 'trades:', result.open_trades?.length || 0);
+            // console.log('[OpenPositions] 📊 Received data for account:', result.account, 
+            //   'expected:', activeAccountId, 'trades:', result.open_trades?.length || 0);
             
             // 🔧 FIX 3: Only update data if it's for the correct account
             if (result.account === activeAccountId) {
@@ -170,8 +168,8 @@ export function OpenPositionsProvider({ children }: { children: React.ReactNode 
       };
 
       socketRef.current.onclose = (event) => {
-        console.log('[OpenPositions] WebSocket closed for account', activeAccountId, 
-          'code:', event.code, 'reason:', event.reason);
+        // console.log('[OpenPositions] WebSocket closed for account', activeAccountId, 
+        //   'code:', event.code, 'reason:', event.reason);
         setIsConnected(false);
         isConnectingRef.current = false;
       };
