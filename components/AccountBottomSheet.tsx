@@ -1,6 +1,6 @@
 import icons from "@/constants/icons";
 import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
-import { X } from "lucide-react-native";
+import { Archive, X } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import ProfitLossIndicator from "./ProfitLossIndicator";
@@ -8,6 +8,7 @@ import { BrokerAccount } from "@/types";
 import { EvaluatedAccountIcon } from "./icons/EvaluatedAccountIcon";
 import { FundedAccountIcon } from "./icons/FundedAccountIcon";
 import { useRouter } from "expo-router";
+import AdditionalStats from "./overview/AdditionalStats";
 
 interface PropFirmAccountData {
     id: number;
@@ -31,15 +32,24 @@ interface AccountBottomSheetProps {
     bottomSheetRef: React.RefObject<BottomSheetModal>;
     accountData?: PropFirmAccountData;
     context?: 'menu' | 'overview';
+    metricsData?: any;
     onAccountSelect?: (accountId: number) => void;
+    onArchivePress?: (account: any) => void;
 }
 
-const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onAccountSelect }: AccountBottomSheetProps) => {
+const AccountBottomSheet = ({
+    bottomSheetRef,
+    accountData,
+    context = "menu",
+    metricsData,
+    onAccountSelect,
+    onArchivePress
+}: AccountBottomSheetProps) => {
 
     const router = useRouter();
-    const snapPoints = useMemo(() => ['70%'], []); // Increased for more content
+    const snapPoints = useMemo(() => ['70%'], []);
 
-    // ✅ FIXED: Configuration for prop firm account types
+    // Configuration for prop firm account types
     const accountTypeConfig = {
         Challenge: {
             bgColor: '', // Purple for Challenge
@@ -109,6 +119,15 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
         }
     }
 
+    const handleArchivePress = () => {
+        if (!accountData || !onArchivePress) {
+            return;
+        }
+
+        bottomSheetRef.current?.dismiss();
+        onArchivePress(accountData);
+    };
+
     const getButtonConfig = () => {
         if (context === 'overview') {
             return {
@@ -118,7 +137,7 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
             };
         } else {
             return {
-                text: accountData?.type === 'Challenge' ? 'Start Challenge' : 'Activate Account',
+                text: 'Switch Account',
                 style: 'border border-primary-100',
                 textStyle: 'text-primary-100'
             };
@@ -163,17 +182,6 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
                             <Text className="text-gray-400 text-sm mt-1 font-Inter">
                                 ID: {accountData?.id || 'N/A'}
                             </Text>
-                            {/* ✅ FIXED: Show firm and program for prop firm accounts */}
-                            {accountData?.firm && (
-                                <Text className="text-gray-400 text-xs font-Inter">
-                                    Firm: {accountData.firm}
-                                </Text>
-                            )}
-                            {accountData?.program && (
-                                <Text className="text-gray-400 text-xs font-Inter">
-                                    Program: {accountData.program}
-                                </Text>
-                            )}
                         </View>
                     </View>
 
@@ -193,7 +201,7 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
                 </View>
 
                 {/* Account Metrics */}
-                <View className="flex-row items-center justify-between rounded-lg mb-4">
+                {/* <View className="flex-row items-center justify-between rounded-lg mb-4">
                     <View className="bg-propfirmone-300 flex-1 rounded-lg py-3">
                         <Image
                             source={icons.dollar_chart_sign}
@@ -224,7 +232,12 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
                             {accountData?.dailyPL || '$0.00'}
                         </Text>
                     </View>
-                </View>
+                </View> */}
+
+                <AdditionalStats
+                    metricsData={metricsData}
+                    isLoading={!metricsData}
+                />
 
                 {accountData?.type && (accountData.type === 'Challenge' || accountData.type === 'Funded') && (
                     <View className="mb-4">
@@ -295,6 +308,19 @@ const AccountBottomSheet = ({ bottomSheetRef, accountData, context = "menu", onA
                         {buttonConfig.text}
                     </Text>
                 </TouchableOpacity>
+
+                {/* Archive Button - Only show in menu context */}
+                {context === 'menu' && onArchivePress && (
+                    <TouchableOpacity
+                        onPress={handleArchivePress}
+                        className="px-4 py-3 mt-2 rounded-lg border border-gray-600 flex-row items-center justify-center"
+                    >
+                        <Archive size={16} color='#fff' />
+                        <Text className="text-white font-InterSemiBold ml-2">
+                            Archive Account
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
             </BottomSheetView>
         </BottomSheetModal>

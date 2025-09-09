@@ -29,7 +29,7 @@ interface MenuAccountsProps {
     onAccountPress: (account: any) => void;
     accountType: 'propFirm' | 'brokerage' | 'practice';
     activeTab?: string;
-    // 
+    // Current account and archive functionality
     currentAccountId?: number;
     onArchivePress?: (account: any) => void;
     context?: 'menu' | 'overview';
@@ -40,7 +40,6 @@ const MenuAccounts = ({
     onAccountPress,
     accountType,
     activeTab,
-    //
     currentAccountId,
     onArchivePress,
     context = 'menu'
@@ -76,7 +75,7 @@ const MenuAccounts = ({
         }
     };
 
-    // ✅ IMPROVED: Enhanced press handler with immediate response
+    // Enhanced press handler with immediate response
     const handleAccountPress = (account: any) => {
         console.log('[MenuAccounts] Account pressed - Full area touch:', {
             id: account.id,
@@ -114,9 +113,8 @@ const MenuAccounts = ({
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
                     onPress={null}
-                    //
                     isCurrentAccount={isCurrentAccount}
-                    onArchivePress={onAccountPress}
+                    onArchivePress={onArchivePress}
                     context={context}
                 />
             );
@@ -133,7 +131,6 @@ const MenuAccounts = ({
                     dailyPL={account.dailyPL}
                     icon={getIcon(specificAccountType)}
                     onPress={null}
-                    //
                     isCurrentAccount={isCurrentAccount}
                     onArchivePress={onArchivePress}
                     context={context}

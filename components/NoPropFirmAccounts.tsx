@@ -16,7 +16,7 @@ import MenuAccounts from './MenuAccounts';
 import { getDateRangeFromTimeframe, timeframes, TimeframeSelector } from './timeframe-selector';
 import { AccountTypeEnum } from '@/constants/enums';
 
-// ✅ Import API hooks but use them conditionally
+// Import API hooks but use them conditionally
 import {
   useFetchPropFirmAccountsOverview,
   useFetchAccountsOverviewDetails
@@ -38,14 +38,14 @@ interface NoPropFirmAccountsProps {
   isMenuScreen?: boolean;
   presetActiveTab?: 'Challenge' | 'Funded';
   hideTabBar?: boolean;
-  // ✅ Props for external data (from overview.tsx)
+  // Props for external data (from overview.tsx)
   accountData?: MockAccounts;
   isLoading?: boolean;
   error?: Error | null;
   onAccountPress?: (account: PropFirmAccount) => void;
   onRefresh?: () => void;
   context?: 'menu' | 'overview';
-  //
+  // Archive functionality
   currentAccountId?: number;
   onArchivePress?: (account: PropFirmAccount) => void;
 }
@@ -67,14 +67,14 @@ const NoPropFirmAccounts = ({
   onAccountPress,
   onRefresh,
   context = 'menu',
-  //
+  // Archive functionality
   currentAccountId,
   onArchivePress
 }: NoPropFirmAccountsProps) => {
 
   const bottomSheetRef = useRef<BottomSheetModal>(null);
 
-  // ✅ Only fetch data when not provided by parent
+  // Only fetch data when not provided by parent
   const shouldFetchData = !accountData;
 
   const {
@@ -123,7 +123,7 @@ const NoPropFirmAccounts = ({
     staleTime: 1 * 60 * 1000,
   });
 
-  // ✅ Use passed data or empty arrays if no API data is available
+  // Use passed data or empty arrays if no API data is available
   const challengeAccounts = useMemo(() => {
     if (accountData?.evaluation) {
       console.log('[NoPropFirmAccounts] Using external evaluation data:', accountData.evaluation.length);
@@ -146,7 +146,7 @@ const NoPropFirmAccounts = ({
     return [];
   }, [accountData]);
 
-  // ✅ Tab counts from actual data
+  // Tab counts from actual data
   const tabCounts = useMemo(() => ({
     'Challenge': challengeAccounts.length,
     'Funded': fundedAccounts.length
@@ -161,7 +161,7 @@ const NoPropFirmAccounts = ({
     setFilteredFundedAccounts(fundedAccounts);
   }, [challengeAccounts, fundedAccounts]);
 
-  // ✅ Use external overview data if available, otherwise use fetched data
+  // Use external overview data if available, otherwise use fetched data
   const overviewDataToUse = propFirmOverviewData;
 
   const totalChallengeBalance = useMemo(() => {
@@ -200,7 +200,7 @@ const NoPropFirmAccounts = ({
     setFilteredFundedAccounts(filterFunded);
   };
 
-  // ✅ Use external loading/error states when provided
+  // Use external loading/error states when provided
   const isLoading = externalLoading || overviewLoading;
   const error = externalError || overviewError;
 
@@ -255,7 +255,8 @@ const NoPropFirmAccounts = ({
           accountType="propFirm"
           activeTab={activeTab}
           currentAccountId={currentAccountId}
-          onArchivePress={onAccountPress}
+          onArchivePress={onArchivePress}
+          context={context}
         />
       );
     } else {
@@ -273,6 +274,7 @@ const NoPropFirmAccounts = ({
             onAccountPress={onAccountPress || handleAccountPress}
             currentAccountId={currentAccountId}
             onArchivePress={onArchivePress}
+            context={context}
           />
         );
       } else if (activeTab === 'Funded') {
@@ -288,7 +290,8 @@ const NoPropFirmAccounts = ({
             accounts={filteredFundedAccounts}
             onAccountPress={onAccountPress || handleAccountPress}
             currentAccountId={currentAccountId}
-            onArchivePress={onAccountPress}
+            onArchivePress={onArchivePress}
+            context={context}
           />
         );
       }
@@ -342,7 +345,7 @@ const NoPropFirmAccounts = ({
     );
   };
 
-  // ✅ Check if we should show the "No Accounts" view
+  // Check if we should show the "No Accounts" view
   const shouldShowNoAccountsView = !isMenuScreen &&
     challengeAccounts.length === 0 &&
     fundedAccounts.length === 0 &&
@@ -355,7 +358,7 @@ const NoPropFirmAccounts = ({
         renderNoAccountContent()
       ) : (
         <View className='flex-1 p-2'>
-          {/* ✅ Always show TabBar in menu screen, conditionally in other screens */}
+          {/* Always show TabBar in menu screen, conditionally in other screens */}
           {(isMenuScreen || !hideTabBar) && (
             <View className='flex-row items-center justify-between'>
               <View className='flex-1 mr-2'>
@@ -380,7 +383,7 @@ const NoPropFirmAccounts = ({
             </View>
           )}
 
-          {/* ✅ Always show search bar in menu screen, conditionally in other screens */}
+          {/* Always show search bar in menu screen, conditionally in other screens */}
           {(isMenuScreen || showSearchBar) && (
             <SearchInput onSearch={handleSearch} />
           )}
@@ -390,6 +393,7 @@ const NoPropFirmAccounts = ({
           <AccountBottomSheet
             bottomSheetRef={bottomSheetRef}
             context={context}
+            onArchivePress={onArchivePress}
             accountData={selectedAccount ? {
               id: selectedAccount.id,
               name: selectedAccount.name,

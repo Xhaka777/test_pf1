@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from 'react-native';
 import ProfitLossIndicator from "./ProfitLossIndicator";
 import { PlatformImage } from "./PlatformImage";
+import { Archive } from "lucide-react-native";
 
 type PropFirmPLCardProps = {
     account: {
@@ -43,7 +44,7 @@ const PropFirmPLCard = ({
     context = 'menu'
 }: PropFirmPLCardProps) => {
 
-    console.log('[PropFirmPLCard] Rendering account:', account.id, account.name);
+    console.log('[PropFirmPLCard] Rendering account:', account.id, account.name, 'context:', context);
 
     // Calculate if it's profit or loss
     const isProfit = account.changePercentage >= 0;
@@ -80,8 +81,21 @@ const PropFirmPLCard = ({
         e.stopPropagation(); // Prevent triggering the main card press
         if (onArchivePress) {
             onArchivePress(account);
+            console.log('[PropFirmPLCard] Archive pressed for account:', account.id);
         }
     };
+
+    // Balance and Percentage component for reuse
+    const BalancePercentageInfo = () => (
+        <View className="flex-row items-center mt-2">
+            <Text className="text-sm font-Inter text-white mr-2">
+                {formatBalance(account.balance, account.currency)}
+            </Text>
+            <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
+                {formatPercentage(account.changePercentage)}
+            </Text>
+        </View>
+    );
 
     const cardContent = (
         <View className={`p-4 bg-propfirmone-300 rounded-xl mb-3`}>
@@ -113,40 +127,51 @@ const PropFirmPLCard = ({
                             </Text>
                         </View>
 
-                        {/* Balance and Percentage Row - moved under account info */}
-                        <View className="flex-row items-center mt-2">
-                            <Text className="text-sm font-Inter text-white mr-2">
-                                {formatBalance(account.balance, account.currency)}
-                            </Text>
-                            <Text className={`text-sm font-Inter ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
-                                {formatPercentage(account.changePercentage)}
-                            </Text>
-                        </View>
+                        {/* Balance and Percentage Row - only show when context is 'menu' */}
+                        {context === 'menu' && <BalancePercentageInfo />}
                     </View>
                 </View>
 
-                {/* Right side: Current label and Archive button */}
-                <View className="items-end">
-                    {/* Current label - only show for selected account */}
-                    {isCurrentAccount && (
-                        <View className="bg-green-500 px-2 py-1 rounded-md mb-2">
-                            <Text className="text-white text-xs font-InterSemiBold">
-                                Current
+                {/* Right side: Balance/Percentage (overview) OR Current label and Archive button (menu) */}
+                <View className="items-end mt-3">
+                    {/* Show Balance/Percentage on the right when context is 'overview' */}
+                    {context === 'overview' && (
+                        <View className="items-end">
+                            <Text className="text-sm font-Inter text-white">
+                                {formatBalance(account.balance, account.currency)}
+                            </Text>
+                            <Text className={`text-sm font-Inter mt-1 ${isProfit ? 'text-green-500' : 'text-red-500'}`}>
+                                {formatPercentage(account.changePercentage)}
                             </Text>
                         </View>
                     )}
 
-                    {/* Archive button */}
-                    {context === 'menu' && onArchivePress && (
-                        <TouchableOpacity
-                            onPress={handleArchivePress}
-                            className="bg-gray-600 px-3 py-1.5 rounded-md"
-                            activeOpacity={0.7}
-                        >
-                            <Text className="text-white text-xs font-Inter">
-                                Archive
-                            </Text>
-                        </TouchableOpacity>
+                    {/* Show Current label and Archive button when context is 'menu' */}
+                    {context === 'menu' && (
+                        <>
+                            {/* Current label - only show for selected account */}
+                            {isCurrentAccount && (
+                                <View className="bg-[#0147374C] px-6 py-1.5 rounded-md mb-2">
+                                    <Text className="text-[#31c48D] text-xs font-InterSemiBold">
+                                        Current
+                                    </Text>
+                                </View>
+                            )}
+
+                            {/* Archive button */}
+                            {onArchivePress && (
+                                <TouchableOpacity
+                                    onPress={handleArchivePress}
+                                    className="px-3 py-1.5 rounded-md border border-[#2f2c2d] flex-row items-center"
+                                    activeOpacity={0.7}
+                                >
+                                    <Archive size={14} color='#fff' />
+                                    <Text className="text-white text-xs font-Inter ml-1">
+                                        Archive
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </>
                     )}
                 </View>
             </View>

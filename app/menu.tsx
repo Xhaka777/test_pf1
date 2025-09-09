@@ -445,7 +445,7 @@ const Menu = () => {
             //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
-
+            context='menu'
           />
         );
 
@@ -469,6 +469,7 @@ const Menu = () => {
             //
             currentAccountId={selectedAccountId}
             onAccountPress={handleArchivePress}
+            context='menu'
           />
         );
 
@@ -493,6 +494,7 @@ const Menu = () => {
             //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
+            context='menu'
           />
         );
 
@@ -511,6 +513,7 @@ const Menu = () => {
             //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
+            context='menu'
           />
         );
     }
@@ -607,6 +610,8 @@ const Menu = () => {
             maxTotalDD: selectedAccount.maxTotalDD,
             profitTarget: selectedAccount.profitTarget,
           } : undefined}
+          metricsData={metricsData}
+          onArchivePress={handleArchivePress}
         />
 
         {selectedAccount && (selectedAccount.type === 'Live' || selectedAccount.type === 'Demo') && (
