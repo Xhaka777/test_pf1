@@ -114,7 +114,7 @@ const AccountScreenChart = ({
 
     const margin = { top: 20, right: 0, bottom: 0, left: 0 };
     const chartWidth = screenWidth - 30 - margin.left - margin.right;
-    const chartHeight = 100;
+    const chartHeight = 115;
 
     const minValue = Math.min(Math.min(...data), displayMaxLoss) - 1000;
     const maxValue = Math.max(Math.max(...data), displayProfitTarget) + 1000;
@@ -154,7 +154,7 @@ const AccountScreenChart = ({
         profitTargetValue !== maxLoss;
 
     return (
-        <View className="rounded-xl m-2.5">
+        <View className="rounded-xl m-2.5 mt-0">
             <View className="flex-row">
                 <View className="flex-1 relative">
                     <Svg width={chartWidth + margin.left + margin.right} height={chartHeight + margin.top + margin.bottom}>

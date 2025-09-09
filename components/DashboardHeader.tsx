@@ -44,12 +44,13 @@ export function DashboardHeaderMobile({
         [AccountTypeEnum.COMPETITION]: 'Competition',
     };
 
+    // Updated color mapping to match BrokerBottomSheet and AccountScreenChart patterns
     const typeColorMap: Record<AccountTypeEnum, { bg: string; text: string }> = {
-        [AccountTypeEnum.DEMO]: { bg: 'bg-success-800', text: 'text-success-400' },
-        [AccountTypeEnum.LIVE]: { bg: 'bg-red-800', text: 'text-red-400' },
-        [AccountTypeEnum.FUNDED]: { bg: 'bg-success-800', text: 'text-success-400' },
-        [AccountTypeEnum.EVALUATION]: { bg: 'bg-blue-800', text: 'text-blue-400' },
-        [AccountTypeEnum.COMPETITION]: { bg: 'bg-purple-800', text: 'text-purple-400' },
+        [AccountTypeEnum.DEMO]: { bg: '#633112', text: '#FACA15' }, // Practice/Demo colors
+        [AccountTypeEnum.LIVE]: { bg: '#771D1D', text: '#F98080' }, // Live/Broker colors  
+        [AccountTypeEnum.FUNDED]: { bg: '#014737', text: '#31C48D' }, // Funded colors
+        [AccountTypeEnum.EVALUATION]: { bg: '#4A1D96', text: '#CABFFD' }, // Challenge/Evaluation colors
+        [AccountTypeEnum.COMPETITION]: { bg: '#4A1D96', text: '#CABFFD' }, // Competition uses same as evaluation
     };
 
     // Helper function to get firm initials
@@ -82,7 +83,7 @@ export function DashboardHeaderMobile({
     }
 
     const accountTypeLabel = typeLabelMap[accountDetails.account_type] || 'Unknown';
-    const accountTypeColors = typeColorMap[accountDetails.account_type] || { bg: 'bg-gray-800', text: 'text-gray-400' };
+    const accountTypeColors = typeColorMap[accountDetails.account_type] || { bg: '#4F494C', text: '#898587' };
     const firmName = accountDetails.firm || accountDetails.name;
 
     return (
@@ -108,8 +109,14 @@ export function DashboardHeaderMobile({
                     </View>
                 </View>
             </View>
-            <View className={`${accountTypeColors.bg} rounded-md px-3 py-0.5 mr-1`}>
-                <Text className={`font-Inter text-base ${accountTypeColors.text}`}>
+            <View 
+                className="rounded-md px-3 py-0.5 mr-1"
+                style={{ backgroundColor: accountTypeColors.bg }}
+            >
+                <Text 
+                    className="font-Inter text-base"
+                    style={{ color: accountTypeColors.text }}
+                >
                     {accountTypeLabel}
                 </Text>
             </View>

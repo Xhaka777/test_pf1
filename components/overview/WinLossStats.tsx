@@ -33,6 +33,11 @@ export const WinLossStats = ({
   const winWidth = totalPercentage > 0 ? (winPercentage / totalPercentage) * (effectiveWidth - diagonalGap) : 0;
   const lossWidth = totalPercentage > 0 ? (lossPercentage / totalPercentage) * (effectiveWidth - diagonalGap) : 0;
 
+  // Check if we have only losses (no wins)
+  const isOnlyLosses = winPercentage === 0 && lossPercentage > 0;
+  // Check if we have only wins (no losses)
+  const isOnlyWins = lossPercentage === 0 && winPercentage > 0;
+
   // Format currency amounts
   const formatAmount = (amount: number) => {
     if (isLoading) return '--';
@@ -109,8 +114,8 @@ export const WinLossStats = ({
                 </LinearGradient>
               </Defs>
               
-              {/* Green (Win) section */}
-              {winWidth > 0 && (
+              {/* Green (Win) section - only show if there are wins */}
+              {winWidth > 0 && !isOnlyLosses && (
                 <Path
                   d={`
                     M ${radius} 0
@@ -126,20 +131,56 @@ export const WinLossStats = ({
                 />
               )}
               
-              {/* Red (Loss) section */}
+              {/* Red (Loss) section - conditional shape based on whether there are wins */}
               {lossWidth > 0 && (
                 <Path
+                  d={
+                    isOnlyLosses 
+                      ? // Full width bar with rounded corners when only losses
+                        `
+                        M ${radius} 0
+                        H ${effectiveWidth - radius}
+                        A ${radius} ${radius} 0 0 1 ${effectiveWidth} ${radius}
+                        V ${barHeight - radius}
+                        A ${radius} ${radius} 0 0 1 ${effectiveWidth - radius} ${barHeight}
+                        H ${radius}
+                        A ${radius} ${radius} 0 0 1 0 ${barHeight - radius}
+                        V ${radius}
+                        A ${radius} ${radius} 0 0 1 ${radius} 0
+                        Z
+                        `
+                      : // Diagonal cut when there are both wins and losses
+                        `
+                        M ${winWidth + diagonalGap + diagonalOffset} 0
+                        H ${effectiveWidth - radius}
+                        A ${radius} ${radius} 0 0 1 ${effectiveWidth} ${radius}
+                        V ${barHeight - radius}
+                        A ${radius} ${radius} 0 0 1 ${effectiveWidth - radius} ${barHeight}
+                        H ${winWidth + diagonalGap - diagonalOffset}
+                        L ${winWidth + diagonalGap + diagonalOffset} 0
+                        Z
+                        `
+                  }
+                  fill="url(#redGrad)"
+                />
+              )}
+
+              {/* Green (Win) section for only wins case */}
+              {isOnlyWins && winWidth > 0 && (
+                <Path
                   d={`
-                    M ${winWidth + diagonalGap + diagonalOffset} 0
+                    M ${radius} 0
                     H ${effectiveWidth - radius}
                     A ${radius} ${radius} 0 0 1 ${effectiveWidth} ${radius}
                     V ${barHeight - radius}
                     A ${radius} ${radius} 0 0 1 ${effectiveWidth - radius} ${barHeight}
-                    H ${winWidth + diagonalGap - diagonalOffset}
-                    L ${winWidth + diagonalGap + diagonalOffset} 0
+                    H ${radius}
+                    A ${radius} ${radius} 0 0 1 0 ${barHeight - radius}
+                    V ${radius}
+                    A ${radius} ${radius} 0 0 1 ${radius} 0
                     Z
                   `}
-                  fill="url(#redGrad)"
+                  fill="url(#greenGrad)"
                 />
               )}
             </Svg>
