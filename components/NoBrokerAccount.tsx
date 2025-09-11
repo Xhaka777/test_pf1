@@ -302,7 +302,7 @@ function NoBrokerAccount({
       ) : (
         <LiveAccounts
           accounts={filteredLiveAccounts}
-          onAccountPress={handleAccountPress}
+          onAccountPress={handleAccountPress} // ✅ FIXED: Pass the correct handler
           currentAccountId={currentAccountId}
           onArchivePress={onArchivePress}
           context={context}
@@ -321,7 +321,7 @@ function NoBrokerAccount({
           accounts={filteredDemoAccounts}
           onAccountPress={handleAccountPress}
           currentAccountId={currentAccountId}
-          onArchivePress={onAccountPress}
+          onArchivePress={onArchivePress}
           context={context}
         />
       );

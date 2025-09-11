@@ -471,9 +471,10 @@ const Menu = () => {
             brokerAccountsLoading={brokerAccountsLoading}
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
+            onAccountPress={handleBrokerAccountPress}
             //
             currentAccountId={selectedAccountId}
-            onAccountPress={handleArchivePress}
+            onArchivePress={handleArchivePress}
             context='menu'
           />
         );
