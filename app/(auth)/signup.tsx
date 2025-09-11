@@ -7,7 +7,8 @@ import {
   Pressable,
   Alert,
   Button,
-  StyleSheet
+  StyleSheet,
+  Linking
 } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { Link, router, Stack } from 'expo-router';
@@ -32,6 +33,14 @@ export default function SignUp() {
     error: "",
     code: "",
   });
+
+  const openTermsOfService = () => {
+    Linking.openURL('https://propfirmone.com/terms-of-service');
+  }
+
+  const openPrivacyPolicy = () => {
+    Linking.openURL('https://propfirmone.com/privacy-policy')
+  }
 
   const onSignUpPress = async () => {
     if (!isLoaded) return;
@@ -161,8 +170,18 @@ export default function SignUp() {
               </Pressable>
               <Text className="flex-1 text-gray-500 leading-5 font-InterSemiBold">
                 By signing up, you agree to our{' '}
-                <Text className="text-primary-100 font-Inter">Terms of Use</Text> and{' '}
-                <Text className="text-primary-100 font-Inter">Privacy Policy</Text>.
+                <Text
+                  className="text-primary-100 font-Inter"
+                  onPress={openTermsOfService}
+                >
+                  Terms of Use
+                </Text> and{' '}
+                <Text
+                  className="text-primary-100 font-Inter"
+                  onPress={openPrivacyPolicy}
+                >
+                  Privacy Policy
+                </Text>.
               </Text>
             </View>
 
