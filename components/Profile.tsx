@@ -33,8 +33,8 @@ const Profile = ({ className, onProfilePress }: ProfileProps) => {
     >
       <View className="flex-row items-center">
         <Image
-          // source={{ uri: user?.imageUrl || 'https://via.placeholder.com/40' }}
-          source={images.profile_clerk}
+          source={{ uri: user?.imageUrl || images.profile_clerk }}
+          // source={images.profile_clerk}
           className="w-12 h-12 rounded-full mr-3"
         />
 

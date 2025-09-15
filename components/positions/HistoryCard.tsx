@@ -276,8 +276,8 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 const fromFlagImage = getCurrencyFlagImage(from);
                 const toFlagImage = getCurrencyFlagImage(to);
 
-                console.log('trade.tags', trade.tags);
-                console.log('journalTagsData', journalTagsData);
+                // console.log('trade.tags', trade.tags);
+                // console.log('journalTagsData', journalTagsData);
 
                 // Create unique key for this trade
                 const uniqueKey = createUniqueKey(trade, index);

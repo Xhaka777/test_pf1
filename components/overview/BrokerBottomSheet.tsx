@@ -191,7 +191,7 @@ const BrokerBottomSheet = ({
         return getNumericValue(accountData?.changePercentage || '0');
     };
 
-    console.log('metricsData', metricsData)
+    // console.log('metricsData', metricsData)
 
     return (
         <BottomSheetModal

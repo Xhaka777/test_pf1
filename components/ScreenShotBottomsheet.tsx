@@ -34,6 +34,7 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
         const [imageUrl, setImageUrl] = useState<string | null>(null);
 
         const { mutate: fetchPLSS, data: plssData, isLoading: isFetchingPLSS } = useFetchPLSSMutation();
+
         const { data: currentUser } = useGetCurrentUser();
 
         const snapPoints = useMemo(() => ['70%', '90%'], []);
@@ -59,32 +60,98 @@ const ScreenShotBottomSheet = forwardRef<BottomSheetModal, ScreenShotBottomSheet
                         backtesting: backtesting,
                     },
                     {
-                        onSuccess: (data) => {
+                        onSuccess: async (blob: Blob) => {
                             try {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    const result = reader.result as string;
-                                    if (result) {
-                                        setImageUrl(result);
-                                    } else {
-                                        console.warn('Empty result from FileReader');
+                                console.log('Blob received:', blob.size, blob.type, blob.constructor.name);
+
+                                if ((blob as any)?._data?.blobId) {
+                                    // React Native blob - add error handling and timeout
+                                    const reader = new FileReader();
+
+                                    // Add timeout for problematic devices
+                                    const timeoutPromise = new Promise((_, reject) => {
+                                        setTimeout(() => reject(new Error('FileReader timeout')), 15000);
+                                    });
+
+                                    const readerPromise = new Promise<string>((resolve, reject) => {
+                                        reader.onloadend = () => {
+                                            const result = reader.result as string;
+                                            console.log('FileReader result length:', result?.length);
+                                            if (result && result.startsWith('data:')) {
+                                                resolve(result);
+                                            } else {
+                                                reject(new Error('Invalid FileReader result'));
+                                            }
+                                        };
+                                        reader.onerror = (error) => {
+                                            console.error('FileReader error:', error);
+                                            reject(error);
+                                        };
+                                        reader.readAsDataURL(blob);
+                                    });
+
+                                    try {
+                                        const base64 = await Promise.race([readerPromise, timeoutPromise]);
+                                        setImageUrl(base64);
+                                        return;
+                                    } catch (readerError) {
+                                        console.error('FileReader failed, trying fallback:', readerError);
+                                        // Continue to other methods
                                     }
-                                };
-                                reader.onerror = (error) => {
-                                    console.error('FileReader error:', error);
-                                };
-                                reader.readAsDataURL(data);
+                                }
+
+                                // Web Blob - add validation
+                                if (typeof (blob as Blob).arrayBuffer === 'function') {
+                                    try {
+                                        const arrayBuffer = await (blob as Blob).arrayBuffer();
+                                        console.log('ArrayBuffer size:', arrayBuffer.byteLength);
+
+                                        if (arrayBuffer.byteLength === 0) {
+                                            throw new Error('Empty arrayBuffer');
+                                        }
+
+                                        // Use btoa for better compatibility instead of Buffer
+                                        const uint8Array = new Uint8Array(arrayBuffer);
+                                        let binary = '';
+                                        for (let i = 0; i < uint8Array.length; i++) {
+                                            binary += String.fromCharCode(uint8Array[i]);
+                                        }
+                                        const base64 = btoa(binary);
+                                        setImageUrl(`data:image/png;base64,${base64}`);
+                                        return;
+                                    } catch (arrayBufferError) {
+                                        console.error('ArrayBuffer method failed:', arrayBufferError);
+                                        // Continue to string method
+                                    }
+                                }
+
+                                // Already base64 string
+                                if (typeof blob === 'string') {
+                                    const finalUrl = blob.startsWith('data:') ? blob : `data:image/png;base64,${blob}`;
+                                    console.log('Using string blob, length:', finalUrl.length);
+                                    setImageUrl(finalUrl);
+                                    return;
+                                }
+
+                                console.error('Unknown blob format:', typeof blob, blob);
+                                throw new Error('Unable to process blob format');
+
                             } catch (error) {
                                 console.error('Error processing server image:', error);
+                                Alert.alert('Image Error', `Failed to process screenshot: ${error.message}`);
                             }
                         },
+
                         onError: (error) => {
                             console.error('Failed to fetch server screenshot:', error);
-                        }
+                        },
                     }
                 );
             }
+            console.log('plssData', plssData)
+
         }, [history, isHistory, backtesting, fetchPLSS, plssData, currentUser]);
+
 
         // Request permissions for MediaLibrary (iOS and Android)
         const requestPermissions = async (): Promise<boolean> => {

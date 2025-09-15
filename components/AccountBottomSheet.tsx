@@ -202,40 +202,6 @@ const AccountBottomSheet = ({
                     </View>
                 </View>
 
-                {/* Account Metrics */}
-                {/* <View className="flex-row items-center justify-between rounded-lg mb-4">
-                    <View className="bg-propfirmone-300 flex-1 rounded-lg py-3">
-                        <Image
-                            source={icons.dollar_chart_sign}
-                            resizeMode='contain'
-                            className='w-8 h-8 ml-3 mb-1'
-                        />
-                        <Text className="text-gray-400 text-base ml-3 font-Inter">Account Balance</Text>
-                        <Text className="text-white text-base font-InterSemiBold ml-3">
-                            {accountData?.balance || '$0.00'}
-                        </Text>
-                    </View>
-
-                    <View className="flex-1 ml-2 py-3 bg-propfirmone-300 rounded-lg">
-                        <Image
-                            source={icons.dollar_sign}
-                            resizeMode='contain'
-                            className='w-8 h-8 ml-3 mb-1'
-                        />
-                        <Text className="text-gray-400 text-base ml-3 font-Inter">Daily P/L</Text>
-                        <Text
-                            className="text-base font-InterSemiBold ml-3"
-                            style={{
-                                color: accountData?.dailyPL
-                                    ? getPLColor(getNumericValue(accountData.dailyPL))
-                                    : '#FFFFFF'
-                            }}
-                        >
-                            {accountData?.dailyPL || '$0.00'}
-                        </Text>
-                    </View>
-                </View> */}
-
                 <AdditionalStats
                     metricsData={metricsData}
                     isLoading={!metricsData}

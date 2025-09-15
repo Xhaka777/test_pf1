@@ -39,7 +39,7 @@ const AdditionalStats = ({
     return 'text-red-400';
   };
 
-  console.log('metricsData?.starting_balance', metricsData?.starting_balance)
+  // console.log('metricsData?.starting_balance', metricsData?.starting_balance)
 
   return (
     <View className="px-2 mt-2 mb-2">

@@ -28,6 +28,8 @@ const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress }: ProfileBottomShe
 
   console.log('planInfo', planInfo)
 
+  console.log('user?.imageUrl', user?.imageUrl)
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -46,7 +48,7 @@ const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress }: ProfileBottomShe
         </View>
         <View className='items-center mb-6'>
           <Image
-            source={images.profile_clerk}
+            source={{ uri: user?.imageUrl || images.profile_clerk }}
             className='w-20 h-20 rounded-full mb-3'
           />
           <Text className='text-white text-base font-InterSemiBold'>

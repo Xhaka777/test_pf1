@@ -61,7 +61,7 @@ const CloseOrderBottomSheet = forwardRef<BottomSheetModal, CloseOrderBottomSheet
                     onClose();
                 } else {
                     showToast(
-                        `Failed to cancel orde "${order.order_id}"`,
+                        `Failed to cancel order "${order.order_id}"`,
                         result.message || 'Unable to cancel your order at this time. Please try again later.'
                     );
                 }
