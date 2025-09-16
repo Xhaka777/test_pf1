@@ -79,23 +79,10 @@ const formatDateTime = (dateString: string): string => {
 function OrderCard(props: OpenOrdersListProps) {
     const { openOrders, oneClickTradingEnabled = false, onEditOrder, onClose } = props;
 
+    // ✅ FIXED: Always call useState, regardless of data length
     const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
-    if (!openOrders.length) {
-        return (
-            <View className="flex-1 items-center justify-center p-8">
-                <Text className="text-gray-400 font-InterRegular text-center">
-                    No open orders
-                </Text>
-            </View>
-        );
-    }
-
-    // Create unique key for orders (similar to HistoryCard fix)
-    const createUniqueKey = (order: OpenTradesData['open_orders'][number], index: number): string => {
-        return `${order.order_id || 'unknown'}-${index}-${order.symbol || 'nosymbol'}`;
-    };
-
+    // ✅ FIXED: Always call useCallback hooks, regardless of data length
     const handleToggleExpansion = useCallback((uniqueKey: string) => {
         setExpandedOrders((prev) => ({
             ...prev,
@@ -116,6 +103,22 @@ function OrderCard(props: OpenOrdersListProps) {
             onClose(order);
         }, 100);
     }, [onClose]);
+
+    // ✅ FIXED: Early return after all hooks have been called
+    if (!openOrders.length) {
+        return (
+            <View className="flex-1 items-center justify-center p-8">
+                <Text className="text-gray-400 font-InterRegular text-center">
+                    No open orders
+                </Text>
+            </View>
+        );
+    }
+
+    // Create unique key for orders (similar to HistoryCard fix)
+    const createUniqueKey = (order: OpenTradesData['open_orders'][number], index: number): string => {
+        return `${order.order_id || 'unknown'}-${index}-${order.symbol || 'nosymbol'}`;
+    };
 
     return (
         <View className="flex flex-col gap-4 p-4">

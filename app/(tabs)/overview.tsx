@@ -240,6 +240,39 @@ const Overview = () => {
     };
   }, [propFirmAccountsData]);
 
+  const processedBrokerAccounts = useMemo(() => {
+    if (!brokerAccountsData?.broker_accounts) return { live: [], demo: [] };
+
+    const processedAccounts = brokerAccountsData.broker_accounts.map((account: any) => {
+      const totalGainLoss = account.balance - account.starting_balance;
+      const totalPerformancePercentage = account.starting_balance > 0
+        ? (totalGainLoss / account.starting_balance) * 100
+        : 0;
+
+      return {
+        id: account.id,
+        name: account.name,
+        balance: account.balance, // Use the actual balance, not string
+        dailyPL: account.daily_pl,
+        changePercentage: totalPerformancePercentage,
+        type: account.account_type === 'broker' ? 'Live' : 'Demo', // Map broker to Live
+        currency: account.currency || 'USD',
+        firm: account.firm,
+        exchange: account.exchange,
+        server: account.server,
+        status: account.status,
+        totalPL: account.total_pl,
+        startingBalance: account.starting_balance,
+        originalData: account,
+      };
+    });
+
+    return {
+      live: processedAccounts.filter(acc => acc.originalData.account_type === 'broker' || acc.originalData.account_type === 'live'),
+      demo: processedAccounts.filter(acc => acc.originalData.account_type === 'demo')
+    };
+  }, [brokerAccountsData]);
+
   // Check if there are any prop firm accounts
   const hasPropFirmAccounts = useMemo(() => {
     return processedPropFirmAccounts.evaluation.length > 0 || processedPropFirmAccounts.funded.length > 0;
@@ -248,11 +281,10 @@ const Overview = () => {
   const getAccountData = (type: string) => {
     if (type === 'evaluation') return processedPropFirmAccounts.evaluation?.[0] ?? {};
     if (type === 'funded') return processedPropFirmAccounts.funded?.[0] ?? {};
-    if (type === 'live') return brokerAccountsData?.live?.[0] ?? {};
-    if (type === 'demo') return brokerAccountsData?.demo?.[0] ?? {};
+    if (type === 'live') return processedBrokerAccounts.live?.[0] ?? {};
+    if (type === 'demo') return processedBrokerAccounts.demo?.[0] ?? {};
     return {};
   };
-
   const currentAccountData = getAccountData(selectedAccountType);
 
   const handleAccountSelect = (accountId: string) => {
@@ -400,36 +432,46 @@ const Overview = () => {
         <Header />
 
         {/* Account Selector Header */}
-        <View className='px-6 pb-2'>
+        <View className='pr-6 pb-2'>
           <View className='flex-row items-center justify-between mt-3'>
-            <TouchableOpacity onPress={openAccountSelector} className='flex-row items-center'>
+            {/* Left-aligned account selector */}
+            <TouchableOpacity onPress={openAccountSelector} className='flex-row items-center ml-3 mr-2'> {/* Add pl-6 here for consistent spacing */}
               <Text className='text-white text-lg font-Inter mr-2'>
                 {accountDisplayInfo.title}
               </Text>
               <Ionicons name="chevron-down" size={20} color="white" />
             </TouchableOpacity>
 
-            {accountDisplayInfo.showSubButtons && (
+            {/* Right-aligned sub buttons */}
+            {accountDisplayInfo.showSubButtons && accountDisplayInfo.subButtons && accountDisplayInfo.subButtons.length > 0 && (
               <View className='flex-row'>
-                {accountDisplayInfo.subButtons.map((button, index) => (
-                  <TouchableOpacity
-                    key={button.id}
-                    onPress={() => setSelectedSubAccount(button.id as 'evaluation' | 'funded')}
-                    className={`py-3 px-5 rounded-lg border items-center justify-center ${selectedSubAccount === button.id
-                      ? 'border-[#e74694]'
-                      : 'bg-propfirmone-300 border border-[#4F494C]'
-                      } ${index < accountDisplayInfo.subButtons.length - 1 ? 'mr-3' : ''}
-                      `}
-                  >
-                    <Text className='text-white text-sm font-medium'>
-                      {button.text}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {accountDisplayInfo.subButtons.map((button, index) => {
+                  // ✅ FIXED: Ensure button and button.text exist
+                  if (!button || !button.id || !button.text) {
+                    return null;
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={button.id}
+                      onPress={() => setSelectedSubAccount(button.id as 'evaluation' | 'funded')}
+                      className={`py-3 px-5 rounded-lg border items-center justify-center ${selectedSubAccount === button.id
+                        ? 'border-[#e74694]'
+                        : 'bg-propfirmone-300 border border-[#4F494C]'
+                        } ${index < accountDisplayInfo.subButtons.length - 1 ? 'mr-3' : ''}`}
+                    >
+                      <Text className='text-white text-sm font-medium'>
+                        {String(button.text)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </View>
         </View>
+
+
 
         {/* ✅ FIXED: Simplified conditional rendering */}
         {shouldShowNoAccountsMessage() && renderNoPropFirmAccountsContent()}
@@ -444,9 +486,9 @@ const Overview = () => {
                   : selectedAccountType === 'funded'
                     ? processedPropFirmAccounts.funded
                     : selectedAccountType === 'live'
-                      ? brokerAccountsData?.broker_accounts?.filter(acc => acc.account_type === 'live') || []
+                      ? processedBrokerAccounts.live
                       : selectedAccountType === 'demo'
-                        ? brokerAccountsData?.broker_accounts?.filter(acc => acc.account_type === 'demo') || []
+                        ? processedBrokerAccounts.demo
                         : []
               }
               totalPL={closedProfitLoss}
@@ -454,6 +496,7 @@ const Overview = () => {
               dailyPL={metricsData?.daily_pl ?? 0}
               dailyPLPercentage={dailyPLPercentage}
             />
+
 
             <WinLossStats
               winPercentage={metricsData?.win_rate ?? 0}
@@ -495,7 +538,9 @@ const Overview = () => {
               showSearchBar={false}
               presetActiveTab="Live"
               hideTabBar={true}
-              brokerAccountsData={brokerAccountsData}
+              brokerAccountsData={{
+                broker_accounts: processedBrokerAccounts.live.map(acc => acc.originalData)
+              }}
               brokerAccountsLoading={brokerAccountsLoading}
               brokerAccountsError={brokerAccountsError}
               refetchBrokerAccounts={refetchBrokerAccounts}
@@ -511,7 +556,9 @@ const Overview = () => {
               showSearchBar={false}
               presetActiveTab="Demo"
               hideTabBar={true}
-              brokerAccountsData={brokerAccountsData}
+              brokerAccountsData={{
+                broker_accounts: processedBrokerAccounts.demo.map(acc => acc.originalData)
+              }}
               brokerAccountsLoading={brokerAccountsLoading}
               brokerAccountsError={brokerAccountsError}
               refetchBrokerAccounts={refetchBrokerAccounts}
@@ -555,6 +602,7 @@ const Overview = () => {
           profitTarget: bottomSheetAccountData.profitTarget,
           originalData: bottomSheetAccountData.originalData,
         } : undefined}
+        metricsData={metricsData}
       />
 
       <BrokerBottomSheet

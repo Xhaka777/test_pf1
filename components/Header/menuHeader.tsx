@@ -1,5 +1,4 @@
 import { Platform, TouchableOpacity, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MenuLogo from "./menuLogo";
 import SignOutButton from "../SignOutButton";
 import { X } from "lucide-react-native";
@@ -12,12 +11,8 @@ interface HeaderProps {
 }
 
 function MenuHeader({ onSignOut }: HeaderProps) {
-    const insets = useSafeAreaInsets();
-
     return (
-        <View className="w-full bg-propfirmone-main shadow-sm z-10"
-            style={{ paddingTop: insets.top }}
-        >
+        <View className="w-full bg-propfirmone-main shadow-sm z-10">
             <View className="flex-row items-center justify-between px-4 h-14">
                 <MenuLogo />
                 <TouchableOpacity

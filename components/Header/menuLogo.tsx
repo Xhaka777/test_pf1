@@ -5,8 +5,6 @@ import { Image, Platform, TouchableOpacity, View, Text } from "react-native";
 import { Dropdown } from "./dropdown";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp} from '@react-navigation/stack';
-import { SafeAreaView } from "react-native-safe-area-context";
-
 
 //Define your navigation param list type
 type RootStackParamList = {
@@ -53,9 +51,6 @@ function MenuLogo() {
                     />
                 </TouchableOpacity>        
             </View>
-
-
-
 
             <Dropdown
                 visible={isDropdownVisible}

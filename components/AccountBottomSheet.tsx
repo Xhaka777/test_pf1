@@ -33,7 +33,7 @@ interface AccountBottomSheetProps {
     accountData?: PropFirmAccountData;
     context?: 'menu' | 'overview';
     metricsData?: any;
-    onAccountSelect?: (accountId: number) => void;
+    onAccountSelect?: (accountId: string) => void;
     onArchivePress?: (account: any) => void;
 }
 
@@ -80,7 +80,7 @@ const AccountBottomSheet = ({
     };
 
     // Extract numeric values from string formats for calculations
-    const getNumericValue = (stringValue: string): number => {
+    const getNumericValue = (stringValue: string | undefined): number => {
         if (!stringValue) return 0;
         // Remove currency symbols, + signs, and convert to number
         const cleaned = stringValue.replace(/[^0-9.-]/g, '');
@@ -120,7 +120,6 @@ const AccountBottomSheet = ({
         }
     }
 
-
     const handleArchivePress = () => {
         if (!accountData || !onArchivePress) {
             return;
@@ -148,6 +147,30 @@ const AccountBottomSheet = ({
 
     const buttonConfig = getButtonConfig();
 
+    // Early return if no account data
+    if (!accountData) {
+        return (
+            <BottomSheetModal
+                ref={bottomSheetRef}
+                index={0}
+                snapPoints={snapPoints}
+                enablePanDownToClose={true}
+                backgroundStyle={{ backgroundColor: '#100E0F', borderColor: '#1E1E2D', borderWidth: 1 }}
+                handleIndicatorStyle={{ backgroundColor: '#666' }}
+            >
+                <BottomSheetView className="px-4 py-4">
+                    <View className="flex-row justify-between items-center mb-4">
+                        <Text className="text-white text-lg font-Inter">Account Details</Text>
+                        <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
+                            <X size={24} color='#898587' />
+                        </TouchableOpacity>
+                    </View>
+                    <Text className="text-white text-center">No account data available</Text>
+                </BottomSheetView>
+            </BottomSheetModal>
+        );
+    }
+
     return (
         <BottomSheetModal
             ref={bottomSheetRef}
@@ -174,16 +197,16 @@ const AccountBottomSheet = ({
                             style={{ backgroundColor: currentConfig.bgColor }}
                         >
                             <currentConfig.icon size={40} />
-
                         </View>
 
                         <View className="flex-1">
                             <Text className="text-white text-lg font-Inter">
-                                {accountData?.name || 'Unknown Account'}
+                                {accountData.name || 'Unknown Account'}
                             </Text>
                             <Text className="text-gray-400 text-sm mt-1 font-Inter">
-                                ID: {accountData?.id || 'N/A'}
+                                ID: {String(accountData?.id || 'N/A')}
                             </Text>
+
                         </View>
                     </View>
 
@@ -196,7 +219,7 @@ const AccountBottomSheet = ({
                                 className="font-Inter text-base"
                                 style={{ color: currentConfig.textColor }}
                             >
-                                {accountData?.type || 'Challenge'}
+                                {accountData.type || 'Challenge'}
                             </Text>
                         </View>
                     </View>
@@ -207,7 +230,7 @@ const AccountBottomSheet = ({
                     isLoading={!metricsData}
                 />
 
-                {accountData?.type && (accountData.type === 'Challenge' || accountData.type === 'Funded') && (
+                {accountData.type && (accountData.type === 'Challenge' || accountData.type === 'Funded') && (
                     <View className="mb-4">
                         {/* Progress toward profit target */}
                         {accountData.profitTarget && (
@@ -217,10 +240,10 @@ const AccountBottomSheet = ({
                                 </Text>
                                 <View className="flex-row justify-between items-center mb-2">
                                     <Text className="text-white text-sm font-Inter">
-                                        Current: ${getCurrentProfit().toLocaleString()}
+                                        {`Current: $${getCurrentProfit().toLocaleString()}`}
                                     </Text>
                                     <Text className="text-white text-sm font-Inter">
-                                        Target: ${accountData.profitTarget.toLocaleString()}
+                                        {`Target: $${accountData.profitTarget.toLocaleString()}`}
                                     </Text>
                                 </View>
                                 <View className="bg-gray-700 h-2 rounded-full">
@@ -230,7 +253,7 @@ const AccountBottomSheet = ({
                                     />
                                 </View>
                                 <Text className="text-gray-400 text-xs font-Inter mt-1">
-                                    {calculateProgressPercentage().toFixed(1)}% Complete
+                                    {`${calculateProgressPercentage().toFixed(1)}% Complete`}
                                 </Text>
                             </View>
                         )}
@@ -242,7 +265,7 @@ const AccountBottomSheet = ({
                                     Max Drawdown Limit
                                 </Text>
                                 <Text className="text-red-400 text-sm font-InterSemiBold">
-                                    ${accountData.maxTotalDD.toLocaleString()}
+                                    {`$${accountData.maxTotalDD.toLocaleString()}`}
                                 </Text>
                             </View>
                         )}
@@ -256,23 +279,23 @@ const AccountBottomSheet = ({
                             Performance
                         </Text>
                         <ProfitLossIndicator
-                            companyName={accountData?.name}
-                            totalValue={getNumericValue(accountData?.balance || '0')}
-                            percentageChange={getNumericValue(accountData?.changePercentage || '0')}
-                            dailyPL={getNumericValue(accountData?.dailyPL || '0')}
-                            startingBalance={accountData?.startingBalance}
-                            currency={accountData?.currency}
+                            companyName={accountData.name}
+                            totalValue={getNumericValue(accountData.balance)}
+                            percentageChange={getNumericValue(accountData.changePercentage)}
+                            dailyPL={getNumericValue(accountData.dailyPL)}
+                            startingBalance={accountData.startingBalance}
+                            currency={accountData.currency}
                             showLabels={false}
                         />
                     </View>
                 </View>
 
-                {/* Action Button */}
+                {/* Action Button - FIXED: Removed space-x-2 and simplified */}
                 <TouchableOpacity
                     onPress={handleActionButtonPress}
-                    className={`px-4 py-3 rounded-lg flex-row items-center justify-center space-x-2 mt-4 ${buttonConfig.style}`}
+                    className={`px-4 py-3 rounded-lg mt-4 ${buttonConfig.style}`}
                 >
-                    <Text className={`font-InterSemiBold text-lg ${buttonConfig.textStyle}`}>
+                    <Text className={`font-InterSemiBold text-lg text-center ${buttonConfig.textStyle}`}>
                         {buttonConfig.text}
                     </Text>
                 </TouchableOpacity>

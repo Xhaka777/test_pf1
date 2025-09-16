@@ -9,12 +9,12 @@ interface HeaderProps {
 function Header({ onSignOut }: HeaderProps) {
 
     return (
-        <SafeAreaView className="w-full bg-propfirmone-main shadow-sm z-10">
-            <View className="flex-row items-center justify-between px-4 h-14">
+        <View className="w-full bg-propfirmone-main shadow-sm z-10">
+            <View className="flex-row items-center justify-between px-4 h-14 ">
                 <Logo />
             </View>
             <View className="w-full h-0.5 bg-gray-800" />
-        </SafeAreaView>
+        </View>
     )
 }
 
