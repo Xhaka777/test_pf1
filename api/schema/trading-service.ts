@@ -56,7 +56,7 @@ export const BaseOrderSchema = z.object({
     sl: z.number(),
     tp: z.number(),
     user_id: z.number(),
-    master_order_od: z.number().nullable(),
+    master_order_id: z.number().nullable(),
     symbol: z.string(),
     order_type: z.nativeEnum(OrderTypeEnum),
 })
@@ -92,7 +92,7 @@ export const OpenTradeDataSchema = BaseTradeSchema.extend({
     open_time: z.string(),
     trailing_sl: TrailingSLLevelDataSchema.optional(),
     tp_levels: PartialTPLevelDataSchema.optional(),
-    risk_percentage: z.number().optional(),
+    risk_percent: z.number().optional(),
     risk_value: z.number().optional(),
 })
 
@@ -213,7 +213,7 @@ export const DeleteBTTradeInputSchema = z.object({
 
 export const DeleteBTTradesInputSchema = z.object({
     account: z.number(),
-    close_time: z.number(),
+    closing_time: z.number(),
     backtesting: z.boolean().optional()
 })
 
