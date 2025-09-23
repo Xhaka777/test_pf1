@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'trading_app'
+rootProject.name = 'PropFirmMatch Trading'
 
 dependencyResolutionManagement {
   versionCatalogs {

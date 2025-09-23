@@ -86,13 +86,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.altinxhaka.trading_app'
+    namespace 'com.propfirmmatch.trading_app'
     defaultConfig {
-        applicationId 'com.altinxhaka.trading_app'
+        applicationId 'com.propfirmmatch.trading_app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0.1"
     }
     signingConfigs {
         debug {

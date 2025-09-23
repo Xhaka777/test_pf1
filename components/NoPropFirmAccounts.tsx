@@ -262,12 +262,15 @@ const NoPropFirmAccounts = ({
     } else {
       if (activeTab === 'Challenge') {
         return filteredChallengeAccounts.length === 0 ? (
-          <View className='flex-1 justify-center items-center'>
-            <FileText size={20} color='#9CA3AF' className='mb-4' />
-            <Text className='text-gray-400 text-base font-Inter'>
-              {searchQuery ? 'No matching accounts found' : 'No evaluated accounts found'}
-            </Text>
-          </View>
+          // ✅ Only show "no accounts" message in menu context, not overview
+          context === 'menu' ? (
+            <View className='flex-1 justify-center items-center'>
+              <FileText size={20} color='#9CA3AF' className='mb-4' />
+              <Text className='text-gray-400 text-base font-Inter'>
+                {searchQuery ? 'No matching accounts found' : 'No evaluated accounts found'}
+              </Text>
+            </View>
+          ) : <View className='flex-1' /> // Empty view for overview context
         ) : (
           <ChallengeAccounts
             accounts={filteredChallengeAccounts}
@@ -279,12 +282,15 @@ const NoPropFirmAccounts = ({
         );
       } else if (activeTab === 'Funded') {
         return filteredFundedAccounts.length === 0 ? (
-          <View className='flex-1 justify-center items-center'>
-            <FileText size={20} color='#9CA3AF' className='mb-4' />
-            <Text className='text-gray-400 text-base font-Inter'>
-              {searchQuery ? 'No matching accounts found' : 'No funded accounts found'}
-            </Text>
-          </View>
+          // ✅ Only show "no accounts" message in menu context, not overview
+          context === 'menu' ? (
+            <View className='flex-1 justify-center items-center'>
+              <FileText size={20} color='#9CA3AF' className='mb-4' />
+              <Text className='text-gray-400 text-base font-Inter'>
+                {searchQuery ? 'No matching accounts found' : 'No funded accounts found'}
+              </Text>
+            </View>
+          ) : <View className='flex-1' /> // Empty view for overview context
         ) : (
           <FundedAccounts
             accounts={filteredFundedAccounts}
@@ -312,38 +318,6 @@ const NoPropFirmAccounts = ({
     bottomSheetRef.current?.present();
   }, [activeTab]);
 
-  const renderNoAccountContent = () => {
-    return (
-      <View className='flex-1 justify-center items-center'>
-        <View className='mb-4'>
-          <Image
-            source={images.results}
-            className='w-38 h-38'
-            resizeMode='contain'
-          />
-        </View>
-        <Text className='text-white text-2xl font-Inter text-center mb-2'>
-          No Prop Firm Accounts
-        </Text>
-        <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
-          You don't have any prop firm accounts yet. Please add a new account in order to start trading.
-        </Text>
-
-        <LinearGradient
-          colors={['#9061F919', '#E7469419']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          className='rounded-lg p-4 mb-6'
-          style={{ borderRadius: 8 }}
-        >
-          <Text className='text-white text-sm text-center font-Inter'>
-            Please note that adding new accounts is only available on the desktop version.
-            To create a new account, please use the desktop application.
-          </Text>
-        </LinearGradient>
-      </View>
-    );
-  };
 
   // Check if we should show the "No Accounts" view
   const shouldShowNoAccountsView = !isMenuScreen &&
@@ -375,7 +349,7 @@ const NoPropFirmAccounts = ({
           )}
 
           {/* Accounts Section with Count - only show when hideTabBar is true (from overview) */}
-          {hideTabBar && !isMenuScreen && (
+          {hideTabBar && !isMenuScreen && currentAccountCount > 0 && (
             <View className='px-6 mb-4'>
               <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
                 Accounts <Text style={{ color: '#E74694' }}>{currentAccountCount}</Text>

@@ -9,6 +9,7 @@ import { useAccounts } from "@/providers/accounts";
 import { useGetAccountDetails } from "@/api/hooks/account-details";
 import { useOpenPositionsWS } from "@/providers/open-positions";
 import { PlatformImage } from "../PlatformImage";
+import { router } from "expo-router";
 
 //Define your navigation param list type
 type RootStackParamList = {
@@ -79,6 +80,11 @@ export function Logo() {
         setIsDropdownVisible(false);
     };
 
+    const handleMenuPress = () => {
+        // Use router.push to ensure proper slide animation from right to left
+        router.push('/menu');
+    };
+
     return (
         <View className="relative w-full flex-row items-center justify-between">
             {/* Left side - Logo with dropdown and separator */}
@@ -125,9 +131,9 @@ export function Logo() {
                 </View>
 
                 <TouchableOpacity
-                    className="flex-row items-center bg-[#2F2C2D] py-3 px-2 rounded-lg"
+                    className="flex-row items-center bg-[#1A1819] py-3 px-2 rounded-lg"
                     activeOpacity={0.8}
-                    onPress={() => navigation.navigate('menu')}
+                    onPress={handleMenuPress}
                 >
                     <PlatformImage
                         className="mr-1"

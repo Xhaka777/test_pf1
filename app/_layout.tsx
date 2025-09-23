@@ -1,4 +1,4 @@
-// app/_layout.tsx - FIXED VERSION (No Hook Order Changes)
+// app/_layout.tsx - FIXED VERSION with proper screen transitions
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -108,16 +108,29 @@ export default function RootLayout() {
                         <Stack>
                           <Stack.Screen name='index' options={{ headerShown: false }} />
                           <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-                          <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-                          <Stack.Screen name='menu'
+                          <Stack.Screen 
+                            name='(tabs)' 
+                            options={{ 
+                              headerShown: false,
+                              animation: 'none' // No animation to avoid glitching
+                            }} 
+                          />
+                          <Stack.Screen 
+                            name='menu'
+                            options={{
+                              headerShown: false,
+                              // Menu slides in from right to left
+                              animation: 'slide_from_right',
+                              // Enable gesture navigation
+                              gestureEnabled: true,
+                              gestureDirection: 'horizontal',
+                            }}
+                          />
+                          <Stack.Screen 
+                            name='assets'
                             options={{
                               headerShown: false,
                               animation: 'slide_from_right',
-                            }}
-                          />
-                          <Stack.Screen name='assets'
-                            options={{
-                              headerShown: false,
                               animationTypeForReplace: 'push'
                             }}
                           />

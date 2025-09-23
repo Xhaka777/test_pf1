@@ -71,9 +71,9 @@ const Trade = ({ navigation }: TradeProps) => {
   });
 
 
-  console.log('selectedAccountId', selectedAccountId)
+  // console.log('selectedAccountId', selectedAccountId)
   console.log('activeSymbol', activeSymbol)
-  console.log('accountDetails', accountDetails)
+  // console.log('accountDetails', accountDetails)
 
 
   return (

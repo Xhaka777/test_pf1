@@ -1,4 +1,4 @@
-package com.altinxhaka.trading_app
+package com.propfirmmatch.trading_app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

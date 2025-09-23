@@ -29,6 +29,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.altinxhaka.trading_app"/>
+        <data android:scheme="com.propfirmmatch.trading_app"/>
       </intent-filter>
     </activity>
   </application>

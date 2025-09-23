@@ -177,8 +177,14 @@ const AccountBottomSheet = ({
             index={0}
             snapPoints={snapPoints}
             enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: '#100E0F', borderColor: '#1E1E2D', borderWidth: 1 }}
-            handleIndicatorStyle={{ backgroundColor: '#666' }}
+            backgroundStyle={{
+                backgroundColor: '#100E0F',
+                borderColor: '#1E1E2D',
+                borderWidth: 1,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16
+            }}
+            handleIndicatorStyle={{ backgroundColor: '#100E0F' }}
         >
             <BottomSheetView className="px-4 py-4">
                 {/* Header */}
@@ -293,7 +299,7 @@ const AccountBottomSheet = ({
                 {/* Action Button - FIXED: Removed space-x-2 and simplified */}
                 <TouchableOpacity
                     onPress={handleActionButtonPress}
-                    className={`px-4 py-3 rounded-lg mt-4 ${buttonConfig.style}`}
+                    className={`px-4 py-3 rounded-lg mt-4 mb-10 ${buttonConfig.style}`}
                 >
                     <Text className={`font-InterSemiBold text-lg text-center ${buttonConfig.textStyle}`}>
                         {buttonConfig.text}

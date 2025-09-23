@@ -1,11 +1,10 @@
-import React, { useMemo } from "react";
+import React, { forwardRef, useMemo } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import BottomSheet, { BottomSheetView } from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { X } from "lucide-react-native";
 import { TakeProfitSlTypeEnum } from "@/shared/enums";
 
 interface TPBottomSheetProps {
-    bottomSheetRef: React.RefObject<BottomSheet>;
     onClose: () => void;
     selectedType: string;
     onTypeSelect: (type: TakeProfitSlTypeEnum) => void;
@@ -13,15 +12,14 @@ interface TPBottomSheetProps {
     isStopLoss?: boolean;
 }
 
-const TPBottomSheet = ({
-    bottomSheetRef,
+const TPBottomSheet = forwardRef<BottomSheetModal, TPBottomSheetProps>(({
     onClose,
     selectedType,
     onTypeSelect,
     title,
     isStopLoss = false
-}: TPBottomSheetProps) => {
-    const snapPoints = useMemo(() => ['45%'], []);
+}, ref) => {
+    const snapPoints = useMemo(() => ['20%'], []);
 
     const dynamicTitle = useMemo(() => {
         if (title) return title;
@@ -46,23 +44,35 @@ const TPBottomSheet = ({
         onClose();
     };
 
+    const handleSheetChanges = (index: number) => {
+        if (index === -1) {
+            onClose();
+        }
+    };
+
     return (
-        <BottomSheet
-            ref={bottomSheetRef}
-            index={-1}
+        <BottomSheetModal
+            ref={ref}
+            index={0}
             snapPoints={snapPoints}
             enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: '#1A1819' }}
-            handleIndicatorStyle={{ backgroundColor: '#898587' }}
+            backgroundStyle={{
+                backgroundColor: '#100E0F',
+                borderColor: '#1E1E2D',
+                borderWidth: 1,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+            }}
+            handleIndicatorStyle={{ backgroundColor: '#100E0F' }}
+            onChange={handleSheetChanges}
         >
             <BottomSheetView className="flex-1 px-4">
                 <View className="flex-row items-center justify-between py-3 mb-4">
-                    <Text className="text-white text-lg font-InterSemiBold">
-                        {dynamicTitle}
-                    </Text>
-                    <Text className="text-gray-400 text-sm mt-1">
-                        Select unit type
-                    </Text>
+                    <View className="flex-1">
+                        <Text className="text-white text-lg font-InterSemiBold">
+                            {dynamicTitle}
+                        </Text>
+                    </View>
                     <TouchableOpacity
                         onPress={onClose}
                         className="p-2"
@@ -81,7 +91,7 @@ const TPBottomSheet = ({
                         return (
                             <TouchableOpacity
                                 key={option.value}
-                                className={`flex-1 py-4 px-3 rounded-lg items-center justify-center border ${isSelected
+                                className={`flex-1 py-1 px-3 mb-4 rounded-lg items-center justify-center border ${isSelected
                                     ? 'bg-[#252223] border-[#898587]'
                                     : 'bg-[#1A1819] border-gray-600'
                                     }`}
@@ -89,25 +99,22 @@ const TPBottomSheet = ({
                                 activeOpacity={0.8}
                                 accessible={true}
                                 accessibilityRole="button"
-                                accessibilityLabel={`${'Select'} ${option.label}`}
+                                accessibilityLabel={`Select ${option.label}`}
                                 accessibilityState={{ selected: isSelected }}
                             >
                                 <Text className={`text-base font-InterSemiBold mb-1 ${isSelected ? 'text-white' : 'text-gray-400'
                                     }`}>
                                     {option.label}
                                 </Text>
-                                <Text className={`text-xs text-center ${isSelected ? 'text-gray-300' : 'text-gray-500'
-                                    }`}>
-                                    {option.description}
-                                </Text>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
-
             </BottomSheetView>
-        </BottomSheet>
+        </BottomSheetModal>
     );
-};
+});
+
+TPBottomSheet.displayName = 'TPBottomSheet';
 
 export default TPBottomSheet;

@@ -169,7 +169,7 @@ export function AccountInfo({
                     </View>
                 </View>
 
-                <View className="w-full h-0.5 bg-gray-800" />
+                <View className="w-full h-[1px] bg-[#2F2C2D]" />
 
                 {/* Program & Trading Days Section */}
                 <View className="space-y-3 mt-2">
@@ -200,7 +200,7 @@ export function AccountInfo({
                     </View>
                 </View>
 
-                <View className="w-full h-0.5 bg-gray-800" />
+                <View className="w-full h-[1px] bg-[#2F2C2D]" />
 
                 {/* Leverage Section */}
 
@@ -268,7 +268,7 @@ export function AccountInfo({
                     </View>
                 </View>
 
-                <View className="w-full h-0.5 bg-gray-800" />
+                <View className="w-full h-[1px] bg-[#2F2C2D]" />
 
                 {/* Progress Section */}
                 <View className="flex-row items-center justify-between rounded-lg mt-2">

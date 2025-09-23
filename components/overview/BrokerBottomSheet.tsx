@@ -199,8 +199,14 @@ const BrokerBottomSheet = ({
             index={0}
             snapPoints={snapPoints}
             enablePanDownToClose={true}
-            backgroundStyle={{ backgroundColor: '#100E0F', borderColor: '#1E1E2D', borderWidth: 1 }}
-            handleIndicatorStyle={{ backgroundColor: '#666' }}
+            backgroundStyle={{
+                backgroundColor: '#100E0F',
+                borderColor: '#1E1E2D',
+                borderWidth: 1,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16
+            }}
+            handleIndicatorStyle={{ backgroundColor: '#100E0F' }}
         >
             <BottomSheetView className="px-2 py-4">
                 {/* Header */}
@@ -262,7 +268,7 @@ const BrokerBottomSheet = ({
                 {/* Action Button */}
                 <TouchableOpacity
                     onPress={handleActionButtonPress}
-                    className={`mx-2 px-4 py-3 rounded-lg ${buttonConfig.style}`}
+                    className={`mx-2 px-4 py-3 rounded-lg mb-10 ${buttonConfig.style}`}
                 >
                     <Text className={`font-InterSemiBold text-center ${buttonConfig.textStyle}`}>
                         {buttonConfig.text}

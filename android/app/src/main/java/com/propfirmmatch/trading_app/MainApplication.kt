@@ -1,4 +1,4 @@
-package com.altinxhaka.trading_app
+package com.propfirmmatch.trading_app
 
 import android.app.Application
 import android.content.res.Configuration

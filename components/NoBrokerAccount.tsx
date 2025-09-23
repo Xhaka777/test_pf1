@@ -290,19 +290,21 @@ function NoBrokerAccount({
       );
     }
 
-    // Regular screen layout
     if (activeTab === 'Live') {
       return filteredLiveAccounts.length === 0 ? (
-        <View className='flex-1 items-center justify-center'>
-          <FileText size={20} color='#9CA3AF' className='mb-4' />
-          <Text className='text-gray-400 text-base font-Inter'>
-            {hasSearchQuery ? 'No matching live accounts found' : 'No live accounts found'}
-          </Text>
-        </View>
+        // ✅ Only show "no accounts" message in menu context, not overview
+        context === 'menu' ? (
+          <View className='flex-1 items-center justify-center'>
+            <FileText size={20} color='#9CA3AF' className='mb-4' />
+            <Text className='text-gray-400 text-base font-Inter'>
+              {hasSearchQuery ? 'No matching live accounts found' : 'No live accounts found'}
+            </Text>
+          </View>
+        ) : <View className='flex-1' /> // Empty view for overview context
       ) : (
         <LiveAccounts
           accounts={filteredLiveAccounts}
-          onAccountPress={handleAccountPress} 
+          onAccountPress={handleAccountPress}
           currentAccountId={currentAccountId}
           onArchivePress={onArchivePress}
           context={context}
@@ -310,12 +312,15 @@ function NoBrokerAccount({
       );
     } else {
       return filteredDemoAccounts.length === 0 ? (
-        <View className='flex-1 items-center justify-center'>
-          <FileText size={20} color='#9CA3AF' className='mb-4' />
-          <Text className='text-gray-400 text-base font-Inter'>
-            {hasSearchQuery ? 'No matching demo accounts found' : 'No demo accounts found'}
-          </Text>
-        </View>
+        // ✅ Only show "no accounts" message in menu context, not overview
+        context === 'menu' ? (
+          <View className='flex-1 items-center justify-center'>
+            <FileText size={20} color='#9CA3AF' className='mb-4' />
+            <Text className='text-gray-400 text-base font-Inter'>
+              {hasSearchQuery ? 'No matching demo accounts found' : 'No demo accounts found'}
+            </Text>
+          </View>
+        ) : <View className='flex-1' /> // Empty view for overview context
       ) : (
         <DemoAccounts
           accounts={filteredDemoAccounts}
@@ -351,7 +356,7 @@ function NoBrokerAccount({
         )}
 
         {/* Accounts Section with Count - only show when hideTabBar is true AND not in menu screen */}
-        {hideTabBar && !isMenuScreen && (
+        {hideTabBar && !isMenuScreen && currentAccountCount > 0 && (
           <View className='px-2 mb-4'>
             <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>
               Accounts <Text style={{ color: '#E74694' }}>{currentAccountCount}</Text>

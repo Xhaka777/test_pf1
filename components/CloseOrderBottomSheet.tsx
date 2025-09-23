@@ -95,7 +95,7 @@ const CloseOrderBottomSheet = forwardRef<BottomSheetModal, CloseOrderBottomSheet
                     borderColor: '#1E1E2D',
                     borderWidth: 1
                 }}
-                handleIndicatorStyle={{ backgroundColor: '#666' }}
+                handleIndicatorStyle={{ backgroundColor: '#100E0F' }}
                 onChange={handleSheetChanges}
             >
                 <BottomSheetView

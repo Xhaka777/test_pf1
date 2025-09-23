@@ -287,6 +287,16 @@ const Overview = () => {
   };
   const currentAccountData = getAccountData(selectedAccountType);
 
+  // Calculate account counts for tabs
+  const accountCounts = useMemo(() => {
+    return {
+      evaluation: processedPropFirmAccounts.evaluation.length,
+      funded: processedPropFirmAccounts.funded.length,
+      live: processedBrokerAccounts.live.length,
+      demo: processedBrokerAccounts.demo.length,
+    };
+  }, [processedPropFirmAccounts, processedBrokerAccounts]);
+
   const handleAccountSelect = (accountId: string) => {
     console.log('[Overview] Account selected:', accountId);
     setSelectedAccountType(accountId as 'evaluation' | 'funded' | 'live' | 'demo');
@@ -371,54 +381,116 @@ const Overview = () => {
   }, []);
 
   // Render the "No Accounts" content for prop firm accounts
-  const renderNoPropFirmAccountsContent = () => {
-    return (
-      <View className='flex-1 justify-center items-center px-6 py-10'>
-        <View className='mb-4'>
-          <Image
-            source={images.results}
-            className='w-38 h-38'
-            resizeMode='contain'
-          />
-        </View>
-        <Text className='text-white text-2xl font-Inter text-center mb-2'>
-          No Prop Firm Accounts
-        </Text>
-        <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
-          You don't have any prop firm accounts yet. Please add a new account in order to start trading.
-        </Text>
+const renderNoPropFirmAccountsContent = () => {
+  const getAccountTypeInfo = () => {
+    switch (selectedAccountType) {
+      case 'evaluation':
+        return { title: 'Evaluation', type: 'evaluation' };
+      case 'funded':
+        return { title: 'Funded', type: 'funded' };
+      case 'live':
+        return { title: 'Live', type: 'live' };
+      case 'demo':
+        return { title: 'Demo', type: 'demo' };
+      default:
+        return { title: 'Evaluation', type: 'evaluation' };
+    }
+  };
 
-        <LinearGradient
-          colors={['#9061F919', '#E7469419']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          className='rounded-lg p-4 mb-6'
-          style={{ borderRadius: 8 }}
-        >
-          <Text className='text-white text-sm text-center font-Inter'>
-            Please note that adding new accounts is only available on the desktop version.
-            To create a new account, please use the desktop application.
-          </Text>
-        </LinearGradient>
+  const accountTypeInfo = getAccountTypeInfo();
+
+  return (
+    <View className='flex-1 justify-center items-center px-6 py-10'>
+      <View className='mb-4'>
+        <Image
+          source={images.results}
+          className='w-38 h-38'
+          resizeMode='contain'
+        />
       </View>
-    );
-  };
+      <Text className='text-white text-2xl font-Inter text-center mb-2'>
+        No {accountTypeInfo.title} Accounts
+      </Text>
+      <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
+        You don't have any {accountTypeInfo.type} accounts yet. Please add a new account in order to start trading.
+      </Text>
 
-  const shouldShowAccountCards = () => {
-    if (selectedAccountType === 'evaluation' || selectedAccountType === 'funded') {
-      return hasPropFirmAccounts && !propFirmAccountsLoading && !propFirmAccountsError;
-    } else if (selectedAccountType === 'live' || selectedAccountType === 'demo') {
-      return brokerAccountsData && !brokerAccountsLoading && !brokerAccountsError;
-    }
-    return false;
-  };
+      <LinearGradient
+        colors={['#9061F919', '#E7469419']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className='rounded-lg p-4 mb-6'
+        style={{ borderRadius: 8 }}
+      >
+        <Text className='text-white text-sm text-center font-Inter p-4'>
+          Please note that adding new accounts is only available on the desktop version.
+          To create a new account, please use the desktop application.
+        </Text>
+      </LinearGradient>
+    </View>
+  );
+};
 
-  const shouldShowNoAccountsMessage = () => {
-    if (selectedAccountType === 'evaluation' || selectedAccountType === 'funded') {
-      return !hasPropFirmAccounts && !propFirmAccountsLoading && !propFirmAccountsError;
-    }
-    return false;
-  };
+const shouldShowAccountCards = () => {
+  if (selectedAccountType === 'evaluation') {
+    return accountCounts.evaluation > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+  } else if (selectedAccountType === 'funded') {
+    return accountCounts.funded > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+  } else if (selectedAccountType === 'live') {
+    return accountCounts.live > 0 && !brokerAccountsLoading && !brokerAccountsError;
+  } else if (selectedAccountType === 'demo') {
+    return accountCounts.demo > 0 && !brokerAccountsLoading && !brokerAccountsError;
+  }
+  return false;
+};
+
+const shouldShowNoAccountsMessage = () => {
+  if (selectedAccountType === 'evaluation') {
+    return accountCounts.evaluation === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+  } else if (selectedAccountType === 'funded') {
+    return accountCounts.funded === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+  } else if (selectedAccountType === 'live') {
+    return accountCounts.live === 0 && !brokerAccountsLoading && !brokerAccountsError;
+  } else if (selectedAccountType === 'demo') {
+    return accountCounts.demo === 0 && !brokerAccountsLoading && !brokerAccountsError;
+  }
+  return false;
+};
+
+  // Tab component
+  const AccountTypeTab = ({
+    type,
+    label,
+    count,
+    isSelected,
+    onPress
+  }: {
+    type: string;
+    label: string;
+    count: number;
+    isSelected: boolean;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      className="items-center py-3 relative px-3" activeOpacity={0.7}
+    >
+      <View className="flex-row items-center">
+        <Text className={`text-base font-InterBold ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+          {label}
+        </Text>
+        <Text className={`text-base font-InterBold ml-1 ${count > 0 ? 'text-[#e74694]' : (isSelected ? 'text-white' : 'text-gray-400')}`}>
+          {count}
+        </Text>
+      </View>
+      {isSelected && (
+        <View
+          className="absolute bottom-0 h-0.5 bg-[#e74694] rounded-full"
+          style={{ width: '100%' }}
+        />
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView className='bg-[#100E0F] h-full'
@@ -431,22 +503,54 @@ const Overview = () => {
       <ScrollView>
         <Header />
 
-        {/* Account Selector Header */}
+        {/* Top Account Type Tabs */}
+        <View className='py-4'>
+          <View className='flex-row items-start'>
+            <AccountTypeTab
+              type="evaluation"
+              label="Evaluation"
+              count={accountCounts.evaluation}
+              isSelected={selectedAccountType === 'evaluation'}
+              onPress={() => handleAccountSelect('evaluation')}
+            />
+            <AccountTypeTab
+              type="funded"
+              label="Funded"
+              count={accountCounts.funded}
+              isSelected={selectedAccountType === 'funded'}
+              onPress={() => handleAccountSelect('funded')}
+            />
+            <AccountTypeTab
+              type="live"
+              label="Live"
+              count={accountCounts.live}
+              isSelected={selectedAccountType === 'live'}
+              onPress={() => handleAccountSelect('live')}
+            />
+            <AccountTypeTab
+              type="demo"
+              label="Demo"
+              count={accountCounts.demo}
+              isSelected={selectedAccountType === 'demo'}
+              onPress={() => handleAccountSelect('demo')}
+            />
+          </View>
+        </View>
+
+        {/* COMMENTED OUT: Old Account Selector Header */}
+        {/* 
         <View className='pr-6 pb-2'>
           <View className='flex-row items-center justify-between mt-3'>
-            {/* Left-aligned account selector */}
-            <TouchableOpacity onPress={openAccountSelector} className='flex-row items-center ml-3 mr-2'> {/* Add pl-6 here for consistent spacing */}
+            <TouchableOpacity onPress={openAccountSelector} className='flex-row items-center ml-3 mr-2'>
               <Text className='text-white text-lg font-Inter mr-2'>
                 {accountDisplayInfo.title}
               </Text>
               <Ionicons name="chevron-down" size={20} color="white" />
             </TouchableOpacity>
 
-            {/* Right-aligned sub buttons */}
             {accountDisplayInfo.showSubButtons && accountDisplayInfo.subButtons && accountDisplayInfo.subButtons.length > 0 && (
               <View className='flex-row'>
                 {accountDisplayInfo.subButtons.map((button, index) => {
-                  // ✅ FIXED: Ensure button and button.text exist
                   if (!button || !button.id || !button.text) {
                     return null;
                   }
@@ -470,8 +574,7 @@ const Overview = () => {
             )}
           </View>
         </View>
-
-
+        */}
 
         {/* ✅ FIXED: Simplified conditional rendering */}
         {shouldShowNoAccountsMessage() && renderNoPropFirmAccountsContent()}
@@ -496,7 +599,6 @@ const Overview = () => {
               dailyPL={metricsData?.daily_pl ?? 0}
               dailyPLPercentage={dailyPLPercentage}
             />
-
 
             <WinLossStats
               winPercentage={metricsData?.win_rate ?? 0}

@@ -1,4 +1,4 @@
-// components/TradingPrices.tsx - Original UI with FlatList and Live Prices
+// components/TradingPrices.tsx - Modified UI with search but no auto-focus
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import {
     View,
@@ -116,7 +116,7 @@ const CurrencyListItem = React.memo(({
                         {item.symbol}
                     </Text>
                 </View>
-                <View className="flex-1 items-center">
+                <View className="items-end">
                     <Text className="font-semibold text-sm text-red-500">
                         {item.marketPrice.toLocaleString('en-US', {
                             maximumFractionDigits: Math.min(
@@ -174,10 +174,7 @@ export function TradingPrices() {
 
     const handleModalOpen = useCallback(() => {
         setOpen(true);
-        // Focus search input after modal animation
-        setTimeout(() => {
-            searchInputRef.current?.focus();
-        }, 300);
+        // Removed auto-focus - user needs to manually tap search input
     }, []);
 
     const handleModalClose = useCallback(() => {
@@ -304,7 +301,7 @@ export function TradingPrices() {
         <View className="flex-row items-center px-4 py-2 gap-2">
             <View className="w-8" />
             <Text className="flex-1 text-xs text-gray-500">{t('Instruments')}</Text>
-            <Text className="flex-1 text-xs text-gray-500 text-center">{t('Market Price')}</Text>
+            <Text className="text-xs text-gray-500">{t('Market Price')}</Text>
         </View>
     ), [t]);
 
@@ -312,7 +309,7 @@ export function TradingPrices() {
         <>
             {/* Search Container */}
             <View className="p-4 bg-propfirmone-main">
-                <View className="flex-row items-center bg-propfirmone-200 border border-gray-800 rounded-lg px-3 py-2">
+                <View className="flex-row items-center bg-propfirmone-200 border border-gray-800 rounded-lg px-3 py-1">
                     <SearchIcon />
                     <TextInput
                         ref={searchInputRef}
@@ -436,7 +433,7 @@ export function TradingPrices() {
             >
                 <View className="flex-1 bg-propfirmone-main">
                     {/* Modal Header */}
-                    <View className="flex-row justify-between items-center p-5 border-b border-gray-200">
+                    <View className="flex-row justify-between items-center p-5">
                         <Text className="text-lg font-semibold text-white">{t('Assets')}</Text>
                         <TouchableOpacity
                             className="p-2"
