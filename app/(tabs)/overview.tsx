@@ -473,7 +473,7 @@ const shouldShowNoAccountsMessage = () => {
   }) => (
     <TouchableOpacity
       onPress={onPress}
-      className="items-center py-3 relative px-3" activeOpacity={0.7}
+      className="items-center py-2 relative px-3" activeOpacity={0.7}
     >
       <View className="flex-row items-center">
         <Text className={`text-base font-InterBold ${isSelected ? 'text-white' : 'text-gray-400'}`}>
@@ -504,7 +504,7 @@ const shouldShowNoAccountsMessage = () => {
         <Header />
 
         {/* Top Account Type Tabs */}
-        <View className='py-4'>
+        <View className='py-2'>
           <View className='flex-row items-start'>
             <AccountTypeTab
               type="evaluation"

@@ -90,23 +90,23 @@ export function Logo() {
             {/* Left side - Logo with dropdown and separator */}
             <View className="flex-row items-center">
                 <TouchableOpacity
-                    className="flex-row items-center py-2 rounded-lg min-h-11 min-w-11"
+                    className="flex-row items-center py-2 rounded-lg"
                     onPress={toggleDropdown}
                     activeOpacity={0.8}
                 >
                     <Image
                         source={images.logo}
-                        className="w-7 h-7 mr-2"
+                        className="w-7 h-7"
                         resizeMode="contain"
                     />
-                    <ChevronDown
+                    {/* <ChevronDown
                         size={20}
                         color="#898587"
                         style={[
                             Platform.OS === 'web' ? { transition: 'transform 0.2s ease-in-out' } : {},
                             { transform: [{ rotate: isDropdownVisible ? '180deg' : '0deg' }] }
                         ]}
-                    />
+                    /> */}
                 </TouchableOpacity>
 
                 {/* Vertical separator */}

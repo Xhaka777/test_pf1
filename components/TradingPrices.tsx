@@ -1,4 +1,3 @@
-// components/TradingPrices.tsx - Modified UI with search but no auto-focus
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import {
     View,
@@ -19,17 +18,19 @@ import { useFavorites } from "@/hooks/use-favorites";
 import { ChevronDown, Search, X, Star } from "lucide-react-native";
 import { TradingPair } from "@/api/schema/trading-service";
 import images from "@/constants/images";
+import { categorizeProviderSymbol, getSymbolsForTab } from "@/utils/symbol-categorization";
+import { symbol } from "d3";
 
 const ChevronDownIcon = () => (
-    <ChevronDown size={16} color='#6B7280' />
+    <ChevronDown size={16} color='#4F494C' />
 )
 
 const SearchIcon = () => (
-    <Search size={16} color='#6B7280' />
+    <Search size={18} color='#4F494C' />
 )
 
 const ClearIcon = () => (
-    <X size={16} color='#6B7280' />
+    <X size={16} color='#4F494C' />
 )
 
 const StarIcon = ({ filled = false, onPress }: { filled?: boolean; onPress: () => void }) => (
@@ -42,7 +43,7 @@ const StarIcon = ({ filled = false, onPress }: { filled?: boolean; onPress: () =
     >
         <Star
             size={16}
-            color={filled ? '#FFD700' : '#6B7280'}
+            color={filled ? '#FFD700' : '#4F494C'}
             fill={filled ? '#FFD700' : 'transparent'}
         />
     </TouchableOpacity>
@@ -70,11 +71,11 @@ const getCurrencyFlagImage = (currency: CurrencyCodeEnum) => {
 };
 
 // Memoized FlatList item component for better performance
-const CurrencyListItem = React.memo(({ 
-    item, 
-    favoriteSymbols, 
-    onToggleFavorite, 
-    onSelectSymbol 
+const CurrencyListItem = React.memo(({
+    item,
+    favoriteSymbols,
+    onToggleFavorite,
+    onSelectSymbol
 }: {
     item: TradingPair;
     favoriteSymbols: string[];
@@ -92,8 +93,7 @@ const CurrencyListItem = React.memo(({
             onPress={() => onSelectSymbol(item.symbol)}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel={`Select ${item.symbol}, current price ${item.marketPrice}`}
-        >
+            accessibilityLabel={`Select ${item.symbol}, current price ${item.marketPrice}, spread ${item.ask && item.bid ? (item.ask - item.bid).toFixed(2) : 'unknown'}`}>
             <View className="flex-row items-center gap-2">
                 <View className="w-8 items-center">
                     <StarIcon
@@ -102,29 +102,44 @@ const CurrencyListItem = React.memo(({
                     />
                 </View>
                 <View className="flex-1 flex-row items-center gap-2 overflow-hidden">
-                    <View className="flex-row w-11">
+                    <View className="relative w-[24px] h-[24px]">
                         <Image
                             source={fromFlagImage}
-                            style={{ width: 18, height: 18 }}
+                            style={{ width: 24, height: 24 }}
+                            className="absolute top-0 left-0"
                         />
                         <Image
                             source={toFlagImage}
-                            style={{ width: 18, height: 18, marginLeft: -6 }}
+                            style={{ width: 12, height: 12 }}
+                            className="absolute bottom-0 right-0"
                         />
                     </View>
-                    <Text className="font-semibold text-sm text-white" numberOfLines={1}>
+                    <Text className="font-Inter text-sm text-white" numberOfLines={1}>
                         {item.symbol}
                     </Text>
                 </View>
-                <View className="items-end">
-                    <Text className="font-semibold text-sm text-red-500">
-                        {item.marketPrice.toLocaleString('en-US', {
-                            maximumFractionDigits: Math.min(
-                                item.marketPrice.toString().split('.')[1]?.length || 0, 
-                                8
-                            )
-                        })}
-                    </Text>
+                <View className="flex-row items-center gap-4">
+                    <View className="items-end min-w-[80px]">
+                        <Text className="font-semibold text-sm text-white">
+                            {item.marketPrice.toLocaleString('en-US', {
+                                maximumFractionDigits: Math.min(
+                                    item.marketPrice.toString().split('.')[1]?.length || 0,
+                                    8
+                                )
+                            })}
+                        </Text>
+                    </View>
+                    <View className="items-end min-w-[60px]">
+                        <Text className="font-Inter text-sm text-white">
+                            {(() => {
+                                if (item.ask && item.bid) {
+                                    const spread = item.ask - item.bid;
+                                    return spread.toFixed(2) + '%';
+                                }
+                                return '-';
+                            })()}
+                        </Text>
+                    </View>
                 </View>
             </View>
         </TouchableOpacity>
@@ -134,17 +149,17 @@ const CurrencyListItem = React.memo(({
 export function TradingPrices() {
     const { t } = useTranslation();
     const [activeSymbol, setActiveSymbol] = useActiveSymbol();
-    const { 
-        coreSymbols, 
-        allSymbols, 
-        findCurrencyPairBySymbol, 
-        loadAllSymbols, 
-        isLoadingAll 
+    const {
+        coreSymbols,
+        allSymbols,
+        findCurrencyPairBySymbol,
+        loadAllSymbols,
+        isLoadingAll
     } = useCurrencySymbol();
-    
+
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+    const [activeTab, setActiveTab] = useState<'forex' | 'stocks' | 'favorites'>('forex');
     const searchInputRef = useRef<TextInput>(null);
     const flatListRef = useRef<FlatList>(null);
 
@@ -187,31 +202,70 @@ export function TradingPrices() {
         return open ? allSymbols : coreSymbols;
     }, [open, allSymbols, coreSymbols]);
 
-    // Filtered symbols for FlatList - return raw data, not JSX
-    const filteredSymbols = useMemo(() => {
-        const symbolsToFilter = currentSymbols.filter((currency) => {
-            if (activeTab === 'favorites' && !favoriteSymbols.includes(currency.symbol)) {
-                return false;
-            }
+    const symbolCounts = useMemo(() => {
+        const forexSymbols = getSymbolsForTab(currentSymbols, 'forex');
+        const stocksSymbols = getSymbolsForTab(currentSymbols, 'stocks');
 
-            if (!searchQuery) {
-                return true;
-            }
-
-            return (
-                currency.symbol === searchQuery ||
-                currency.symbol.toLowerCase().includes(searchQuery.toLowerCase())
-            )
+        const additionalForextSymbols = currentSymbols.filter(symbol => {
+            const category = categorizeProviderSymbol(symbol.symbol);
+            return category === 'forex' && !forexSymbols.some(s => s.symbol === symbol.symbol);
         });
 
-        // Different sorting based on tab
+        const additionalStocksSymbols = currentSymbols.filter(symbol => {
+            const category = categorizeProviderSymbol(symbol.symbol);
+            return (category === 'indices' || category === 'metals' || category === 'commodities') &&
+                !stocksSymbols.some(s => s.symbol === symbol.symbol);
+        });
+
+        return {
+            forex: forexSymbols.length + additionalForextSymbols.length,
+            stocks: stocksSymbols.length + additionalStocksSymbols.length,
+            favorites: favoriteSymbols.length
+        };
+    }, [currentSymbols, favoriteSymbols.length]);
+
+    const filteredSymbols = useMemo(() => {
+        let symbolsToFilter: TradingPair[] = [];
+
         if (activeTab === 'favorites') {
-            // In favorites tab: show only favorites, sorted alphabetically
-            return symbolsToFilter.sort((a, b) => a.symbol.localeCompare(b.symbol));
-        } else {
-            // In all assets tab: show all symbols alphabetically (no favorites priority)
-            return symbolsToFilter.sort((a, b) => a.symbol.localeCompare(b.symbol));
+            symbolsToFilter = currentSymbols.filter(currency =>
+                favoriteSymbols.includes(currency.symbol)
+            );
+        } else if (activeTab === 'forex') {
+            // Get predefined forex symbols
+            const predefinedForex = getSymbolsForTab(currentSymbols, 'forex');
+
+            // Get additional forex symbols from provider categorization
+            const additionalForex = currentSymbols.filter(symbol => {
+                const category = categorizeProviderSymbol(symbol.symbol);
+                return category === 'forex' && !predefinedForex.some(s => s.symbol === symbol.symbol);
+            });
+
+            symbolsToFilter = [...predefinedForex, ...additionalForex];
+        } else if (activeTab === 'stocks') {
+            // Get predefined stocks symbols (indices, metals, commodities)
+            const predefinedStocks = getSymbolsForTab(currentSymbols, 'stocks');
+
+            // Get additional stocks symbols from provider categorization
+            const additionalStocks = currentSymbols.filter(symbol => {
+                const category = categorizeProviderSymbol(symbol.symbol);
+                return (category === 'indices' || category === 'metals' || category === 'commodities') &&
+                    !predefinedStocks.some(s => s.symbol === symbol.symbol);
+            });
+
+            symbolsToFilter = [...predefinedStocks, ...additionalStocks];
         }
+
+        // Apply search filter
+        if (searchQuery) {
+            symbolsToFilter = symbolsToFilter.filter(currency =>
+                currency.symbol === searchQuery ||
+                currency.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        // Sort alphabetically for all tabs
+        return symbolsToFilter.sort((a, b) => a.symbol.localeCompare(b.symbol));
     }, [
         currentSymbols,
         activeTab,
@@ -236,17 +290,19 @@ export function TradingPrices() {
         return (
             <View className="flex-row items-center justify-between min-w-fit">
                 <View className="flex-row items-center gap-2 overflow-hidden">
-                    <View className="flex-row">
+                    <View className="relative w-[24px] h-[24px]">
                         <Image
                             source={fromFlagImage}
-                            style={{ width: 18, height: 18 }}
+                            style={{ width: 24, height: 24 }}
+                            className="absolute top-0 left-0"
                         />
                         <Image
                             source={toFlagImage}
-                            style={{ width: 18, height: 18, marginLeft: -6 }}
+                            style={{ width: 12, height: 12 }}
+                            className="absolute bottom-0 right-0"
                         />
                     </View>
-                    <Text className="font-semibold text-base text-white max-w-[25vw]" numberOfLines={1}>
+                    <Text className="font-Inter text-base text-white max-w-[25vw]" numberOfLines={1}>
                         {currency.symbol}
                     </Text>
                 </View>
@@ -255,9 +311,22 @@ export function TradingPrices() {
     }, [activeSymbol, findCurrencyPairBySymbol])
 
     const tabs = useMemo(() => [
-        { id: 'all', label: t('All Assets'), count: currentSymbols.length },
-        { id: 'favorites', label: t('Favorites'), count: favoriteSymbols.length }
-    ], [t, currentSymbols.length, favoriteSymbols.length]);
+        {
+            id: 'forex',
+            label: t('Forex'),
+            count: symbolCounts.forex
+        },
+        {
+            id: 'stocks',
+            label: t('Stocks'),
+            count: symbolCounts.stocks
+        },
+        {
+            id: 'favorites',
+            label: t('Favorites'),
+            count: symbolCounts.favorites
+        }
+    ], [t, symbolCounts]);
 
     const clearSearch = useCallback(() => {
         setSearchQuery('');
@@ -279,7 +348,7 @@ export function TradingPrices() {
     // Empty component for FlatList
     const renderEmptyComponent = useCallback(() => (
         <View className="py-8 items-center">
-            <Text className="text-sm text-gray-500 text-center">
+            <Text className="text-sm font-Inter text-gray-500 text-center">
                 {activeTab === 'favorites'
                     ? t('No favorite assets yet. Star some assets to add them here.')
                     : t('No assets found matching your search.')
@@ -292,7 +361,7 @@ export function TradingPrices() {
     const renderLoadingComponent = useCallback(() => (
         <View className="flex-1 justify-center items-center py-8">
             <ActivityIndicator size="large" color="#3B82F6" />
-            <Text className="text-gray-500 mt-2">{t('Loading all symbols...')}</Text>
+            <Text className="text-gray-500 font-Inter mt-2">{t('Loading all symbols...')}</Text>
         </View>
     ), [t]);
 
@@ -300,8 +369,11 @@ export function TradingPrices() {
     const renderListHeader = useCallback(() => (
         <View className="flex-row items-center px-4 py-2 gap-2">
             <View className="w-8" />
-            <Text className="flex-1 text-xs text-gray-500">{t('Instruments')}</Text>
-            <Text className="text-xs text-gray-500">{t('Market Price')}</Text>
+            <Text className="flex-1 text-sm font-Inter text-gray-500">{t('Instruments')}</Text>
+            <View className="flex-row items-center gap-4">
+                <Text className="text-sm text-gray-500 min-w-[80px] text-right font-Inter">{t('Market Price')}</Text>
+                <Text className="text-sm text-gray-500 min-w-[60px] text-right font-Inter">{t('Spread')}</Text>
+            </View>
         </View>
     ), [t]);
 
@@ -309,15 +381,15 @@ export function TradingPrices() {
         <>
             {/* Search Container */}
             <View className="p-4 bg-propfirmone-main">
-                <View className="flex-row items-center bg-propfirmone-200 border border-gray-800 rounded-lg px-3 py-1">
+                <View className="flex-row items-center bg-[#252223] border border-[#2F2C2D] rounded-lg px-3">
                     <SearchIcon />
                     <TextInput
                         ref={searchInputRef}
-                        className="flex-1 ml-2 text-base text-white"
+                        className="flex-1 ml-2 text-lg font-Inter"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder={t('Search')}
-                        placeholderTextColor='#6B7280'
+                        placeholderTextColor='#898587'
                         accessible={true}
                         accessibilityLabel="Search currency pairs"
                     />
@@ -336,14 +408,13 @@ export function TradingPrices() {
             </View>
 
             {/* Tabs Container */}
-            <View className="px-4">
-                <View className="flex-row mb-4 gap-2">
+            <View className="px-2">
+                <View className="flex-row mb-1">
                     {tabs.map((tab) => (
                         <TouchableOpacity
                             key={tab.id}
-                            className={`px-3 py-2 rounded-md border border-gray-800 ${activeTab === tab.id ? 'bg-propfirmone-200' : 'bg-propfirmone-100'
-                                }`}
-                            onPress={() => setActiveTab(tab.id as 'all' | 'favorites')}
+                            className="px-3 py-3"
+                            onPress={() => setActiveTab(tab.id as 'forex' | 'stocks' | 'favorites')}
                             accessible={true}
                             accessibilityRole="tab"
                             accessibilityLabel={`${tab.label} tab`}
@@ -353,16 +424,33 @@ export function TradingPrices() {
                                 {tab.id === 'favorites' && (
                                     <Star size={12} color='#FFD700' fill='#FFD700' />
                                 )}
-                                <Text className={`text-sm ${activeTab === tab.id ? 'text-white' : 'text-white'
+                                <Text className={`text-base font-Inter ${activeTab === tab.id ? 'text-white' : 'text-gray-400'
                                     }`}>
                                     {tab.label}
                                 </Text>
-                                <Text className="text-sm text-blue-500">
+                                <Text className={`text-base font-Inter ${activeTab === tab.id ? 'text-pink-400' : 'text-gray-500'
+                                    }`}>
                                     ({tab.count})
                                 </Text>
                             </View>
                         </TouchableOpacity>
                     ))}
+                </View>
+
+                <View className="relative mb-4 mx-3">
+                    {/* Gray background line */}
+                    <View className="h-0.5 bg-[#2F2C2D] w-full" />
+
+                    {/* Pink active indicator line */}
+                    <View
+                        className="absolute top-0 h-0.5 bg-pink-400 transition-all duration-300 ease-in-out"
+                        style={{
+                            width: `${70 / tabs.length}%`,
+                            // width: `${100 / tabs.length}%`,
+                            left: `${(tabs.findIndex(tab => tab.id === activeTab) * 75) / tabs.length}%`
+                        }}
+
+                    />
                 </View>
             </View>
 
@@ -378,7 +466,7 @@ export function TradingPrices() {
                         keyExtractor={keyExtractor}
                         ListHeaderComponent={renderListHeader}
                         ListEmptyComponent={renderEmptyComponent}
-                        
+
                         // Performance optimizations
                         removeClippedSubviews={true}
                         maxToRenderPerBatch={15}
@@ -390,20 +478,20 @@ export function TradingPrices() {
                             offset: 48 * index,
                             index,
                         })}
-                        
+
                         // Style and behavior
                         className="flex-1"
                         showsVerticalScrollIndicator={true}
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={{ flexGrow: 1 }}
-                        
+
                         // Scroll to top when data changes
                         onContentSizeChange={() => {
                             if (searchQuery || activeTab === 'favorites') {
                                 flatListRef.current?.scrollToOffset({ animated: false, offset: 0 });
                             }
                         }}
-                        
+
                         // Enhanced performance for live data
                         extraData={`${favoriteSymbols.join(',')}-${Date.now()}`}
                     />
@@ -434,7 +522,7 @@ export function TradingPrices() {
                 <View className="flex-1 bg-propfirmone-main">
                     {/* Modal Header */}
                     <View className="flex-row justify-between items-center p-5">
-                        <Text className="text-lg font-semibold text-white">{t('Assets')}</Text>
+                        <Text className="text-lg font-Inter text-white">{t('Assets')}</Text>
                         <TouchableOpacity
                             className="p-2"
                             onPress={handleModalClose}

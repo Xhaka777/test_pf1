@@ -1,0 +1,136 @@
+// Complete asset configuration based on backend list - Updated with proper types
+export interface AssetInfo {
+  base: string;
+  quote?: string;
+  type: 'index' | 'metal' | 'commodity' | 'crypto' | 'fiat';
+  displayName?: string;
+  category: 'forex' | 'stocks' | 'crypto'; // Added category for tab filtering
+}
+
+export const ASSET_CONFIG: Record<string, AssetInfo> = {
+  // Indices (single icon, no badge) - categorized as 'stocks'
+  "UK100": { base: "UK100", type: "index", displayName: "FTSE 100", category: "stocks" },
+  "JPN225": { base: "JPN225", type: "index", displayName: "Nikkei 225", category: "stocks" },
+  "FRA40": { base: "FRA40", type: "index", displayName: "CAC 40", category: "stocks" },
+  "US30": { base: "US30", type: "index", displayName: "Dow Jones", category: "stocks" },
+  "AUS200": { base: "AUS200", type: "index", displayName: "ASX 200", category: "stocks" },
+  "US500": { base: "US500", type: "index", displayName: "S&P 500", category: "stocks" },
+  "US100": { base: "US100", type: "index", displayName: "NASDAQ 100", category: "stocks" },
+  "ESP35": { base: "ESP35", type: "index", displayName: "IBEX 35", category: "stocks" },
+  "EU50": { base: "EU50", type: "index", displayName: "Euro Stoxx 50", category: "stocks" },
+  "HK50": { base: "HK50", type: "index", displayName: "Hang Seng", category: "stocks" },
+  "GER40": { base: "GER40", type: "index", displayName: "DAX 40", category: "stocks" },
+
+  // Commodities (single icon, no badge) - categorized as 'stocks'
+  "USOIL": { base: "USOIL", type: "commodity", displayName: "US Oil", category: "stocks" },
+  "UKOIL": { base: "UKOIL", type: "commodity", displayName: "UK Oil", category: "stocks" },
+  "COPPER": { base: "COPPER", type: "commodity", displayName: "Copper", category: "stocks" },
+  "NATGAS": { base: "NATGAS", type: "commodity", displayName: "Natural Gas", category: "stocks" },
+
+  // Metals (base + quote badge) - categorized as 'stocks'
+  "XAGAUD": { base: "XAG", quote: "AUD", type: "metal", displayName: "Silver/AUD", category: "stocks" },
+  "XAUCHF": { base: "XAU", quote: "CHF", type: "metal", displayName: "Gold/CHF", category: "stocks" },
+  "XAUGBP": { base: "XAU", quote: "GBP", type: "metal", displayName: "Gold/GBP", category: "stocks" },
+  "XPTUSD": { base: "XPT", quote: "USD", type: "metal", displayName: "Platinum/USD", category: "stocks" },
+  "XAGEUR": { base: "XAG", quote: "EUR", type: "metal", displayName: "Silver/EUR", category: "stocks" },
+  "XAUUSD": { base: "XAU", quote: "USD", type: "metal", displayName: "Gold/USD", category: "stocks" },
+  "XPDUSD": { base: "XPD", quote: "USD", type: "metal", displayName: "Palladium/USD", category: "stocks" },
+  "XAGCHF": { base: "XAG", quote: "CHF", type: "metal", displayName: "Silver/CHF", category: "stocks" },
+  "XAGGBP": { base: "XAG", quote: "GBP", type: "metal", displayName: "Silver/GBP", category: "stocks" },
+  "XAUAUD": { base: "XAU", quote: "AUD", type: "metal", displayName: "Gold/AUD", category: "stocks" },
+  "XAGUSD": { base: "XAG", quote: "USD", type: "metal", displayName: "Silver/USD", category: "stocks" },
+  "XAUEUR": { base: "XAU", quote: "EUR", type: "metal", displayName: "Gold/EUR", category: "stocks" },
+
+  // Crypto (base + quote badge) - categorized as 'crypto'
+  "ETHUSD": { base: "ETH", quote: "USD", type: "crypto", displayName: "Ethereum/USD", category: "crypto" },
+  "BTCUSD": { base: "BTC", quote: "USD", type: "crypto", displayName: "Bitcoin/USD", category: "crypto" },
+
+  // Fiat pairs (base + quote badge) - categorized as 'forex'
+  "EURUSD": { base: "EUR", quote: "USD", type: "fiat", category: "forex" },
+  "AUDSGD": { base: "AUD", quote: "SGD", type: "fiat", category: "forex" },
+  "CHFSGD": { base: "CHF", quote: "SGD", type: "fiat", category: "forex" },
+  "EURCZK": { base: "EUR", quote: "CZK", type: "fiat", category: "forex" },
+  "USDCNH": { base: "USD", quote: "CNH", type: "fiat", category: "forex" },
+  "USDDKK": { base: "USD", quote: "DKK", type: "fiat", category: "forex" },
+  "AUDNOK": { base: "AUD", quote: "NOK", type: "fiat", category: "forex" },
+  "CHFNOK": { base: "CHF", quote: "NOK", type: "fiat", category: "forex" },
+  "EURJPY": { base: "EUR", quote: "JPY", type: "fiat", category: "forex" },
+  "AUDNZD": { base: "AUD", quote: "NZD", type: "fiat", category: "forex" },
+  "USDSGD": { base: "USD", quote: "SGD", type: "fiat", category: "forex" },
+  "EURHKD": { base: "EUR", quote: "HKD", type: "fiat", category: "forex" },
+  "USDRUB": { base: "USD", quote: "RUB", type: "fiat", category: "forex" },
+  "EURCHF": { base: "EUR", quote: "CHF", type: "fiat", category: "forex" },
+  "USDNOK": { base: "USD", quote: "NOK", type: "fiat", category: "forex" },
+  "EURMXN": { base: "EUR", quote: "MXN", type: "fiat", category: "forex" },
+  "GBPDKK": { base: "GBP", quote: "DKK", type: "fiat", category: "forex" },
+  "PLNJPY": { base: "PLN", quote: "JPY", type: "fiat", category: "forex" },
+  "USDILS": { base: "USD", quote: "ILS", type: "fiat", category: "forex" },
+  "NZDSGD": { base: "NZD", quote: "SGD", type: "fiat", category: "forex" },
+  "HKDJPY": { base: "HKD", quote: "JPY", type: "fiat", category: "forex" },
+  "GBPSGD": { base: "GBP", quote: "SGD", type: "fiat", category: "forex" },
+  "EURHUF": { base: "EUR", quote: "HUF", type: "fiat", category: "forex" },
+  "GBPNOK": { base: "GBP", quote: "NOK", type: "fiat", category: "forex" },
+  "EURCAD": { base: "EUR", quote: "CAD", type: "fiat", category: "forex" },
+  "USDTHB": { base: "USD", quote: "THB", type: "fiat", category: "forex" },
+  "GBPNZD": { base: "GBP", quote: "NZD", type: "fiat", category: "forex" },
+  "EURSEK": { base: "EUR", quote: "SEK", type: "fiat", category: "forex" },
+  "EURTRY": { base: "EUR", quote: "TRY", type: "fiat", category: "forex" },
+  "EURZAR": { base: "EUR", quote: "ZAR", type: "fiat", category: "forex" },
+  "AUDUSD": { base: "AUD", quote: "USD", type: "fiat", category: "forex" },
+  "AUDJPY": { base: "AUD", quote: "JPY", type: "fiat", category: "forex" },
+  "EURPLN": { base: "EUR", quote: "PLN", type: "fiat", category: "forex" },
+  "CHFJPY": { base: "CHF", quote: "JPY", type: "fiat", category: "forex" },
+  "USDCZK": { base: "USD", quote: "CZK", type: "fiat", category: "forex" },
+  "AUDCHF": { base: "AUD", quote: "CHF", type: "fiat", category: "forex" },
+  "SEKJPY": { base: "SEK", quote: "JPY", type: "fiat", category: "forex" },
+  "USDJPY": { base: "USD", quote: "JPY", type: "fiat", category: "forex" },
+  "GBPAUD": { base: "GBP", quote: "AUD", type: "fiat", category: "forex" },
+  "USDHKD": { base: "USD", quote: "HKD", type: "fiat", category: "forex" },
+  "CHFHUF": { base: "CHF", quote: "HUF", type: "fiat", category: "forex" },
+  "USDCHF": { base: "USD", quote: "CHF", type: "fiat", category: "forex" },
+  "ZARJPY": { base: "ZAR", quote: "JPY", type: "fiat", category: "forex" },
+  "USDMXN": { base: "USD", quote: "MXN", type: "fiat", category: "forex" },
+  "EURDKK": { base: "EUR", quote: "DKK", type: "fiat", category: "forex" },
+  "NZDUSD": { base: "NZD", quote: "USD", type: "fiat", category: "forex" },
+  "NZDJPY": { base: "NZD", quote: "JPY", type: "fiat", category: "forex" },
+  "AUDCAD": { base: "AUD", quote: "CAD", type: "fiat", category: "forex" },
+  "NOKJPY": { base: "NOK", quote: "JPY", type: "fiat", category: "forex" },
+  "EURGBP": { base: "EUR", quote: "GBP", type: "fiat", category: "forex" },
+  "GBPUSD": { base: "GBP", quote: "USD", type: "fiat", category: "forex" },
+  "GBPJPY": { base: "GBP", quote: "JPY", type: "fiat", category: "forex" },
+  "USDHUF": { base: "USD", quote: "HUF", type: "fiat", category: "forex" },
+  "EURSGD": { base: "EUR", quote: "SGD", type: "fiat", category: "forex" },
+  "NZDCHF": { base: "NZD", quote: "CHF", type: "fiat", category: "forex" },
+  "AUDSEK": { base: "AUD", quote: "SEK", type: "fiat", category: "forex" },
+  "CHFSEK": { base: "CHF", quote: "SEK", type: "fiat", category: "forex" },
+  "GBPCHF": { base: "GBP", quote: "CHF", type: "fiat", category: "forex" },
+  "GBPMXN": { base: "GBP", quote: "MXN", type: "fiat", category: "forex" },
+  "EURNOK": { base: "EUR", quote: "NOK", type: "fiat", category: "forex" },
+  "USDCAD": { base: "USD", quote: "CAD", type: "fiat", category: "forex" },
+  "NZDHUF": { base: "NZD", quote: "HUF", type: "fiat", category: "forex" },
+  "EURNZD": { base: "EUR", quote: "NZD", type: "fiat", category: "forex" },
+  "GBPHUF": { base: "GBP", quote: "HUF", type: "fiat", category: "forex" },
+  "USDSEK": { base: "USD", quote: "SEK", type: "fiat", category: "forex" },
+  "NZDCAD": { base: "NZD", quote: "CAD", type: "fiat", category: "forex" },
+  "AUDPLN": { base: "AUD", quote: "PLN", type: "fiat", category: "forex" },
+  "GBPCAD": { base: "GBP", quote: "CAD", type: "fiat", category: "forex" },
+  "USDTRY": { base: "USD", quote: "TRY", type: "fiat", category: "forex" },
+  "CHFPLN": { base: "CHF", quote: "PLN", type: "fiat", category: "forex" },
+  "USDZAR": { base: "USD", quote: "ZAR", type: "fiat", category: "forex" },
+  "CADJPY": { base: "CAD", quote: "JPY", type: "fiat", category: "forex" },
+  "NOKSEK": { base: "NOK", quote: "SEK", type: "fiat", category: "forex" },
+  "GBPSEK": { base: "GBP", quote: "SEK", type: "fiat", category: "forex" },
+  "CADCHF": { base: "CAD", quote: "CHF", type: "fiat", category: "forex" },
+  "USDPLN": { base: "USD", quote: "PLN", type: "fiat", category: "forex" },
+  "GBPTRY": { base: "GBP", quote: "TRY", type: "fiat", category: "forex" },
+  "GBPZAR": { base: "GBP", quote: "ZAR", type: "fiat", category: "forex" },
+  "GBPPLN": { base: "GBP", quote: "PLN", type: "fiat", category: "forex" },
+  "EURAUD": { base: "EUR", quote: "AUD", type: "fiat", category: "forex" },
+  "SGDJPY": { base: "SGD", quote: "JPY", type: "fiat", category: "forex" },
+};
+
+// Helper function to get category from ASSET_CONFIG
+export function getAssetCategory(symbol: string): 'forex' | 'stocks' | 'crypto' | null {
+  const asset = ASSET_CONFIG[symbol];
+  return asset?.category || null;
+}
