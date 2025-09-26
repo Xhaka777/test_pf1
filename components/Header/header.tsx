@@ -9,7 +9,7 @@ interface HeaderProps {
 function Header({ onSignOut }: HeaderProps) {
 
     return (
-        <View className="w-full bg-propfirmone-main shadow-sm z-10 mt-10">
+        <View className="w-full bg-propfirmone-main shadow-sm z-10">
             <View className="flex-row items-center justify-between px-4 h-16">
                 <Logo />
             </View>

@@ -16,7 +16,7 @@ function MenuHeader({ onSignOut }: HeaderProps) {
             <View className="flex-row items-center justify-between px-4 h-14">
                 <MenuLogo />
                 <TouchableOpacity
-                    onPress={() => router.push('/(tabs)/overview')}
+                    onPress={() => router.back()}
                     className="p-2"
                     activeOpacity={0.7}
                 >

@@ -20,6 +20,8 @@ import { AppState } from 'react-native';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
 import { NetworkProvider, useNetwork } from '@/providers/network';
 import ConnectionErrorScreen from '@/components/ConnectionErrorScreen';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
+
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -95,56 +97,50 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView className='flex-1'>
-      <BottomSheetModalProvider>
-        <NetworkProvider>
-          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-            <ClerkLoaded>
-              <QueryProvider>
-                <AccountsProvider>
-                  <AccountDetailsProvider>
-                    <CurrencySymbolProvider>
-                      <OpenPositionsProvider>
-                        <Stack>
-                          <Stack.Screen name='index' options={{ headerShown: false }} />
-                          <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-                          <Stack.Screen 
-                            name='(tabs)' 
-                            options={{ 
-                              headerShown: false,
-                              animation: 'none' // No animation to avoid glitching
-                            }} 
-                          />
-                          <Stack.Screen 
-                            name='menu'
-                            options={{
-                              headerShown: false,
-                              // Menu slides in from right to left
-                              animation: 'slide_from_right',
-                              // Enable gesture navigation
-                              gestureEnabled: true,
-                              gestureDirection: 'horizontal',
-                            }}
-                          />
-                          <Stack.Screen 
-                            name='assets'
-                            options={{
-                              headerShown: false,
-                              animation: 'slide_from_right',
-                              animationTypeForReplace: 'push'
-                            }}
-                          />
-                        </Stack>
-                      </OpenPositionsProvider>
-                    </CurrencySymbolProvider>
-                  </AccountDetailsProvider>
-                </AccountsProvider>
-                <StatusBar style="auto" />
-              </QueryProvider>
-            </ClerkLoaded>
-          </ClerkProvider>
-        </NetworkProvider>
-      </BottomSheetModalProvider>
-    </GestureHandlerRootView>
+    <KeyboardProvider>
+      <GestureHandlerRootView className='flex-1'>
+        <BottomSheetModalProvider>
+          <NetworkProvider>
+            <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+              <ClerkLoaded>
+                <QueryProvider>
+                  <AccountsProvider>
+                    <AccountDetailsProvider>
+                      <CurrencySymbolProvider>
+                        <OpenPositionsProvider>
+                          <Stack>
+                            <Stack.Screen name='index' options={{ headerShown: false }} />
+                            <Stack.Screen name='(auth)' options={{ headerShown: false }} />
+                            <Stack.Screen
+                              name='(tabs)'
+                              options={{
+                                headerShown: false,
+                                animation: 'none' // No animation to avoid glitching
+                              }}
+                            />
+                            <Stack.Screen
+                              name='menu'
+                              options={{
+                                headerShown: false,
+                                // Menu slides in from right to left
+                                animation: 'slide_from_right',
+                                // Enable gesture navigation
+                                gestureEnabled: true,
+                                gestureDirection: 'horizontal',
+                              }}
+                            />
+                          </Stack>
+                        </OpenPositionsProvider>
+                      </CurrencySymbolProvider>
+                    </AccountDetailsProvider>
+                  </AccountsProvider>
+                  <StatusBar style="auto" />
+                </QueryProvider>
+              </ClerkLoaded>
+            </ClerkProvider>
+          </NetworkProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </KeyboardProvider>
   );
 }

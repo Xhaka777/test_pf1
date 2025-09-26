@@ -1,7 +1,7 @@
 import BottomSheet, { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { Check, Minus, Plus, X, ChevronDown, Loader as Loader2 } from "lucide-react-native";
 import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import { Animated, Easing, Alert, TextInput } from "react-native";
+import { Animated, Easing, Alert, TextInput, Platform } from "react-native";
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useForm, FormProvider, SubmitHandler } from 'react-hook-form';
@@ -19,6 +19,7 @@ import { useGetSymbolInfo } from "@/api/hooks/metrics";
 import { useCreateTradeMutation } from "@/api/hooks/trade-service";
 import { OpenTradeInput } from "@/api/schema/trade-service";
 import { StatusEnum } from "@/api/services/api";
+import { KeyboardAwareScrollView, KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
 
 // Complete web schema logic - exactly as your teammates have
 const getTradeFormSchema = (
@@ -110,6 +111,8 @@ const roundQuantity = (value: number) => {
 
 const TradingButtons = () => {
     const { t } = useTranslation();
+    const offset = { closed: 0, opened: -20 };
+
     const [selectedPositionType, setSelectedPositionType] = useState<PositionTypeEnum>(PositionTypeEnum.LONG);
     const [showSlTp, setShowSlTp] = useState(false);
     const [takeProfitType] = useState<TakeProfitSlTypeEnum | null>(null);
@@ -121,6 +124,8 @@ const TradingButtons = () => {
     const [priceFocused, setPriceFocused] = useState(false);
     const [tpFocused, setTpFocused] = useState(false);
     const [slFocused, setSlFocused] = useState(false);
+
+    const [quantitySelection, setQuantitySelection] = useState<{ start: number, end: number } | undefined>();
 
     const { selectedAccountId } = useAccounts();
     const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
@@ -309,33 +314,38 @@ const TradingButtons = () => {
     }
 
     const handleQuantityChange = (increment: number) => {
-        const currentQuantity = methods.getValues('quantity') || 0.01;
+        const currentQuantity = parseFloat(quantityText) || 0.01;
         const newValue = Math.max(0.01, currentQuantity + increment);
         const roundedValue = roundQuantity(newValue);
+        setQuantityText(roundedValue.toString());
         methods.setValue('quantity', roundedValue);
-        console.log('Quantity updated to:', roundedValue); // Debug log
-    }
+    };
+
 
     const handlePriceChange = (increment: number) => {
-        const currentPrice = methods.getValues('price') || 0.01;
+        const currentPrice = parseFloat(priceText) || 0.01;
         const newValue = Math.max(0.01, currentPrice + increment);
         const roundedValue = roundQuantity(newValue);
+        setPriceText(roundedValue.toString());
         methods.setValue('price', roundedValue);
-    }
+    };
 
     const handleTpChange = (increment: number) => {
-        const currentTp = methods.getValues('tp') || 0.01;
+        const currentTp = parseFloat(tpText) || 0.01;
         const newValue = Math.max(0.01, currentTp + increment);
         const roundedValue = roundQuantity(newValue);
+        setTpText(roundedValue.toString());
         methods.setValue('tp', roundedValue);
-    }
+    };
 
     const handleSlChange = (increment: number) => {
-        const currentSl = methods.getValues('sl') || 0.01;
+        const currentSl = parseFloat(slText) || 0.01;
         const newValue = Math.max(0.01, currentSl + increment);
         const roundedValue = roundQuantity(newValue);
+        setSlText(roundedValue.toString());
         methods.setValue('sl', roundedValue);
-    }
+    };
+
 
     // WEB LOGIC: TP/SL toggle - MATCH EXACTLY
     const handleTpSlToggle = (checked: boolean) => {
@@ -373,10 +383,10 @@ const TradingButtons = () => {
     const currentTp = methods.watch('tp') || 0.01;
     const currentSl = methods.watch('sl') || 0.01;
 
-    const [quantityText, setQuantityText] = useState(currentQuantity.toFixed(2));
-    const [priceText, setPriceText] = useState(currentPrice.toFixed(2));
-    const [tpText, setTpText] = useState(currentTp.toFixed(2));
-    const [slText, setSlText] = useState(currentSl.toFixed(2));
+    const [quantityText, setQuantityText] = useState('0.01');
+    const [priceText, setPriceText] = useState('0.01');
+    const [tpText, setTpText] = useState('0.01');
+    const [slText, setSlText] = useState('0.01');
 
     // Sync text states when form values change (from +/- buttons)
     useEffect(() => {
@@ -418,438 +428,466 @@ const TradingButtons = () => {
 
     return (
         <FormProvider {...methods}>
-            {/* FIXED: Remove Animated.View and use dynamic height based on content */}
-            <View className="bg-propfirmone-main rounded-lg px-2 m-2">
-                <View className="p-2">
-                    {/* Top row: Buy/Sell + conditionally show TP/SL checkbox + Close button */}
-                    <View className="flex-row items-center">
-                        {/* WEB MATCH: Dynamic width based on clickedPositionType state */}
-                        <View
-                            className={`flex-row gap-2 ${clickedPositionType ? 'flex-1' : 'w-full'}`}
-                        >
-                            <BuySellButtons
-                                buyButtonTitle={t('Buy')}
-                                sellButtonTitle={t('Sell')}
-                                selectedPositionType={selectedPositionType}
-                                onClickBuy={() => handlePositionSelect(PositionTypeEnum.LONG)}
-                                onClickSell={() => handlePositionSelect(PositionTypeEnum.SHORT)}
-                                isExpanded={clickedPositionType}
-                            />
+            {clickedPositionType ? (
+    <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+    >
+                    <View className="bg-propfirmone-main rounded-lg px-2 m-2">
+                        <View className="p-2">
+                            {/* Top row: Buy/Sell + conditionally show TP/SL checkbox + Close button */}
+                            <View className="flex-row items-center">
+                                {/* WEB MATCH: Dynamic width based on clickedPositionType state */}
+                                <View
+                                    className={`flex-row gap-2 ${clickedPositionType ? 'flex-1' : 'w-full'}`}
+                                >
+                                    <BuySellButtons
+                                        buyButtonTitle={t('Buy')}
+                                        sellButtonTitle={t('Sell')}
+                                        selectedPositionType={selectedPositionType}
+                                        onClickBuy={() => handlePositionSelect(PositionTypeEnum.LONG)}
+                                        onClickSell={() => handlePositionSelect(PositionTypeEnum.SHORT)}
+                                        isExpanded={clickedPositionType}
+                                    />
+                                </View>
+
+                                {/* WEB MATCH: Show controls only when expanded */}
+                                {clickedPositionType && (
+                                    <View className="flex-row items-center gap-3 ml-4">
+                                        <CheckBox
+                                            checked={showSlTp}
+                                            onPress={() => handleTpSlToggle(!showSlTp)}
+                                        />
+                                        <View className="w-px h-5 bg-gray-600" />
+                                        <TouchableOpacity onPress={handleClose}>
+                                            <X size={20} color='#898587' />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Expanded content - only show when clickedPositionType is true */}
+                            {clickedPositionType && (
+                                <>
+                                    {/* Order type buttons */}
+                                    <View className="flex-row gap-2 mt-3">
+                                        {Object.values(OrderTypeEnum).map((type) => (
+                                            <TouchableOpacity
+                                                key={type}
+                                                className={`flex-1 py-2 rounded-md items-center justify-center ${selectedOrderType === type
+                                                    ? 'bg-[#252223] border border-[#898587]'
+                                                    : 'bg-[#1A1819]'
+                                                    }`}
+                                                onPress={() => handleOrderTypeSelect(type)}
+                                                activeOpacity={0.8}
+                                                disabled={isPending}
+                                            >
+                                                <Text className={`text-sm font-InterSemiBold ${selectedOrderType === type ? 'text-white' : 'text-gray-400'
+                                                    }`}>
+                                                    {t(type.charAt(0).toUpperCase() + type.slice(1))}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    {/* Labels row */}
+                                    <View className="flex-row justify-between items-center mt-3">
+                                        {selectedOrderType === OrderTypeEnum.MARKET ? (
+                                            <>
+                                                <Text className="text-gray-400 text-sm font-Inter">
+                                                    {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
+                                                </Text>
+                                                <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text className="text-gray-400 text-sm font-Inter">
+                                                    {selectedOrderType === OrderTypeEnum.LIMIT ? t('Limit Price') : t('Stop Price')}
+                                                </Text>
+                                                <View className="flex-row gap-4">
+                                                    <Text className="text-gray-400 text-sm font-Inter">
+                                                        {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
+                                                    </Text>
+                                                    <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
+                                                </View>
+                                            </>
+                                        )}
+                                    </View>
+
+                                    {/* Input section */}
+                                    {selectedOrderType === OrderTypeEnum.MARKET ? (
+                                        // Market: Full-width quantity input only
+                                        <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-600/50">
+                                            <TouchableOpacity
+                                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                onPress={() => handleQuantityChange(-0.01)}
+                                                activeOpacity={0.8}
+                                                disabled={isPending}
+                                            >
+                                                <Minus size={16} strokeWidth={3} color='#898587' />
+                                            </TouchableOpacity>
+
+                                            <TextInput
+                                                className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(quantityText) > 0 ? 'text-white' : 'text-[#898587]'}`}
+                                                style={{
+                                                    borderColor: quantityFocused ? '#E74694' : 'transparent',
+                                                    borderWidth: quantityFocused ? 1 : 0,
+                                                }}
+                                                value={quantityText}
+                                                onFocus={() => setQuantityFocused(true)}
+                                                onBlur={() => {
+                                                    setQuantityFocused(false);
+                                                    // Only validate and set form value on blur
+                                                    const numValue = parseFloat(quantityText) || 0.01;
+                                                    const finalValue = Math.max(0.01, numValue);
+                                                    setQuantityText(finalValue.toString());
+                                                    methods.setValue('quantity', finalValue);
+                                                }}
+                                                onChangeText={(text) => {
+                                                    // Just update the display text, don't validate or set form values yet
+                                                    setQuantityText(text);
+                                                }}
+                                                keyboardType="numeric"
+                                                placeholder="0.01"
+                                                placeholderTextColor="#898587"
+                                                selectTextOnFocus={true}
+                                            />
+
+
+                                            <TouchableOpacity
+                                                className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                onPress={() => handleQuantityChange(0.01)}
+                                                activeOpacity={0.8}
+                                                disabled={isPending}
+                                            >
+                                                <Plus size={16} strokeWidth={3} color='#898587' />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        // Limit/Stop: Two inputs side by side
+                                        <View className="flex-row gap-2 mt-3">
+                                            {/* Price Input (Limit or Stop) */}
+                                            <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-600/50">
+                                                <TouchableOpacity
+                                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                    onPress={() => handlePriceChange(-0.01)}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Minus size={16} strokeWidth={3} color='#898587' />
+                                                </TouchableOpacity>
+
+                                                <TextInput
+                                                    className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(priceText) > 0 ? 'text-white' : 'text-[#898587]'}`}
+                                                    style={{
+                                                        borderColor: priceFocused ? '#E74694' : 'transparent',
+                                                        borderWidth: priceFocused ? 1 : 0,
+                                                    }}
+                                                    value={priceText}
+                                                    onFocus={() => setPriceFocused(true)}
+                                                    onBlur={() => {
+                                                        setPriceFocused(false);
+                                                        const numValue = parseFloat(priceText) || 0;
+                                                        const finalValue = Math.max(0, numValue);
+                                                        setPriceText(finalValue.toString());
+                                                        methods.setValue('price', finalValue);
+                                                    }}
+                                                    onChangeText={setPriceText} // Just update text, no validation
+                                                    keyboardType="numeric"
+                                                    placeholder="0.01"
+                                                    placeholderTextColor="#898587"
+                                                    selectTextOnFocus={true}
+                                                />
+
+                                                <TouchableOpacity
+                                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                    onPress={() => handlePriceChange(0.01)}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Plus size={16} strokeWidth={3} color='#898587' />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            {/* Quantity Input */}
+                                            <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-600/50">
+                                                <TouchableOpacity
+                                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                    onPress={() => handleQuantityChange(-0.01)}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Minus size={16} strokeWidth={3} color='#898587' />
+                                                </TouchableOpacity>
+
+                                                <TextInput
+                                                    className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(quantityText) > 0 ? 'text-white' : 'text-[#898587]'}`}
+                                                    style={{
+                                                        borderColor: quantityFocused ? '#E74694' : 'transparent',
+                                                        borderWidth: quantityFocused ? 1 : 0,
+                                                    }}
+                                                    value={quantityText}
+                                                    onFocus={() => setQuantityFocused(true)}
+                                                    onBlur={() => {
+                                                        setQuantityFocused(false);
+                                                        // Only validate and set form value on blur
+                                                        const numValue = parseFloat(quantityText) || 0.01;
+                                                        const finalValue = Math.max(0.01, numValue);
+                                                        setQuantityText(finalValue.toString());
+                                                        methods.setValue('quantity', finalValue);
+                                                    }}
+                                                    onChangeText={(text) => {
+                                                        // Just update the display text, don't validate or set form values yet
+                                                        setQuantityText(text);
+                                                    }}
+                                                    keyboardType="numeric"
+                                                    placeholder="0.01"
+                                                    placeholderTextColor="#898587"
+                                                    selectTextOnFocus={true}
+                                                />
+
+
+                                                <TouchableOpacity
+                                                    className="bg-[#1A1819] py-3 px-4 items-center justify-center"
+                                                    onPress={() => handleQuantityChange(0.01)}
+                                                    activeOpacity={0.8}
+                                                    disabled={isPending}
+                                                >
+                                                    <Plus size={16} strokeWidth={3} color='#898587' />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* TP/SL inputs - only show when checkbox is checked */}
+                                    {showSlTp && (
+                                        <View className="flex-row gap-2 mt-3">
+                                            {/* Take Profit Section */}
+                                            <View className="flex-1">
+                                                <Text className="text-white text-sm font-Inter mb-2">{t('Take Profit (TP)')}</Text>
+                                                <View className="bg-[#1A1819] border border-gray-600/50 rounded-md">
+                                                    <View className="flex-row items-center">
+                                                        <TouchableOpacity
+                                                            className="py-3 px-3"
+                                                            onPress={() => handleTpChange(-0.01)}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Minus size={12} color='#898587' />
+                                                        </TouchableOpacity>
+
+                                                        <TextInput
+                                                            className={`flex-1 text-center text-sm font-Inter py-3 ${parseFloat(tpText) > 0 ? 'text-white' : 'text-[#898587]'}`}
+                                                            style={{
+                                                                borderColor: tpFocused ? '#E74694' : 'transparent',
+                                                                borderWidth: tpFocused ? 1 : 0,
+                                                                borderRadius: 4,
+                                                            }}
+                                                            value={tpText}
+                                                            onFocus={() => setTpFocused(true)}
+                                                            onBlur={() => {
+                                                                setTpFocused(false);
+                                                                const numValue = parseFloat(tpText) || 0;
+                                                                const finalValue = Math.max(0, numValue);
+                                                                setTpText(finalValue.toString());
+                                                                methods.setValue('tp', finalValue);
+                                                            }}
+                                                            onChangeText={setTpText} // Just update text, no validation
+                                                            keyboardType="numeric"
+                                                            placeholder="0.01"
+                                                            placeholderTextColor="#898587"
+                                                            selectTextOnFocus={true}
+                                                        />
+
+
+                                                        <TouchableOpacity
+                                                            className="py-3 px-3"
+                                                            onPress={() => handleTpChange(0.01)}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Plus size={12} color='#898587' />
+                                                        </TouchableOpacity>
+
+                                                        <View className="w-px h-5 bg-gray-600 mx-2" />
+
+                                                        <TouchableOpacity
+                                                            className="flex-row items-center gap-1 pr-3"
+                                                            onPress={openTakeProfitBottomSheet}
+                                                            activeOpacity={0.8}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Text className="text-[#898587] text-sm font-Inter">
+                                                                {takeProfitType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
+                                                            </Text>
+                                                            <ChevronDown size={16} color='#898587' />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            {/* Stop Loss Section */}
+                                            <View className="flex-1">
+                                                <Text className="text-white text-sm font-Inter mb-2">{t('Stop Loss (SL)')}</Text>
+                                                <View className="bg-[#1A1819] border border-gray-600/50 rounded-md">
+                                                    <View className="flex-row items-center">
+                                                        <TouchableOpacity
+                                                            className="py-3 px-3"
+                                                            onPress={() => handleSlChange(-0.01)}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Minus size={12} color='#898587' />
+                                                        </TouchableOpacity>
+
+                                                        <TextInput
+                                                            className={`flex-1 text-center text-sm font-Inter py-3 ${parseFloat(slText) > 0 ? 'text-white' : 'text-[#898587]'}`}
+                                                            style={{
+                                                                borderColor: slFocused ? '#E74694' : 'transparent',
+                                                                borderWidth: slFocused ? 1 : 0,
+                                                                borderRadius: 4,
+                                                            }}
+                                                            value={slText}
+                                                            onFocus={() => setSlFocused(true)}
+                                                            onBlur={() => {
+                                                                setSlFocused(false);
+                                                                const numValue = parseFloat(slText) || 0;
+                                                                const finalValue = Math.max(0, numValue);
+                                                                setSlText(finalValue.toString());
+                                                                methods.setValue('sl', finalValue);
+                                                            }}
+                                                            onChangeText={setSlText} // Just update text, no validation
+                                                            keyboardType="numeric"
+                                                            placeholder="0.01"
+                                                            placeholderTextColor="#898587"
+                                                            selectTextOnFocus={true}
+                                                        />
+
+
+                                                        <TouchableOpacity
+                                                            className="py-3 px-3"
+                                                            onPress={() => handleSlChange(0.01)}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Plus size={12} color='#898587' />
+                                                        </TouchableOpacity>
+
+                                                        <View className="w-px h-5 bg-gray-600 mx-2" />
+
+                                                        <TouchableOpacity
+                                                            className="flex-row items-center gap-1 pr-3"
+                                                            onPress={openStopLossBottomSheet}
+                                                            activeOpacity={0.8}
+                                                            disabled={isPending}
+                                                        >
+                                                            <Text className="text-[#898587] text-sm font-Inter">
+                                                                {stopLossType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
+                                                            </Text>
+                                                            <ChevronDown size={16} color='#898587' />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* Submit Button - Now positioned normally in the flow */}
+                                    <TouchableOpacity
+                                        className={`py-3 rounded-md items-center justify-center w-full mt-4 ${selectedPositionType === PositionTypeEnum.LONG ? 'bg-[#31C48D]' : 'bg-red-500'
+                                            }`}
+                                        onPress={() => methods.handleSubmit(onSubmit)()}
+                                        activeOpacity={0.8}
+                                        disabled={isPending}
+                                    >
+                                        {isPending ? (
+                                            <View className="flex-row items-center">
+                                                <Loader2 size={16} color='#000' className="mr-2" />
+                                                <Text className="text-[#000] text-base font-InterMedium ml-2">
+                                                    {t('Processing...')}
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text className="text-[#000] text-base font-InterMedium">
+                                                {selectedPositionType === PositionTypeEnum.LONG
+                                                    ? selectedOrderType === OrderTypeEnum.LIMIT
+                                                        ? t('Buy Limit')
+                                                        : selectedOrderType === OrderTypeEnum.STOP
+                                                            ? t('Buy Stop')
+                                                            : t('Buy')
+                                                    : selectedOrderType === OrderTypeEnum.LIMIT
+                                                        ? t('Sell Limit')
+                                                        : selectedOrderType === OrderTypeEnum.STOP
+                                                            ? t('Sell Stop')
+                                                            : t('Sell')
+                                                }
+                                                {buyAtValue}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </>
+                            )}
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            ) : (
+                // When collapsed - normal view (stays at bottom)
+                <View className="bg-propfirmone-main rounded-lg px-2 m-2">
+                    <View className="p-2">
+                        {/* Top row: Buy/Sell + conditionally show TP/SL checkbox + Close button */}
+                        <View className="flex-row items-center">
+                            {/* WEB MATCH: Dynamic width based on clickedPositionType state */}
+                            <View
+                                className={`flex-row gap-2 ${clickedPositionType ? 'flex-1' : 'w-full'}`}
+                            >
+                                <BuySellButtons
+                                    buyButtonTitle={t('Buy')}
+                                    sellButtonTitle={t('Sell')}
+                                    selectedPositionType={selectedPositionType}
+                                    onClickBuy={() => handlePositionSelect(PositionTypeEnum.LONG)}
+                                    onClickSell={() => handlePositionSelect(PositionTypeEnum.SHORT)}
+                                    isExpanded={clickedPositionType}
+                                />
+                            </View>
+
+                            {/* WEB MATCH: Show controls only when expanded */}
+                            {clickedPositionType && (
+                                <View className="flex-row items-center gap-3 ml-4">
+                                    <CheckBox
+                                        checked={showSlTp}
+                                        onPress={() => handleTpSlToggle(!showSlTp)}
+                                    />
+                                    <View className="w-px h-5 bg-gray-600" />
+                                    <TouchableOpacity onPress={handleClose}>
+                                        <X size={20} color='#898587' />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </View>
 
-                        {/* WEB MATCH: Show controls only when expanded */}
+                        {/* Expanded content - only show when clickedPositionType is true */}
                         {clickedPositionType && (
-                            <View className="flex-row items-center gap-3 ml-4">
-                                <CheckBox
-                                    checked={showSlTp}
-                                    onPress={() => handleTpSlToggle(!showSlTp)}
-                                />
-                                <View className="w-px h-5 bg-gray-600" />
-                                <TouchableOpacity onPress={handleClose}>
-                                    <X size={20} color='#898587' />
-                                </TouchableOpacity>
-                            </View>
+                            <>
+                                {/* Note: This section won't render in collapsed state, 
+                                 but keeping structure consistent */}
+                            </>
                         )}
                     </View>
 
-                    {/* Expanded content - only show when clickedPositionType is true */}
-                    {clickedPositionType && (
-                        <>
-                            {/* Order type buttons */}
-                            <View className="flex-row gap-2 mt-3">
-                                {Object.values(OrderTypeEnum).map((type) => (
-                                    <TouchableOpacity
-                                        key={type}
-                                        className={`flex-1 py-2 rounded-md items-center justify-center ${selectedOrderType === type
-                                            ? 'bg-[#252223] border border-[#898587]'
-                                            : 'bg-[#1A1819]'
-                                            }`}
-                                        onPress={() => handleOrderTypeSelect(type)}
-                                        activeOpacity={0.8}
-                                        disabled={isPending}
-                                    >
-                                        <Text className={`text-sm font-InterSemiBold ${selectedOrderType === type ? 'text-white' : 'text-gray-400'
-                                            }`}>
-                                            {t(type.charAt(0).toUpperCase() + type.slice(1))}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+                    {/* Bottom Sheets */}
+                    <TPBottomSheet
+                        ref={takeProfitBottomSheetRef}
+                        onClose={closeTakeProfitBottomSheet}
+                        selectedType={takeProfitType || TakeProfitSlTypeEnum.PRICE}
+                        onTypeSelect={handleTakeProfitTypeSelect}
+                        isStopLoss={false}
+                    />
 
-                            {/* Labels row */}
-                            <View className="flex-row justify-between items-center mt-3">
-                                {selectedOrderType === OrderTypeEnum.MARKET ? (
-                                    <>
-                                        <Text className="text-gray-400 text-sm font-Inter">
-                                            {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
-                                        </Text>
-                                        <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Text className="text-gray-400 text-sm font-Inter">
-                                            {selectedOrderType === OrderTypeEnum.LIMIT ? t('Limit Price') : t('Stop Price')}
-                                        </Text>
-                                        <View className="flex-row gap-4">
-                                            <Text className="text-gray-400 text-sm font-Inter">
-                                                {t('Contracts')}: <Text className="text-white font-Inter">{formatToK(symbolInfo?.contract_size ?? 1)}</Text>
-                                            </Text>
-                                            <Text className="text-white text-sm font-Inter">{t('Quantity')} ({t('lots')})</Text>
-                                        </View>
-                                    </>
-                                )}
-                            </View>
-
-                            {/* Input section */}
-                            {selectedOrderType === OrderTypeEnum.MARKET ? (
-                                // Market: Full-width quantity input only
-                                <View className="flex-row items-center rounded-md overflow-hidden mt-3 bg-[#1A1819] border border-gray-600/50">
-                                    <TouchableOpacity
-                                        className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                        onPress={() => handleQuantityChange(-0.01)}
-                                        activeOpacity={0.8}
-                                        disabled={isPending}
-                                    >
-                                        <Minus size={16} strokeWidth={3} color='#898587' />
-                                    </TouchableOpacity>
-
-                                    <TextInput
-                                        className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(quantityText) > 0 ? 'text-white' : 'text-[#898587]'}`}
-                                        style={{
-                                            borderColor: quantityFocused ? '#E74694' : 'transparent',
-                                            borderWidth: quantityFocused ? 1 : 0,
-                                        }}
-                                        value={quantityText}
-                                        onFocus={() => setQuantityFocused(true)}
-                                        onBlur={() => {
-                                            setQuantityFocused(false);
-                                            // Your existing onBlur logic
-                                            const numValue = parseFloat(quantityText) || 0.01;
-                                            const finalValue = Math.max(0.01, numValue);
-                                            methods.setValue('quantity', finalValue);
-                                            setQuantityText(finalValue.toFixed(2));
-                                        }}
-                                        onChangeText={(text) => {
-                                            setQuantityText(text);
-                                            const numValue = parseFloat(text);
-                                            if (!isNaN(numValue) && numValue > 0) {
-                                                methods.setValue('quantity', numValue);
-                                            }
-                                        }}
-                                        keyboardType="numeric"
-                                        placeholder="0.01"
-                                        placeholderTextColor="#898587"
-                                        selectTextOnFocus={true}
-                                    />
-
-                                    <TouchableOpacity
-                                        className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                        onPress={() => handleQuantityChange(0.01)}
-                                        activeOpacity={0.8}
-                                        disabled={isPending}
-                                    >
-                                        <Plus size={16} strokeWidth={3} color='#898587' />
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                // Limit/Stop: Two inputs side by side
-                                <View className="flex-row gap-2 mt-3">
-                                    {/* Price Input (Limit or Stop) */}
-                                    <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-600/50">
-                                        <TouchableOpacity
-                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                            onPress={() => handlePriceChange(-0.01)}
-                                            activeOpacity={0.8}
-                                            disabled={isPending}
-                                        >
-                                            <Minus size={16} strokeWidth={3} color='#898587' />
-                                        </TouchableOpacity>
-
-                                        <TextInput
-                                            className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(priceText) > 0 ? 'text-white' : 'text-[#898587]'}`}
-                                            style={{
-                                                borderColor: priceFocused ? '#E74694' : 'transparent',
-                                                borderWidth: priceFocused ? 1 : 0,
-                                            }}
-                                            value={priceText}
-                                            onFocus={() => setPriceFocused(true)}
-                                            onBlur={() => {
-                                                setPriceFocused(false);
-                                                const numValue = parseFloat(priceText) || 0;
-                                                const finalValue = Math.max(0, numValue);
-                                                methods.setValue('price', finalValue);
-                                                setPriceText(finalValue.toFixed(2));
-                                            }}
-                                            onChangeText={(text) => {
-                                                setPriceText(text);
-                                                const numValue = parseFloat(text);
-                                                if (!isNaN(numValue) && numValue >= 0) {
-                                                    methods.setValue('price', numValue);
-                                                }
-                                            }}
-                                            keyboardType="numeric"
-                                            placeholder="0.01"
-                                            placeholderTextColor="#898587"
-                                            selectTextOnFocus={true}
-                                        />
-
-                                        <TouchableOpacity
-                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                            onPress={() => handlePriceChange(0.01)}
-                                            activeOpacity={0.8}
-                                            disabled={isPending}
-                                        >
-                                            <Plus size={16} strokeWidth={3} color='#898587' />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    {/* Quantity Input */}
-                                    <View className="flex-1 flex-row items-center rounded-md overflow-hidden bg-[#1A1819] border border-gray-600/50">
-                                        <TouchableOpacity
-                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                            onPress={() => handleQuantityChange(-0.01)}
-                                            activeOpacity={0.8}
-                                            disabled={isPending}
-                                        >
-                                            <Minus size={16} strokeWidth={3} color='#898587' />
-                                        </TouchableOpacity>
-
-
-                                        <TextInput
-                                            className={`bg-[#1A1819] flex-1 text-center py-3 text-base font-Inter ${parseFloat(quantityText) > 0 ? 'text-white' : 'text-[#898587]'}`}
-                                            style={{
-                                                borderColor: quantityFocused ? '#E74694' : 'transparent',
-                                                borderWidth: quantityFocused ? 1 : 0,
-                                            }}
-                                            value={quantityText}
-                                            onFocus={() => setQuantityFocused(true)}
-                                            onBlur={() => {
-                                                setQuantityFocused(false);
-                                                // Your existing onBlur logic
-                                                const numValue = parseFloat(quantityText) || 0.01;
-                                                const finalValue = Math.max(0.01, numValue);
-                                                methods.setValue('quantity', finalValue);
-                                                setQuantityText(finalValue.toFixed(2));
-                                            }}
-                                            onChangeText={(text) => {
-                                                setQuantityText(text);
-                                                const numValue = parseFloat(text);
-                                                if (!isNaN(numValue) && numValue > 0) {
-                                                    methods.setValue('quantity', numValue);
-                                                }
-                                            }}
-                                            keyboardType="numeric"
-                                            placeholder="0.01"
-                                            placeholderTextColor="#898587"
-                                            selectTextOnFocus={true}
-                                        />
-
-                                        <TouchableOpacity
-                                            className="bg-[#1A1819] py-3 px-4 items-center justify-center"
-                                            onPress={() => handleQuantityChange(0.01)}
-                                            activeOpacity={0.8}
-                                            disabled={isPending}
-                                        >
-                                            <Plus size={16} strokeWidth={3} color='#898587' />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* TP/SL inputs - only show when checkbox is checked */}
-                            {showSlTp && (
-                                <View className="flex-row gap-2 mt-3">
-                                    {/* Take Profit Section */}
-                                    <View className="flex-1">
-                                        <Text className="text-white text-sm font-Inter mb-2">{t('Take Profit (TP)')}</Text>
-                                        <View className="bg-[#1A1819] border border-gray-600/50 rounded-md">
-                                            <View className="flex-row items-center">
-                                                <TouchableOpacity
-                                                    className="py-3 px-3"
-                                                    onPress={() => handleTpChange(-0.01)}
-                                                    disabled={isPending}
-                                                >
-                                                    <Minus size={12} color='#898587' />
-                                                </TouchableOpacity>
-
-                                                <TextInput
-                                                    className={`flex-1 text-center text-sm font-Inter py-3 ${parseFloat(tpText) > 0 ? 'text-white' : 'text-[#898587]'}`}
-                                                    style={{
-                                                        borderColor: tpFocused ? '#E74694' : 'transparent',
-                                                        borderWidth: tpFocused ? 1 : 0,
-                                                        borderRadius: 4,
-                                                    }}
-                                                    value={tpText}
-                                                    onFocus={() => setTpFocused(true)}
-                                                    onBlur={() => {
-                                                        setTpFocused(false);
-                                                        const numValue = parseFloat(tpText) || 0;
-                                                        const finalValue = Math.max(0, numValue);
-                                                        methods.setValue('tp', finalValue);
-                                                        setTpText(finalValue.toFixed(2));
-                                                    }}
-                                                    onChangeText={(text) => {
-                                                        setTpText(text);
-                                                        const numValue = parseFloat(text);
-                                                        if (!isNaN(numValue) && numValue >= 0) {
-                                                            methods.setValue('tp', numValue);
-                                                        }
-                                                    }}
-                                                    keyboardType="numeric"
-                                                    placeholder="0.01"
-                                                    placeholderTextColor="#898587"
-                                                    selectTextOnFocus={true}
-                                                />
-
-                                                <TouchableOpacity
-                                                    className="py-3 px-3"
-                                                    onPress={() => handleTpChange(0.01)}
-                                                    disabled={isPending}
-                                                >
-                                                    <Plus size={12} color='#898587' />
-                                                </TouchableOpacity>
-
-                                                <View className="w-px h-5 bg-gray-600 mx-2" />
-
-                                                <TouchableOpacity
-                                                    className="flex-row items-center gap-1 pr-3"
-                                                    onPress={openTakeProfitBottomSheet}
-                                                    activeOpacity={0.8}
-                                                    disabled={isPending}
-                                                >
-                                                    <Text className="text-[#898587] text-sm font-Inter">
-                                                        {takeProfitType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
-                                                    </Text>
-                                                    <ChevronDown size={16} color='#898587' />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    {/* Stop Loss Section */}
-                                    <View className="flex-1">
-                                        <Text className="text-white text-sm font-Inter mb-2">{t('Stop Loss (SL)')}</Text>
-                                        <View className="bg-[#1A1819] border border-gray-600/50 rounded-md">
-                                            <View className="flex-row items-center">
-                                                <TouchableOpacity
-                                                    className="py-3 px-3"
-                                                    onPress={() => handleSlChange(-0.01)}
-                                                    disabled={isPending}
-                                                >
-                                                    <Minus size={12} color='#898587' />
-                                                </TouchableOpacity>
-
-                                                <TextInput
-                                                    className={`flex-1 text-center text-sm font-Inter py-3 ${parseFloat(slText) > 0 ? 'text-white' : 'text-[#898587]'}`}
-                                                    style={{
-                                                        borderColor: slFocused ? '#E74694' : 'transparent',
-                                                        borderWidth: slFocused ? 1 : 0,
-                                                        borderRadius: 4,
-                                                    }}
-                                                    value={slText}
-                                                    onFocus={() => setSlFocused(true)}
-                                                    onBlur={() => {
-                                                        setSlFocused(false);
-                                                        const numValue = parseFloat(slText) || 0;
-                                                        const finalValue = Math.max(0, numValue);
-                                                        methods.setValue('sl', finalValue);
-                                                        setSlText(finalValue.toFixed(2));
-                                                    }}
-                                                    onChangeText={(text) => {
-                                                        setSlText(text);
-                                                        const numValue = parseFloat(text);
-                                                        if (!isNaN(numValue) && numValue >= 0) {
-                                                            methods.setValue('sl', numValue);
-                                                        }
-                                                    }}
-                                                    keyboardType="numeric"
-                                                    placeholder="0.01"
-                                                    placeholderTextColor="#898587"
-                                                    selectTextOnFocus={true}
-                                                />
-
-                                                <TouchableOpacity
-                                                    className="py-3 px-3"
-                                                    onPress={() => handleSlChange(0.01)}
-                                                    disabled={isPending}
-                                                >
-                                                    <Plus size={12} color='#898587' />
-                                                </TouchableOpacity>
-
-                                                <View className="w-px h-5 bg-gray-600 mx-2" />
-
-                                                <TouchableOpacity
-                                                    className="flex-row items-center gap-1 pr-3"
-                                                    onPress={openStopLossBottomSheet}
-                                                    activeOpacity={0.8}
-                                                    disabled={isPending}
-                                                >
-                                                    <Text className="text-[#898587] text-sm font-Inter">
-                                                        {stopLossType === TakeProfitSlTypeEnum.PIPS ? t('Pips') : t('Price')}
-                                                    </Text>
-                                                    <ChevronDown size={16} color='#898587' />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Submit Button - Now positioned normally in the flow */}
-                            <TouchableOpacity
-                                className={`py-3 rounded-md items-center justify-center w-full mt-4 ${selectedPositionType === PositionTypeEnum.LONG ? 'bg-[#31C48D]' : 'bg-red-500'
-                                    }`}
-                                onPress={() => methods.handleSubmit(onSubmit)()}
-                                activeOpacity={0.8}
-                                disabled={isPending}
-                            >
-                                {isPending ? (
-                                    <View className="flex-row items-center">
-                                        <Loader2 size={16} color='#000' className="mr-2" />
-                                        <Text className="text-[#000] text-base font-InterMedium ml-2">
-                                            {t('Processing...')}
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <Text className="text-[#000] text-base font-InterMedium">
-                                        {selectedPositionType === PositionTypeEnum.LONG
-                                            ? selectedOrderType === OrderTypeEnum.LIMIT
-                                                ? t('Buy Limit')
-                                                : selectedOrderType === OrderTypeEnum.STOP
-                                                    ? t('Buy Stop')
-                                                    : t('Buy')
-                                            : selectedOrderType === OrderTypeEnum.LIMIT
-                                                ? t('Sell Limit')
-                                                : selectedOrderType === OrderTypeEnum.STOP
-                                                    ? t('Sell Stop')
-                                                    : t('Sell')
-                                        }
-                                        {buyAtValue}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        </>
-                    )}
+                    <TPBottomSheet
+                        ref={stopLossBottomSheetRef}
+                        onClose={closeStopLossBottomSheet}
+                        selectedType={stopLossType || TakeProfitSlTypeEnum.PRICE}
+                        onTypeSelect={handleStopLossTypeSelect}
+                        isStopLoss={true}
+                    />
                 </View>
-
-                {/* Bottom Sheets */}
-                <TPBottomSheet
-                    ref={takeProfitBottomSheetRef}
-                    onClose={closeTakeProfitBottomSheet}
-                    selectedType={takeProfitType || TakeProfitSlTypeEnum.PRICE}
-                    onTypeSelect={handleTakeProfitTypeSelect}
-                    isStopLoss={false}
-                />
-
-                <TPBottomSheet
-                    ref={stopLossBottomSheetRef}
-                    onClose={closeStopLossBottomSheet}
-                    selectedType={stopLossType || TakeProfitSlTypeEnum.PRICE}
-                    onTypeSelect={handleStopLossTypeSelect}
-                    isStopLoss={true}
-                />
-
-            </View>
+            )}
         </FormProvider>
     );
 };

@@ -2,7 +2,7 @@
   "expo": {
     "name": "PropFirmMatch Trading",
     "slug": "prop-firm-one",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -20,7 +20,8 @@
         "NSPhotoLibraryAddUsageDescription": "This app needs access to save trading screenshots to your photo library",
         "NSPhotoLibraryUsageDescription": "This app needs access to save trading screenshots to your photo library",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "292S5A9L2S"
     },
     "android": {
       "adaptiveIcon": {
