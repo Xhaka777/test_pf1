@@ -385,7 +385,7 @@ export function TradingPrices() {
                     <SearchIcon />
                     <TextInput
                         ref={searchInputRef}
-                        className="flex-1 ml-2 text-lg font-Inter"
+                        className="flex-1 ml-2 text-lg font-Inter text-white"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder={t('Search')}

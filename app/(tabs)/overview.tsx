@@ -24,6 +24,8 @@ import AccountBottomSheet from '@/components/AccountBottomSheet';
 import { useGetMetrics } from '@/api/hooks/metrics';
 import { useAccounts } from '@/providers/accounts';
 import { useGetAccountDetails } from '@/api/hooks/account-details';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { OverviewAccountType, overviewAccountTypeAtom, overviewSelectedTabAtom } from '@/atoms/overview-atoms';
 
 export enum DashboardAccountType {
   PROP_FIRM = 'propfirm',
@@ -34,9 +36,11 @@ const Overview = () => {
   const { user } = useUser();
   const bottomSheetRef = useRef<AccountSelectorRef>(null);
 
-  const [selectedAccountType, setSelectedAccountType] = useState<'evaluation' | 'funded' | 'live' | 'demo'>('evaluation');
+  const [selectedAccountType, setSelectedAccountType] = useAtom(overviewSelectedTabAtom);
+  const setOverviewAccountType = useSetAtom(overviewAccountTypeAtom);
+  const overviewAccountType = useAtomValue(overviewAccountTypeAtom);
   const [selectedSubAccount, setSelectedSubAccount] = useState<'evaluation' | 'funded'>('evaluation');
-  const [selectedAccountTypeCategory, setSelectedAccountTypeCategory] = useState<'propFirm' | 'brokerage' | 'practice'>('propFirm');
+  const [selectedAccountTypeCategory, setSelectedAccountTypeCategory] = useState<'propfirm' | 'brokerage' | 'practice'>('propfirm');
 
   const [bottomSheetAccountData, setBottomSheetAccountData] = useState<any>(null);
 
@@ -46,14 +50,14 @@ const Overview = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (selectedAccountType === 'evaluation' || selectedAccountType === 'funded') {
-      setSelectedAccountTypeCategory('propFirm');
-    } else if (selectedAccountType === 'live') {
-      setSelectedAccountTypeCategory('brokerage');
-    } else if (selectedAccountType === 'demo') {
-      setSelectedAccountTypeCategory('practice');
+    if (selectedAccountType === AccountTypeEnum.EVALUATION ||
+      selectedAccountType === AccountTypeEnum.FUNDED) {
+      setOverviewAccountType(OverviewAccountType.PROPFIRM);
+    } else if (selectedAccountType === AccountTypeEnum.LIVE ||
+      selectedAccountType === AccountTypeEnum.DEMO) {
+      setOverviewAccountType(OverviewAccountType.OWNBROKER);
     }
-  }, [selectedAccountType]);
+  }, [selectedAccountType, setOverviewAccountType]);
 
   const {
     data: propFirmAccountsData,
@@ -61,7 +65,7 @@ const Overview = () => {
     error: propFirmAccountsError,
     refetch: refetchPropFirmAccounts
   } = useGetPropFirmAccounts({
-    enabled: selectedAccountTypeCategory === 'propFirm',
+    enabled: overviewAccountType === OverviewAccountType.PROPFIRM,
   });
 
   const {
@@ -69,7 +73,9 @@ const Overview = () => {
     isLoading: brokerAccountsLoading,
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
-  } = useGetBrokerAccounts();
+  } = useGetBrokerAccounts({
+    enabled: overviewAccountType === OverviewAccountType.OWNBROKER,
+  });
 
   const {
     selectedAccountId,
@@ -207,7 +213,10 @@ const Overview = () => {
 
   // ⚙️ Process prop firm accounts like in Menu.tsx
   const processedPropFirmAccounts = useMemo(() => {
-    if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
+    if (overviewAccountType !== OverviewAccountType.PROPFIRM ||
+      !propFirmAccountsData?.prop_firm_accounts) {
+      return { evaluation: [], funded: [] };
+    }
 
     const processedAccounts = propFirmAccountsData.prop_firm_accounts.map((account: any) => {
       const totalGainLoss = account.balance - account.starting_balance;
@@ -241,7 +250,10 @@ const Overview = () => {
   }, [propFirmAccountsData]);
 
   const processedBrokerAccounts = useMemo(() => {
-    if (!brokerAccountsData?.broker_accounts) return { live: [], demo: [] };
+    if (overviewAccountType !== OverviewAccountType.OWNBROKER ||
+      !brokerAccountsData?.broker_accounts) {
+      return { broker: [], demo: [] };
+    }
 
     const processedAccounts = brokerAccountsData.broker_accounts.map((account: any) => {
       const totalGainLoss = account.balance - account.starting_balance;
@@ -255,7 +267,7 @@ const Overview = () => {
         balance: account.balance, // Use the actual balance, not string
         dailyPL: account.daily_pl,
         changePercentage: totalPerformancePercentage,
-        type: account.account_type === 'broker' ? 'Live' : 'Demo', // Map broker to Live
+        type: (account.account_type === 'broker' || account.account_type === 'live') ? 'Live' : 'Demo',
         currency: account.currency || 'USD',
         firm: account.firm,
         exchange: account.exchange,
@@ -268,7 +280,7 @@ const Overview = () => {
     });
 
     return {
-      live: processedAccounts.filter(acc => acc.originalData.account_type === 'broker' || acc.originalData.account_type === 'live'),
+      broker: processedAccounts.filter(acc => acc.originalData.account_type === 'broker' || acc.originalData.account_type === 'live'),
       demo: processedAccounts.filter(acc => acc.originalData.account_type === 'demo')
     };
   }, [brokerAccountsData]);
@@ -281,7 +293,7 @@ const Overview = () => {
   const getAccountData = (type: string) => {
     if (type === 'evaluation') return processedPropFirmAccounts.evaluation?.[0] ?? {};
     if (type === 'funded') return processedPropFirmAccounts.funded?.[0] ?? {};
-    if (type === 'live') return processedBrokerAccounts.live?.[0] ?? {};
+    if (type === 'broker') return processedBrokerAccounts.broker?.[0] ?? {};
     if (type === 'demo') return processedBrokerAccounts.demo?.[0] ?? {};
     return {};
   };
@@ -292,18 +304,16 @@ const Overview = () => {
     return {
       evaluation: processedPropFirmAccounts.evaluation.length,
       funded: processedPropFirmAccounts.funded.length,
-      live: processedBrokerAccounts.live.length,
+      broker: processedBrokerAccounts.broker.length,
       demo: processedBrokerAccounts.demo.length,
     };
   }, [processedPropFirmAccounts, processedBrokerAccounts]);
 
   const handleAccountSelect = (accountId: string) => {
     console.log('[Overview] Account selected:', accountId);
-    setSelectedAccountType(accountId as 'evaluation' | 'funded' | 'live' | 'demo');
-    if (accountId === 'evaluation' || accountId === 'funded') {
-      setSelectedSubAccount(accountId as 'evaluation' | 'funded');
-    }
+    setSelectedAccountType(accountId as AccountTypeEnum);
   };
+
 
   const openAccountSelector = () => {
     bottomSheetRef.current?.expand();
@@ -321,7 +331,7 @@ const Overview = () => {
             { id: 'funded', text: 'Funded' }
           ]
         };
-      case 'live':
+      case 'broker':
         return {
           title: 'Brokerage Account',
           showSubButtons: false,
@@ -381,81 +391,81 @@ const Overview = () => {
   }, []);
 
   // Render the "No Accounts" content for prop firm accounts
-const renderNoPropFirmAccountsContent = () => {
-  const getAccountTypeInfo = () => {
-    switch (selectedAccountType) {
-      case 'evaluation':
-        return { title: 'Evaluation', type: 'evaluation' };
-      case 'funded':
-        return { title: 'Funded', type: 'funded' };
-      case 'live':
-        return { title: 'Live', type: 'live' };
-      case 'demo':
-        return { title: 'Demo', type: 'demo' };
-      default:
-        return { title: 'Evaluation', type: 'evaluation' };
-    }
+  const renderNoPropFirmAccountsContent = () => {
+    const getAccountTypeInfo = () => {
+      switch (selectedAccountType) {
+        case 'evaluation':
+          return { title: 'Evaluation', type: 'evaluation' };
+        case 'funded':
+          return { title: 'Funded', type: 'funded' };
+        case 'broker':
+          return { title: 'Live', type: 'broker' };
+        case 'demo':
+          return { title: 'Demo', type: 'demo' };
+        default:
+          return { title: 'Evaluation', type: 'evaluation' };
+      }
+    };
+
+    const accountTypeInfo = getAccountTypeInfo();
+
+    return (
+      <View className='flex-1 justify-center items-center px-6 py-10'>
+        <View className='mb-4'>
+          <Image
+            source={images.results}
+            className='w-38 h-38'
+            resizeMode='contain'
+          />
+        </View>
+        <Text className='text-white text-2xl font-Inter text-center mb-2'>
+          No {accountTypeInfo.title} Accounts
+        </Text>
+        <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
+          You don't have any {accountTypeInfo.type} accounts yet. Please add a new account in order to start trading.
+        </Text>
+
+        <LinearGradient
+          colors={['#9061F919', '#E7469419']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className='rounded-lg p-4 mb-6'
+          style={{ borderRadius: 8 }}
+        >
+          <Text className='text-white text-sm text-center font-Inter p-4'>
+            Please note that adding new accounts is only available on the desktop version.
+            To create a new account, please use the desktop application.
+          </Text>
+        </LinearGradient>
+      </View>
+    );
   };
 
-  const accountTypeInfo = getAccountTypeInfo();
+  const shouldShowAccountCards = () => {
+    if (selectedAccountType === 'evaluation') {
+      return accountCounts.evaluation > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+    } else if (selectedAccountType === 'funded') {
+      return accountCounts.funded > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+    } else if (selectedAccountType === 'broker') {
+      return accountCounts.broker > 0 && !brokerAccountsLoading && !brokerAccountsError;
+    } else if (selectedAccountType === 'demo') {
+      return accountCounts.demo > 0 && !brokerAccountsLoading && !brokerAccountsError;
+    }
+    return false;
+  };
 
-  return (
-    <View className='flex-1 justify-center items-center px-6 py-10'>
-      <View className='mb-4'>
-        <Image
-          source={images.results}
-          className='w-38 h-38'
-          resizeMode='contain'
-        />
-      </View>
-      <Text className='text-white text-2xl font-Inter text-center mb-2'>
-        No {accountTypeInfo.title} Accounts
-      </Text>
-      <Text className='text-gray-400 text-base text-center mb-6 font-Inter'>
-        You don't have any {accountTypeInfo.type} accounts yet. Please add a new account in order to start trading.
-      </Text>
-
-      <LinearGradient
-        colors={['#9061F919', '#E7469419']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className='rounded-lg p-4 mb-6'
-        style={{ borderRadius: 8 }}
-      >
-        <Text className='text-white text-sm text-center font-Inter p-4'>
-          Please note that adding new accounts is only available on the desktop version.
-          To create a new account, please use the desktop application.
-        </Text>
-      </LinearGradient>
-    </View>
-  );
-};
-
-const shouldShowAccountCards = () => {
-  if (selectedAccountType === 'evaluation') {
-    return accountCounts.evaluation > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
-  } else if (selectedAccountType === 'funded') {
-    return accountCounts.funded > 0 && !propFirmAccountsLoading && !propFirmAccountsError;
-  } else if (selectedAccountType === 'live') {
-    return accountCounts.live > 0 && !brokerAccountsLoading && !brokerAccountsError;
-  } else if (selectedAccountType === 'demo') {
-    return accountCounts.demo > 0 && !brokerAccountsLoading && !brokerAccountsError;
-  }
-  return false;
-};
-
-const shouldShowNoAccountsMessage = () => {
-  if (selectedAccountType === 'evaluation') {
-    return accountCounts.evaluation === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
-  } else if (selectedAccountType === 'funded') {
-    return accountCounts.funded === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
-  } else if (selectedAccountType === 'live') {
-    return accountCounts.live === 0 && !brokerAccountsLoading && !brokerAccountsError;
-  } else if (selectedAccountType === 'demo') {
-    return accountCounts.demo === 0 && !brokerAccountsLoading && !brokerAccountsError;
-  }
-  return false;
-};
+  const shouldShowNoAccountsMessage = () => {
+    if (selectedAccountType === 'evaluation') {
+      return accountCounts.evaluation === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+    } else if (selectedAccountType === 'funded') {
+      return accountCounts.funded === 0 && !propFirmAccountsLoading && !propFirmAccountsError;
+    } else if (selectedAccountType === 'broker') {
+      return accountCounts.broker === 0 && !brokerAccountsLoading && !brokerAccountsError;
+    } else if (selectedAccountType === 'demo') {
+      return accountCounts.demo === 0 && !brokerAccountsLoading && !brokerAccountsError;
+    }
+    return false;
+  };
 
   // Tab component
   const AccountTypeTab = ({
@@ -465,7 +475,7 @@ const shouldShowNoAccountsMessage = () => {
     isSelected,
     onPress
   }: {
-    type: string;
+    type: AccountTypeEnum;
     label: string;
     count: number;
     isSelected: boolean;
@@ -507,32 +517,32 @@ const shouldShowNoAccountsMessage = () => {
         <View className='py-2'>
           <View className='flex-row items-start'>
             <AccountTypeTab
-              type="evaluation"
+              type={AccountTypeEnum.EVALUATION}
               label="Evaluation"
               count={accountCounts.evaluation}
-              isSelected={selectedAccountType === 'evaluation'}
-              onPress={() => handleAccountSelect('evaluation')}
+              isSelected={selectedAccountType === AccountTypeEnum.EVALUATION}
+              onPress={() => handleAccountSelect(AccountTypeEnum.EVALUATION)}
             />
             <AccountTypeTab
-              type="funded"
+              type={AccountTypeEnum.FUNDED}
               label="Funded"
               count={accountCounts.funded}
-              isSelected={selectedAccountType === 'funded'}
-              onPress={() => handleAccountSelect('funded')}
+              isSelected={selectedAccountType === AccountTypeEnum.FUNDED}
+              onPress={() => handleAccountSelect(AccountTypeEnum.FUNDED)}
             />
             <AccountTypeTab
-              type="live"
+              type={AccountTypeEnum.LIVE}
               label="Live"
-              count={accountCounts.live}
-              isSelected={selectedAccountType === 'live'}
-              onPress={() => handleAccountSelect('live')}
+              count={accountCounts.broker}
+              isSelected={selectedAccountType === AccountTypeEnum.LIVE}
+              onPress={() => handleAccountSelect(AccountTypeEnum.LIVE)}
             />
             <AccountTypeTab
-              type="demo"
+              type={AccountTypeEnum.DEMO}
               label="Demo"
               count={accountCounts.demo}
-              isSelected={selectedAccountType === 'demo'}
-              onPress={() => handleAccountSelect('demo')}
+              isSelected={selectedAccountType === AccountTypeEnum.DEMO}
+              onPress={() => handleAccountSelect(AccountTypeEnum.DEMO)}
             />
           </View>
         </View>
@@ -588,8 +598,8 @@ const shouldShowNoAccountsMessage = () => {
                   ? processedPropFirmAccounts.evaluation
                   : selectedAccountType === 'funded'
                     ? processedPropFirmAccounts.funded
-                    : selectedAccountType === 'live'
-                      ? processedBrokerAccounts.live
+                    : selectedAccountType === 'broker'
+                      ? processedBrokerAccounts.broker
                       : selectedAccountType === 'demo'
                         ? processedBrokerAccounts.demo
                         : []
@@ -634,14 +644,14 @@ const shouldShowNoAccountsMessage = () => {
           </View>
         )}
 
-        {selectedAccountType === 'live' && (
+        {selectedAccountType === AccountTypeEnum.LIVE && (
           <View className='flex-1'>
             <NoBrokerAccount
               showSearchBar={false}
               presetActiveTab="Live"
               hideTabBar={true}
               brokerAccountsData={{
-                broker_accounts: processedBrokerAccounts.live.map(acc => acc.originalData)
+                broker_accounts: processedBrokerAccounts.broker.map(acc => acc.originalData)
               }}
               brokerAccountsLoading={brokerAccountsLoading}
               brokerAccountsError={brokerAccountsError}
@@ -652,7 +662,7 @@ const shouldShowNoAccountsMessage = () => {
           </View>
         )}
 
-        {selectedAccountType === 'demo' && (
+        {selectedAccountType === AccountTypeEnum.DEMO && (
           <View className='flex-1'>
             <NoBrokerAccount
               showSearchBar={false}
