@@ -26,6 +26,7 @@ import { useAccounts } from '@/providers/accounts';
 import { useGetAccountDetails } from '@/api/hooks/account-details';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { OverviewAccountType, overviewAccountTypeAtom, overviewSelectedTabAtom } from '@/atoms/overview-atoms';
+import { AccountStatusEnum } from '@/shared/enums';
 
 export enum DashboardAccountType {
   PROP_FIRM = 'propfirm',
@@ -65,7 +66,9 @@ const Overview = () => {
     error: propFirmAccountsError,
     refetch: refetchPropFirmAccounts
   } = useGetPropFirmAccounts({
-    enabled: overviewAccountType === OverviewAccountType.PROPFIRM,
+    // enabled: overviewAccountType === OverviewAccountType.PROPFIRM,
+    // enabled: true,
+    staleTime: 5 * 60 * 1000,
   });
 
   const {
@@ -74,7 +77,10 @@ const Overview = () => {
     error: brokerAccountsError,
     refetch: refetchBrokerAccounts
   } = useGetBrokerAccounts({
-    enabled: overviewAccountType === OverviewAccountType.OWNBROKER,
+    // enabled: overviewAccountType === OverviewAccountType.OWNBROKER,
+    // enabled: true,
+    staleTime: 5 * 60 * 1000,
+
   });
 
   const {
@@ -86,7 +92,11 @@ const Overview = () => {
   const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
 
   const { data: accountDetails } = useGetAccountDetails(currentAccountId);
-  const { data: metricsData } = useGetMetrics(currentAccountId);
+  const { data: metricsData, refetch: refetchMetrics, isLoading: metricsLoading } = useGetMetrics(currentAccountId, {
+    enabled: Boolean(currentAccountId && currentAccountId > 0),
+    staleTime: 0,
+    gcTime: 0,
+  });
 
   const [dashboardAccountType, setDashboardAccountType] =
     useState<DashboardAccountType | null>(null);
@@ -206,82 +216,127 @@ const Overview = () => {
     }, 0) || 0;
   }, [getBrokerMetricsData]);
 
-  const getBrokerLossRate = useCallback(() => {
-    const brokerMetrics = getBrokerMetricsData();
-    return 100 - (brokerMetrics?.win_rate ?? 0);
-  }, [getBrokerMetricsData]);
+  useEffect(() => {
+    if (selectedAccountType && currentAccountId && currentAccountId > 0) {
+      console.log('[Overview] Tab switched to:', selectedAccountType, 'for account:', currentAccountId);
 
-  // ⚙️ Process prop firm accounts like in Menu.tsx
+      // Clear preview account when switching tabs
+      setSelectedPreviewAccountId(undefined);
+
+      // Refetch metrics for the current account
+      const timer = setTimeout(() => {
+        refetchMetrics();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedAccountType]);
+
+  useEffect(() => {
+    if (currentAccountId && currentAccountId > 0) {
+      console.log('[Overview] Account changed to:', currentAccountId);
+      const timer = setTimeout(() => {
+        refetchMetrics();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [currentAccountId]);
+
   const processedPropFirmAccounts = useMemo(() => {
-    if (overviewAccountType !== OverviewAccountType.PROPFIRM ||
-      !propFirmAccountsData?.prop_firm_accounts) {
+    // ✅ Remove the overviewAccountType check
+    if (!propFirmAccountsData?.prop_firm_accounts) {
       return { evaluation: [], funded: [] };
     }
 
-    const processedAccounts = propFirmAccountsData.prop_firm_accounts.map((account: any) => {
-      const totalGainLoss = account.balance - account.starting_balance;
-      const totalPerformancePercentage = account.starting_balance > 0
-        ? (totalGainLoss / account.starting_balance) * 100
-        : 0;
+    const processedAccounts = propFirmAccountsData.prop_firm_accounts
+      .filter(account => account.status === AccountStatusEnum.ACTIVE)
+      .map((account: any) => {
+        const totalGainLoss = account.balance - account.starting_balance;
+        const totalPerformancePercentage = account.starting_balance > 0
+          ? (totalGainLoss / account.starting_balance) * 100
+          : 0;
 
-      return {
-        id: account.id,
-        name: account.name,
-        balance: account.balance,
-        dailyPL: account.daily_pl,
-        changePercentage: totalPerformancePercentage,
-        type: account.account_type.toLowerCase() === 'funded' ? 'Funded' : 'Challenge',
-        currency: account.currency || 'USD',
-        firm: account.firm,
-        program: account.program,
-        totalPL: account.total_pl,
-        netPL: account.net_pl,
-        startingBalance: account.starting_balance,
-        maxTotalDD: account.max_total_dd,
-        profitTarget: account.profit_target,
-        originalData: account,
-      };
-    });
+        const isEvaluation = account.account_type === AccountTypeEnum.EVALUATION;
+        const isFunded = account.account_type === AccountTypeEnum.FUNDED;
+
+        return {
+          id: account.id,
+          name: account.name,
+          balance: account.balance,
+          dailyPL: account.daily_pl,
+          changePercentage: totalPerformancePercentage,
+          type: isEvaluation ? 'Challenge' : isFunded ? 'Funded' : 'Challenge',
+          accountType: account.account_type,
+          currency: account.currency || 'USD',
+          firm: account.firm,
+          program: account.program,
+          totalPL: account.total_pl,
+          netPL: account.net_pl,
+          startingBalance: account.starting_balance,
+          maxTotalDD: account.max_total_dd,
+          profitTarget: account.profit_target,
+          status: account.status,
+          originalData: account,
+        };
+      });
 
     return {
-      evaluation: processedAccounts.filter(acc => acc.type === 'Challenge'),
-      funded: processedAccounts.filter(acc => acc.type === 'Funded')
+      evaluation: processedAccounts.filter(acc =>
+        acc.accountType === AccountTypeEnum.EVALUATION
+      ),
+      funded: processedAccounts.filter(acc =>
+        acc.accountType === AccountTypeEnum.FUNDED
+      )
     };
-  }, [propFirmAccountsData]);
+  }, [propFirmAccountsData]); // ✅ Only depend on data, not tab
 
+
+  // ✅ Same fix for broker accounts
   const processedBrokerAccounts = useMemo(() => {
-    if (overviewAccountType !== OverviewAccountType.OWNBROKER ||
-      !brokerAccountsData?.broker_accounts) {
+    // ✅ Remove the overviewAccountType check
+    if (!brokerAccountsData?.broker_accounts) {
       return { broker: [], demo: [] };
     }
 
-    const processedAccounts = brokerAccountsData.broker_accounts.map((account: any) => {
-      const totalGainLoss = account.balance - account.starting_balance;
-      const totalPerformancePercentage = account.starting_balance > 0
-        ? (totalGainLoss / account.starting_balance) * 100
-        : 0;
+    const processedAccounts = brokerAccountsData.broker_accounts
+      .filter(account => account.status === AccountStatusEnum.ACTIVE)
+      .map((account: any) => {
+        const totalGainLoss = account.balance - account.starting_balance;
+        const totalPerformancePercentage = account.starting_balance > 0
+          ? (totalGainLoss / account.starting_balance) * 100
+          : 0;
 
-      return {
-        id: account.id,
-        name: account.name,
-        balance: account.balance, // Use the actual balance, not string
-        dailyPL: account.daily_pl,
-        changePercentage: totalPerformancePercentage,
-        type: (account.account_type === 'broker' || account.account_type === 'live') ? 'Live' : 'Demo',
-        currency: account.currency || 'USD',
-        firm: account.firm,
-        exchange: account.exchange,
-        server: account.server,
-        status: account.status,
-        totalPL: account.total_pl,
-        startingBalance: account.starting_balance,
-        originalData: account,
-      };
-    });
+        const isLive = account.account_type === AccountTypeEnum.LIVE ||
+          account.account_type === 'broker';
+        const isDemo = account.account_type === AccountTypeEnum.DEMO;
+
+        return {
+          id: account.id,
+          name: account.name,
+          balance: account.balance,
+          dailyPL: account.daily_pl,
+          changePercentage: totalPerformancePercentage,
+          type: isLive ? 'Live' : isDemo ? 'Demo' : 'Demo',
+          accountType: isLive ? AccountTypeEnum.LIVE : AccountTypeEnum.DEMO,
+          currency: account.currency || 'USD',
+          firm: account.firm,
+          exchange: account.exchange,
+          server: account.server,
+          status: account.status,
+          totalPL: account.total_pl,
+          startingBalance: account.starting_balance,
+          originalData: account,
+        };
+      });
 
     return {
-      broker: processedAccounts.filter(acc => acc.originalData.account_type === 'broker' || acc.originalData.account_type === 'live'),
-      demo: processedAccounts.filter(acc => acc.originalData.account_type === 'demo')
+      broker: processedAccounts.filter(acc =>
+        acc.accountType === AccountTypeEnum.LIVE
+      ),
+      demo: processedAccounts.filter(acc =>
+        acc.accountType === AccountTypeEnum.DEMO
+      )
     };
   }, [brokerAccountsData]);
 
@@ -311,12 +366,9 @@ const Overview = () => {
 
   const handleAccountSelect = (accountId: string) => {
     console.log('[Overview] Account selected:', accountId);
-    setSelectedAccountType(accountId as AccountTypeEnum);
-  };
-
-
-  const openAccountSelector = () => {
-    bottomSheetRef.current?.expand();
+    // Convert string to enum if needed
+    const enumValue = accountId as AccountTypeEnum;
+    setSelectedAccountType(enumValue);
   };
 
   const getAccountDisplayInfo = () => {
@@ -389,6 +441,33 @@ const Overview = () => {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (selectedAccountType) {
+      let firstAccountId: number | undefined;
+
+      switch (selectedAccountType) {
+        case AccountTypeEnum.EVALUATION:
+          firstAccountId = processedPropFirmAccounts.evaluation[0]?.id;
+          break;
+        case AccountTypeEnum.FUNDED:
+          firstAccountId = processedPropFirmAccounts.funded[0]?.id;
+          break;
+        case AccountTypeEnum.LIVE:
+          firstAccountId = processedBrokerAccounts.broker[0]?.id;
+          break;
+        case AccountTypeEnum.DEMO:
+          firstAccountId = processedBrokerAccounts.demo[0]?.id;
+          break;
+      }
+
+      // If we have a first account and it's different from current, select it
+      if (firstAccountId && firstAccountId !== selectedPreviewAccountId) {
+        console.log('[Overview] Auto-selecting first account for tab:', firstAccountId);
+        setSelectedPreviewAccountId(firstAccountId);
+      }
+    }
+  }, [selectedAccountType, processedPropFirmAccounts, processedBrokerAccounts]);
 
   // Render the "No Accounts" content for prop firm accounts
   const renderNoPropFirmAccountsContent = () => {
@@ -592,6 +671,7 @@ const Overview = () => {
         {shouldShowAccountCards() && (
           <>
             <AccountBalanceCard
+              key={`balance-${currentAccountId}-${selectedAccountType}`}
               accountType={selectedAccountType}
               accounts={
                 selectedAccountType === 'evaluation'
@@ -611,15 +691,18 @@ const Overview = () => {
             />
 
             <WinLossStats
+              key={`winloss-${currentAccountId}-${selectedAccountType}-${metricsData?.win_rate}`}
               winPercentage={metricsData?.win_rate ?? 0}
               lossPercentage={lossRate}
               winAmount={Math.abs(metricsData?.average_profit ?? 0)}
               lossAmount={Math.abs(metricsData?.average_loss ?? 0)}
+              isLoading={metricsLoading}
             />
 
             <AdditionalStats
+              key={`stats-${currentAccountId}-${selectedAccountType}`}
               metricsData={metricsData}
-              isLoading={!metricsData}
+              isLoading={metricsLoading || !metricsData}
             />
           </>
         )}
