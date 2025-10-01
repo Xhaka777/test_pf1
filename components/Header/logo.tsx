@@ -32,10 +32,13 @@ const formatCurrency = (amount: number): string => {
 export function Logo() {
     const navigation = useNavigation<NavigationProp>();
     const { selectedAccountId, selectedPreviewAccountId, allAccounts } = useAccounts();
-    const { data: accountDetails } = useGetAccountDetails(selectedAccountId);
-    const { data: openTrades } = useOpenPositionsWS();
-
+    
+    // ✅ FIX: Use preview account ID if available, otherwise use selected account ID
     const activeAccountId = selectedPreviewAccountId ?? selectedAccountId;
+    
+    // ✅ FIX: Fetch account details for the ACTIVE account (not just selectedAccountId)
+    const { data: accountDetails } = useGetAccountDetails(activeAccountId);
+    const { data: openTrades } = useOpenPositionsWS();
 
     const selectedAccount = useMemo(() => {
         return [
@@ -99,14 +102,6 @@ export function Logo() {
                         className="w-7 h-7"
                         resizeMode="contain"
                     />
-                    {/* <ChevronDown
-                        size={20}
-                        color="#898587"
-                        style={[
-                            Platform.OS === 'web' ? { transition: 'transform 0.2s ease-in-out' } : {},
-                            { transform: [{ rotate: isDropdownVisible ? '180deg' : '0deg' }] }
-                        ]}
-                    /> */}
                 </TouchableOpacity>
 
                 {/* Vertical separator */}
@@ -120,6 +115,7 @@ export function Logo() {
             {/* Right side - Values and profile dropdown */}
             <View className="flex-row items-center">
                 <View className="mr-3">
+                    {/* ✅ FIX: Balance now updates based on activeAccountId */}
                     <Text className="text-sm font-Inter text-white">
                         {accountDetails?.balance ? formatCurrency(accountDetails.balance) : '$0.00'}
                     </Text>
