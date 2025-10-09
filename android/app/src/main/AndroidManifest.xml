@@ -30,6 +30,7 @@
         <data android:scheme="myapp"/>
         <data android:scheme="com.altinxhaka.trading_app"/>
         <data android:scheme="com.propfirmmatch.trading_app"/>
+        <data android:scheme="exp+prop-firm-one"/>
       </intent-filter>
     </activity>
   </application>

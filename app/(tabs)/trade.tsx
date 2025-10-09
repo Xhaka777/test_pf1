@@ -10,6 +10,7 @@ import { useAccounts } from '@/providers/accounts';
 import { useActiveSymbol } from '@/hooks/use-active-symbol';
 import { useUser } from '@clerk/clerk-expo';
 import { Loader } from 'lucide-react-native';
+import TradingChart from '@/components/TradingChart';
 
 type TradeProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -28,47 +29,47 @@ const Trade = ({ navigation }: TradeProps) => {
     return !userLoaded || !user || accountsLoading || accountDetailsLoading || !selectedAccountId;
   }, [userLoaded, user, accountsLoading, accountDetailsLoading, selectedAccountId]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        setIsInitializing(false);
-      }, 500);
+  // useEffect(() => {
+  //   if (!isLoading) {
+  //     const timer = setTimeout(() => {
+  //       setIsInitializing(false);
+  //     }, 500);
 
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [isLoading]);
 
-  if (isLoading || isInitializing) {
-    let loadingMessage = 'Loading trading interface';
+  // if (isLoading || isInitializing) {
+  //   let loadingMessage = 'Loading trading interface';
 
-    if (!userLoaded || !user) {
-      loadingMessage = 'Authenticating user...';
-    } else if (accountsLoading) {
-      loadingMessage = 'Loading accounts...';
-    } else if (!selectedAccountId) {
-      loadingMessage = 'Selecting account...';
-    } else if (accountDetailsLoading) {
-      loadingMessage = 'Loading account details...';
-    }
+  //   if (!userLoaded || !user) {
+  //     loadingMessage = 'Authenticating user...';
+  //   } else if (accountsLoading) {
+  //     loadingMessage = 'Loading accounts...';
+  //   } else if (!selectedAccountId) {
+  //     loadingMessage = 'Selecting account...';
+  //   } else if (accountDetailsLoading) {
+  //     loadingMessage = 'Loading account details...';
+  //   }
 
-    return (
-      <SafeAreaView className='flex-1 bg-[#100E0F]'>
-        <Header />
-        <View className='flex-1 flex justify-center items-center'>
-          <ActivityIndicator size="large" color='#00d4aa' />
-          <Text className="text-white mt-3 text-base">{loadingMessage}</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  //   return (
+  //     <SafeAreaView className='flex-1 bg-[#100E0F]'>
+  //       <Header />
+  //       <View className='flex-1 flex justify-center items-center'>
+  //         <ActivityIndicator size="large" color='#00d4aa' />
+  //         <Text className="text-white mt-3 text-base">{loadingMessage}</Text>
+  //       </View>
+  //     </SafeAreaView>
+  //   );
+  // }
 
-  // Minimal logging for debugging (instead of massive data dumps)
-  console.log('[Trade] Rendering with:', {
-    selectedAccountId,
-    activeSymbol,
-    hasAccountDetails: !!accountDetails,
-    hasUser: !!user
-  });
+  // // Minimal logging for debugging (instead of massive data dumps)
+  // console.log('[Trade] Rendering with:', {
+  //   selectedAccountId,
+  //   activeSymbol,
+  //   hasAccountDetails: !!accountDetails,
+  //   hasUser: !!user
+  // });
 
 
   // console.log('selectedAccountId', selectedAccountId)
@@ -83,14 +84,15 @@ const Trade = ({ navigation }: TradeProps) => {
       <TradingWidget />
 
       {/* Use the enhanced TradingViewChart with provider-like logic */}
-      {selectedAccountId && accountDetails && user && (
+      {/* {selectedAccountId && accountDetails && user && (
         <TradingViewChart
           symbol={activeSymbol || 'BTCUSD'}
           selectedAccountId={selectedAccountId}
           accountDetails={accountDetails}
           userId={user.id}
         />
-      )}
+      )} */}
+      <TradingChart />
 
       <TradingButtons />
     </SafeAreaView>
