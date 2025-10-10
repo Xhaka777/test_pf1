@@ -17,13 +17,13 @@ export function useAuthenticatedApi<T>() {
     endpoint: string,
     options: FetchApiOptions = {},
   ): Promise<T> => {
-    const { 
-      formData, 
-      returnMethod, 
-      body, 
-      data, 
+    const {
+      formData,
+      returnMethod,
+      body,
+      data,
       _retryCount = 0,
-      ...axiosOptions 
+      ...axiosOptions
     } = options;
 
     if (!isLoaded) {
@@ -41,7 +41,7 @@ export function useAuthenticatedApi<T>() {
     try {
       // If this is a retry after 401, force a fresh token
       const shouldForceRefresh = _retryCount > 0;
-      
+
       if (shouldForceRefresh) {
         console.log('[API] 🔄 Forcing token refresh after 401...');
         await clerkTokenManager.clearCache();
@@ -90,41 +90,36 @@ export function useAuthenticatedApi<T>() {
 
     try {
       const response: AxiosResponse<T> = await axios(axiosConfig);
-      
+
       console.log('[API] Request successful:', {
         status: response.status,
         endpoint,
-        dataKeys: response.data && typeof response.data === 'object' 
-          ? Object.keys(response.data) 
+        dataKeys: response.data && typeof response.data === 'object'
+          ? Object.keys(response.data)
           : 'primitive'
       });
 
       // ✨ AUTOMATIC TOKEN REFRESH LOGIC ✨
       if (response.status === 401) {
         console.warn('[API] 🔐 Received 401 Unauthorized');
-        
-        // Check if we should retry
+
         if (_retryCount < MAX_RETRY_ATTEMPTS) {
           console.log('[API] 🔄 Attempting automatic token refresh and retry...');
-          
-          // Recursive call with incremented retry count
+
+          // ✅ SAFE CHANGE: Add small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           return fetchFromApi(endpoint, {
             ...options,
             _retryCount: _retryCount + 1,
           });
         } else {
-          // Max retries reached - sign out user
-          console.error('[API] ❌ Token refresh failed after retries. Signing out...');
+          // ✅ SAFE CHANGE: Don't sign out immediately, just throw error
+          console.error('[API] ❌ Token refresh failed after retries');
           await clerkTokenManager.clearCache();
-          
-          // Sign out the user
-          try {
-            await signOut();
-          } catch (signOutError) {
-            console.error('[API] Error during sign out:', signOutError);
-          }
-          
-          throw new Error('Session expired. Please sign in again.');
+
+          // Let React Query handle the error instead of force sign out
+          throw new Error('Authentication failed. Please sign in again.');
         }
       }
 
@@ -150,7 +145,7 @@ export function useAuthenticatedApi<T>() {
       if (axios.isAxiosError(error)) {
         const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
         const status = error.response?.status || 0;
-        
+
         // Handle 401 in error response (shouldn't reach here due to validateStatus, but just in case)
         if (status === 401 && _retryCount < MAX_RETRY_ATTEMPTS) {
           console.log('[API] 🔄 Caught 401 in error handler, retrying...');
@@ -159,7 +154,7 @@ export function useAuthenticatedApi<T>() {
             _retryCount: _retryCount + 1,
           });
         }
-        
+
         if (status === 401) {
           await clerkTokenManager.clearCache();
           try {
@@ -177,7 +172,7 @@ export function useAuthenticatedApi<T>() {
         } else if (status >= 500) {
           throw new Error('Server error. Please try again later.');
         }
-        
+
         throw new Error(`API Error (${status}): ${errorMessage}`);
       }
 

@@ -92,6 +92,17 @@ const Trade = ({ navigation }: TradeProps) => {
           userId={user.id}
         />
       )} */}
+        <TradingView
+          symbol={activeSymbol}
+          selectedAccountId={selectedAccountId}
+          accountDetails={accountDetails}
+          userId={`${details.user.id}`}
+          className={cn(
+            'flex-1',
+            isMobile ? 'max-h-[60vh]' : 'min-h-[600px] max-h-[90vh]',
+          )}
+        />
+
       <TradingChart />
 
       <TradingButtons />
