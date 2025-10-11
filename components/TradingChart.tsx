@@ -1,451 +1,1530 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Alert, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
+import {
+    AccountDetails,
+    OpenOrderDataSchemaType,
+    OpenTradesData,
+    UpdateOrderInput,
+} from '../api/schema';
+import { getAPIBaseUrl, StatusEnum } from '../api/services/api';
+import { atomStore, onChartTradingEnabledAtom, oneClickTradingEnabledAtom, updateOrderCheckboxAtom } from '@/atoms';
+import { useAtom, useAtomValue } from 'jotai';
+import {
+    useCancelOrderMutation,
+    useUpdateOrderMutation,
+    useUpdateSlMutation,
+    useUpdateTpMutation
+} from '@/api/hooks/trade-service';
+import { useOpenTradesManager } from '@/api/hooks/use-open-trades-manager';
+import { OrderTypeEnum, PositionTypeEnum, TakeProfitSlTypeEnum } from '@/shared/enums';
+import { useOpenPositionsWS } from '@/providers/open-positions';
+import { useChartTradingDialog } from './ChartTradingDialogProvider';
+import { useConfirmationDialog } from '@/hooks/use-confitmation-dialog';
+import EditPositionBottomSheet from './EditPositionBottomSheet';
+import ClosePositionBottomSheet from './ClosePositionBottomSheet';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '@clerk/clerk-expo';
+import { tokenManager } from '@/utils/websocket-token-manager';
 import * as FileSystem from 'expo-file-system';
-import { TrendingUp } from 'lucide-react-native';
 
-// Define position line colors
+interface TradingViewChartProps {
+    selectedAccountId: number;
+    accountDetails: AccountDetails;
+    userId: string;
+    symbol: string;
+    interval?: string;
+    datafeedUrl?: string;
+    fullscreen?: boolean;
+    autosize?: boolean;
+    className?: string;
+}
+
+interface WebViewMessage {
+    type: string;
+    data?: any;
+}
+
 const SL_COLOR = '#FF0000';
 const TP_COLOR = '#12de1f';
 const POSITION_COLOR = '#FFA500';
-const LABEL_COLOR = '#000000';
 
-interface TradingChartProps {
-  symbol?: string;
-  selectedAccountId?: number;
-  accountDetails?: any;
-  userId?: string;
-  relevantTrades?: any[];
-  relevantOrders?: any[];
-  currency?: string;
-}
+const TradingChart = memo(function TradingViewChart(
+    props: TradingViewChartProps,
+) {
 
-const TradingChart: React.FC<TradingChartProps> = ({
-  symbol = 'BTCUSD',
-  selectedAccountId,
-  accountDetails,
-  userId,
-  relevantTrades = [],
-  relevantOrders = [],
-  currency = 'USD'
-}) => {
-  const [webViewRef, setWebViewRef] = useState<any>(null);
-  const [isChartReady, setIsChartReady] = useState(false);
+    const { isSignedIn, isLoaded, getToken } = useAuth();
+    const { t } = useTranslation();
+    const [onChartTradingEnabled, setOnChartTradingEnabled] = useAtom(
+        onChartTradingEnabledAtom,
+    );
+    const oneClickTradingEnabled = useAtomValue(oneClickTradingEnabledAtom);
+    const { requestPosition, setIsOpen, setIsLoading } = useChartTradingDialog();
+    const { question } = useConfirmationDialog();
 
-  const baseUrl = `${FileSystem.bundleDirectory}charting_assets/`;
+    const webViewRef = useRef<WebView>(null);
+    const baseUrl = `${FileSystem.bundleDirectory}charting_assets/`;
+    const [isReady, setIsReady] = useState(false);
+    const [closePositionDialogVisible, setClosePositionDialogVisible] = useState(false);
+    const [editPositionDialogVisible, setEditPositionDialogVisible] = useState(false);
+    const [currentPosition, setCurrentPosition] = useState<
+        OpenTradesData['open_trades'][number] | null
+    >(null);
 
-  // Generate the HTML content with dynamic symbol and styling
-  const htmlContent = useMemo(() => `
-<!DOCTYPE HTML>
-<html style="height: 100%; margin: 0; padding: 0;">
+    const [editOrderDialogVisible, setEditOrderDialogVisible] = useState(false);
+    const [currentOrder, setCurrentOrder] = useState<
+        OpenTradesData['open_orders'][number] | null
+    >(null);
+
+    // Send WebSocket token when ready
+    useEffect(() => {
+        if (isReady) {
+            // You need to get the token from your token manager
+            // This is a placeholder - replace with your actual token retrieval
+            const sendToken = async () => {
+                try {
+                    // Replace this with your actual token retrieval logic
+                    // For example: const token = await tokenManager.getToken(getToken);
+                    // const token = getToken(); 
+                    const token = await tokenManager.getToken(getToken);
+
+                    sendToWebView({
+                        type: 'SET_WS_TOKEN',
+                        data: { token }
+                    });
+                } catch (error) {
+                    console.error('Failed to get token:', error);
+                }
+            };
+
+            sendToken();
+        }
+    }, [isReady, sendToWebView]);
+
+    const { data: openTrades, refetch: refetchOpenTrades } = useOpenTradesManager({
+        account: props.selectedAccountId,
+    });
+    const { data: wsData } = useOpenPositionsWS();
+    const { mutateAsync: cancelOrder } = useCancelOrderMutation();
+    const { mutateAsync: updateOrder } = useUpdateOrderMutation();
+    const { mutateAsync: updateTp } = useUpdateTpMutation();
+    const { mutateAsync: updateSl } = useUpdateSlMutation();
+
+    const currency = props.accountDetails?.currency;
+
+    // Helper to send messages to WebView
+    const sendToWebView = useCallback((message: WebViewMessage) => {
+        webViewRef.current?.postMessage(JSON.stringify(message));
+    }, []);
+
+    const onUpdateTp = useCallback(
+        async (
+            tp: number | null,
+            tradeItem: OpenTradesData['open_trades'][number],
+        ) => {
+            return await updateTp({
+                account: props.selectedAccountId,
+                tp: tp ? tp.toFixed(5) : null,
+                position: tradeItem.position_type,
+                trade_id: tradeItem.order_id.toString(),
+                symbol: tradeItem.symbol,
+            });
+        },
+        [props.selectedAccountId, updateTp],
+    );
+
+    const onUpdateSl = useCallback(
+        async (
+            sl: number | null,
+            tradeItem: OpenTradesData['open_trades'][number],
+        ) => {
+            return await updateSl({
+                account: props.selectedAccountId,
+                sl: sl ? sl.toFixed(5) : null,
+                position: tradeItem.position_type,
+                trade_id: tradeItem.order_id.toString(),
+                symbol: tradeItem.symbol,
+            });
+        },
+        [props.selectedAccountId, updateSl],
+    );
+
+    const onUpdateOrder = useCallback(
+        async (
+            openOrder: OpenOrderDataSchemaType,
+            price: number,
+            updateOrderQuantity: boolean,
+        ) => {
+            const requestPayload: UpdateOrderInput = {
+                account: props.selectedAccountId,
+                symbol: openOrder.symbol,
+                order_type: openOrder.order_type,
+                position: openOrder.position_type,
+                price: price.toFixed(5),
+                order_id: openOrder.order_id,
+            };
+            if (!updateOrderQuantity || openOrder.sl === 0) {
+                requestPayload.quantity = openOrder.quantity.toString();
+            }
+            if (openOrder.sl !== 0) {
+                requestPayload.sl = openOrder.sl.toFixed(5);
+                requestPayload.sl_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            if (openOrder.tp !== 0) {
+                requestPayload.tp = openOrder.tp.toFixed(5);
+                requestPayload.tp_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            return await updateOrder(requestPayload);
+        },
+        [props.selectedAccountId, updateOrder],
+    );
+
+    const onUpdateOrderTpSl = useCallback(
+        async (
+            openOrder: OpenOrderDataSchemaType,
+            options: {
+                tp?: number | null;
+                sl?: number | null;
+            },
+        ) => {
+            const requestPayload: UpdateOrderInput = {
+                account: props.selectedAccountId,
+                symbol: openOrder.symbol,
+                order_type: openOrder.order_type,
+                position: openOrder.position_type,
+                price: openOrder.price.toFixed(5),
+                order_id: openOrder.order_id,
+                quantity: openOrder.quantity.toString(),
+            };
+            if (openOrder.sl !== 0) {
+                requestPayload.sl = openOrder.sl.toFixed(5);
+                requestPayload.sl_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            if (openOrder.tp !== 0) {
+                requestPayload.tp = openOrder.tp.toFixed(5);
+                requestPayload.tp_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            if (typeof options.sl === 'number') {
+                requestPayload.sl = options.sl.toFixed(5);
+                requestPayload.sl_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            if (typeof options.tp === 'number') {
+                requestPayload.tp = options.tp.toFixed(5);
+                requestPayload.tp_type = TakeProfitSlTypeEnum.PRICE;
+            }
+            if (options.sl === null) {
+                requestPayload.sl = null;
+            }
+            if (options.tp === null) {
+                requestPayload.tp = null;
+            }
+            return await updateOrder(requestPayload);
+        },
+        [props.selectedAccountId, updateOrder],
+    );
+
+    const calculateTp = useCallback(
+        (
+            currentPrice: number,
+            entry: number,
+            initialPrice: number,
+            value: number,
+        ) => {
+            const diff = Math.abs(initialPrice - entry);
+            const new_val = Math.abs(currentPrice - entry);
+            return Math.abs(Math.round((new_val / diff) * value));
+        },
+        [],
+    );
+
+    const calculateSl = useCallback(
+        (
+            currentPrice: number,
+            entryPrice: number,
+            currentSl: number,
+            value: number,
+            positionType: PositionTypeEnum,
+        ) => {
+            const diff = Math.abs(currentSl - entryPrice);
+            const newVal = Math.abs(currentPrice - entryPrice);
+
+            if (diff === 0) return 0;
+
+            const isProfit =
+                positionType === PositionTypeEnum.LONG
+                    ? currentPrice > entryPrice
+                    : currentPrice < entryPrice;
+
+            const multiplier = isProfit ? 1 : -1;
+
+            return multiplier * Math.round((newVal / diff) * Math.abs(value));
+        },
+        [],
+    );
+
+    // Handle messages from WebView
+    const handleWebViewMessage = useCallback(async (event: any) => {
+        try {
+            const message: WebViewMessage = JSON.parse(event.nativeEvent.data);
+
+            switch (message.type) {
+                case 'CHART_READY':
+                    setIsReady(true);
+                    break;
+
+                case 'CLOSE_POSITION':
+                    const closeData = message.data;
+                    const closePosition = openTrades?.open_trades.find(
+                        t => t.order_id === closeData.orderId
+                    );
+                    if (closePosition) {
+                        setCurrentPosition(closePosition);
+                        setTimeout(() => setClosePositionDialogVisible(true), 100);
+                    }
+                    break;
+
+                case 'EDIT_POSITION':
+                    const editData = message.data;
+                    const editPosition = openTrades?.open_trades.find(
+                        t => t.order_id === editData.orderId
+                    );
+                    if (editPosition) {
+                        setCurrentPosition(editPosition);
+                        setTimeout(() => setEditPositionDialogVisible(true), 100);
+                    }
+                    break;
+
+                case 'UPDATE_TP':
+                    const tpData = message.data;
+                    const tpPosition = openTrades?.open_trades.find(
+                        t => t.order_id === tpData.orderId
+                    );
+                    if (tpPosition) {
+                        if (!oneClickTradingEnabled) {
+                            const answer = await question({
+                                description: t('You are about to move TP to {{price}}', {
+                                    price: tpData.price,
+                                }),
+                            });
+                            if (!answer) {
+                                sendToWebView({
+                                    type: 'REVERT_TP',
+                                    data: { orderId: tpData.orderId }
+                                });
+                                return;
+                            }
+                        }
+
+                        try {
+                            const result = await onUpdateTp(tpData.price, tpPosition);
+                            if (result.status !== StatusEnum.SUCCESS) {
+                                Alert.alert(t('Failed to update TP'), result.message);
+                                sendToWebView({
+                                    type: 'REVERT_TP',
+                                    data: { orderId: tpData.orderId }
+                                });
+                            } else {
+                                Alert.alert(t('TP updated'));
+                            }
+                        } catch (e: any) {
+                            Alert.alert(t('Failed to update TP'), e?.message);
+                            sendToWebView({
+                                type: 'REVERT_TP',
+                                data: { orderId: tpData.orderId }
+                            });
+                        }
+                    }
+                    break;
+
+                case 'UPDATE_SL':
+                    const slData = message.data;
+                    const slPosition = openTrades?.open_trades.find(
+                        t => t.order_id === slData.orderId
+                    );
+                    if (slPosition) {
+                        if (!oneClickTradingEnabled) {
+                            const answer = await question({
+                                description: t('You are about to move SL to {{price}}', {
+                                    price: slData.price,
+                                }),
+                            });
+                            if (!answer) {
+                                sendToWebView({
+                                    type: 'REVERT_SL',
+                                    data: { orderId: slData.orderId }
+                                });
+                                return;
+                            }
+                        }
+
+                        try {
+                            const result = await onUpdateSl(slData.price, slPosition);
+                            if (result.status !== StatusEnum.SUCCESS) {
+                                Alert.alert(t('Failed to update SL'), result.message);
+                                sendToWebView({
+                                    type: 'REVERT_SL',
+                                    data: { orderId: slData.orderId }
+                                });
+                            } else {
+                                Alert.alert(t('SL updated'));
+                            }
+                        } catch (e: any) {
+                            Alert.alert(t('Failed to update SL'), e?.message);
+                            sendToWebView({
+                                type: 'REVERT_SL',
+                                data: { orderId: slData.orderId }
+                            });
+                        }
+                    }
+                    break;
+
+                case 'UPDATE_ORDER':
+                    const orderData = message.data;
+                    const order = openTrades?.open_orders.find(
+                        o => o.order_id === orderData.orderId
+                    );
+                    if (order) {
+                        if (!oneClickTradingEnabled) {
+                            const answer = await question({
+                                description: t('You are about to move Order to {{price}}', {
+                                    price: orderData.price,
+                                }),
+                            });
+                            if (!answer) {
+                                sendToWebView({
+                                    type: 'REVERT_ORDER',
+                                    data: { orderId: orderData.orderId }
+                                });
+                                return;
+                            }
+                        }
+
+                        try {
+                            const result = await onUpdateOrder(
+                                { ...order, position_type: orderData.positionType },
+                                orderData.price,
+                                orderData.updateQuantity || false
+                            );
+                            if (result.status === StatusEnum.SUCCESS) {
+                                Alert.alert(t('Order updated'));
+                            } else {
+                                Alert.alert(t('Failed to update order'), result.message);
+                                sendToWebView({
+                                    type: 'REVERT_ORDER',
+                                    data: { orderId: orderData.orderId }
+                                });
+                            }
+                        } catch (e: any) {
+                            Alert.alert(t('Failed to update order'), e?.message);
+                            sendToWebView({
+                                type: 'REVERT_ORDER',
+                                data: { orderId: orderData.orderId }
+                            });
+                        }
+                    }
+                    break;
+
+                case 'CANCEL_ORDER':
+                    const cancelData = message.data;
+                    const cancelOrder_item = openTrades?.open_orders.find(
+                        o => o.order_id === cancelData.orderId
+                    );
+                    if (cancelOrder_item) {
+                        if (!oneClickTradingEnabled) {
+                            const answer = await question({
+                                description: t('You are about to cancel an order'),
+                            });
+                            if (!answer) return;
+                        }
+
+                        try {
+                            const result = await cancelOrder({
+                                symbol: cancelOrder_item.symbol,
+                                account: props.selectedAccountId,
+                                order_id: cancelOrder_item.order_id,
+                            });
+                            if (result.status === StatusEnum.SUCCESS) {
+                                Alert.alert(
+                                    t('Order "{{id}}" canceled', {
+                                        id: cancelOrder_item.order_id,
+                                    })
+                                );
+                            } else {
+                                Alert.alert(
+                                    t('Failed to cancel order "{{id}}"', {
+                                        id: cancelOrder_item.order_id,
+                                    }),
+                                    result.message
+                                );
+                            }
+                        } catch (e: any) {
+                            Alert.alert(
+                                t('Failed to cancel order "{{id}}"', {
+                                    id: cancelOrder_item.order_id,
+                                }),
+                                e?.message
+                            );
+                        }
+                    }
+                    break;
+
+                case 'PLUS_CLICK':
+                    if (!onChartTradingEnabled) {
+                        const answer = await question({
+                            title: t('Chart trading'),
+                            description: t(
+                                'You must toggle on chart trading to open a position via the chart.',
+                            ),
+                        });
+                        if (!answer) {
+                            setOnChartTradingEnabled(false);
+                        }
+                        return;
+                    }
+
+                    const plusData = message.data;
+                    setIsOpen?.(true);
+                    setIsLoading?.(true);
+
+                    await requestPosition({
+                        orderPrice: plusData.price,
+                        marketPrice: plusData.marketPrice,
+                        symbol: plusData.symbol,
+                    });
+
+                    setIsLoading?.(false);
+                    break;
+
+                case 'CALCULATE_TP':
+                    const tpCalcData = message.data;
+                    const tpResult = calculateTp(
+                        tpCalcData.currentPrice,
+                        tpCalcData.entry,
+                        tpCalcData.initialPrice,
+                        tpCalcData.value
+                    );
+                    sendToWebView({
+                        type: 'TP_CALCULATED',
+                        data: {
+                            id: tpCalcData.id,
+                            result: tpResult
+                        }
+                    });
+                    break;
+
+                case 'CALCULATE_SL':
+                    const slCalcData = message.data;
+                    const slResult = calculateSl(
+                        slCalcData.currentPrice,
+                        slCalcData.entryPrice,
+                        slCalcData.currentSl,
+                        slCalcData.value,
+                        slCalcData.positionType
+                    );
+                    sendToWebView({
+                        type: 'SL_CALCULATED',
+                        data: {
+                            id: slCalcData.id,
+                            result: slResult
+                        }
+                    });
+                    break;
+            }
+        } catch (error) {
+            console.error('Error handling WebView message:', error);
+        }
+    }, [
+        openTrades,
+        oneClickTradingEnabled,
+        onUpdateTp,
+        onUpdateSl,
+        onUpdateOrder,
+        cancelOrder,
+        calculateTp,
+        calculateSl,
+        question,
+        requestPosition,
+        setIsOpen,
+        setIsLoading,
+        onChartTradingEnabled,
+        setOnChartTradingEnabled,
+        sendToWebView,
+        props.selectedAccountId,
+        t,
+    ]);
+
+    const symbolPrefix = useMemo(() => {
+        const { exchange, server } = props?.accountDetails;
+        return `${exchange}:${server}:`;
+    }, [props.accountDetails]);
+
+// Add this useEffect
+useEffect(() => {
+    if (openTrades) {
+        console.log('===== FULL OPEN TRADES RESPONSE =====');
+        console.log('Account:', openTrades.account);
+        console.log('Open trades count:', openTrades.open_trades?.length);
+        console.log('Open trades:', JSON.stringify(openTrades.open_trades, null, 2));
+        console.log('Open orders count:', openTrades.open_orders?.length);
+    }
+}, [openTrades]);
+
+    // Send open trades/orders to WebView when they change
+    useEffect(() => {
+        if (isReady && openTrades) {
+            console.log('===== SENDING TRADES TO WEBVIEW =====');
+            console.log('Open trades:', openTrades.open_trades);
+            console.log('First trade symbol:', openTrades.open_trades[0]?.symbol);
+            console.log('Current chart symbol (props.symbol):', props.symbol);
+            console.log('Symbol with prefix:', `${symbolPrefix}${props.symbol}`);
+
+            sendToWebView({
+                type: 'UPDATE_TRADES',
+                data: {
+                    openTrades: openTrades.open_trades,
+                    openOrders: openTrades.open_orders,
+                    currency,
+                    colors: {
+                        sl: SL_COLOR,
+                        tp: TP_COLOR,
+                        position: POSITION_COLOR,
+                    }
+                }
+            });
+        }
+    }, [isReady, openTrades, currency, sendToWebView]);
+
+    // Send symbol changes to WebView
+    useEffect(() => {
+        if (isReady && props.symbol && symbolPrefix) {
+            sendToWebView({
+                type: 'CHANGE_SYMBOL',
+                data: {
+                    symbol: `${symbolPrefix}${props.symbol}`,
+                }
+            });
+        }
+    }, [isReady, props.symbol, symbolPrefix, sendToWebView]);
+
+    // Detect changes in position/order counts via WebSocket
+    useEffect(() => {
+        if (!wsData || !openTrades || wsData.account !== props.selectedAccountId) {
+            return;
+        }
+
+        const wsTradesCount = wsData.open_trades?.length ?? 0;
+        const wsOrdersCount = wsData.open_orders?.length ?? 0;
+        const apiTradesCount = openTrades.open_trades?.length ?? 0;
+        const apiOrdersCount = openTrades.open_orders?.length ?? 0;
+
+        if (wsTradesCount !== apiTradesCount || wsOrdersCount !== apiOrdersCount) {
+            console.log(
+                'Chart: Position/order count mismatch detected - refreshing API data'
+            );
+            void refetchOpenTrades();
+        }
+    }, [wsData, openTrades, props.selectedAccountId, refetchOpenTrades]);
+
+    // Generate HTML for WebView
+    const htmlContent = useMemo(() => {
+        const config = {
+            symbol: `${symbolPrefix}${props.symbol}`,
+            interval: props.interval || 'D',
+            userId: props.userId,
+            apiBaseUrl: getAPIBaseUrl(),
+            fullscreen: props.fullscreen || false,
+            autosize: props.autosize || true,
+        };
+
+        const configJson = JSON.stringify(config).replace(/</g, '\\u003c');
+        const apiBaseUrl = getAPIBaseUrl();
+        const wssBaseUrl = apiBaseUrl?.replace(/^http/, 'ws');
+
+        return `<!DOCTYPE html>
+<html>
 <head>
-    <title>TradingView Advanced Charts</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no">
-    <base href="${baseUrl}">
-    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            background-color: #0f0f0f;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        #tv_chart_container {
-            height: 100% !important;
-            width: 100% !important;
-            position: relative;
-            background-color: #0f0f0f;
-        }
-        /* Custom position line styles */
-        .custom-position-line {
-            position: absolute !important;
-            width: 100%;
-            height: 2px;
-            z-index: 1000 !important;
-            pointer-events: none !important;
-        }
-        .position-label {
-            position: absolute;
-            right: 10px;
-            top: -12px;
-            padding: 2px 8px;
-            font-size: 11px;
-            font-weight: bold;
-            border-radius: 4px;
-            white-space: nowrap;
-        }
-        /* Hide symbol info elements */
-        .chart-markup-table.pane,
-        .layout__area--center .pane-legend,
-        [data-name="legend"],
-        .legend-source-item {
-            display: none !important;
-        }
+        body { margin: 0; padding: 0; overflow: hidden; }
+        #tv_chart_container { height: 100vh; width: 100vw; }
     </style>
-    
+</head>
+<body>
+    <div id="tv_chart_container"></div>
+    <script>
+        window.chartConfig = ${configJson};
+        window.API_BASE_URL = '${apiBaseUrl}';
+        window.WSS_BASE_URL = '${wssBaseUrl}';
+        window.WS_TOKEN = null;
+    </script>
     <script type="text/javascript" src="charting_library/charting_library.standalone.js"></script>
     <script type="text/javascript" src="datafeeds/udf/dist/bundle.js"></script>
+    <script>
+(function() {
+    var API_ROUTES = {
+        GET_SYMBOLS: '/get_symbols',
+        GET_PRICES: '/get_prices'
+    };
     
-    <script type="text/javascript">
-        function log(type, message) {
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type, message }));
-            }
+    var WSS_ROUTES = {
+        GET_PRICES: '/prices'
+    };
+
+    var supportedResolutions = ['1', '3', '5', '15', '30', '60', '240', '1D', '1W', '1M'];
+    
+    var symbolTypes = [
+        { name: 'Crypto', value: 'Crypto' },
+        { name: 'Forex', value: 'Forex' }
+    ];
+
+    function DatafeedChartApi() {
+        this.lastBarsCache = new Map();
+        this.resetCache = new Map();
+        this.subscribers = new Map();
+        this.symbols = new Map();
+        this.configurationData = {
+            supported_resolutions: supportedResolutions,
+            exchanges: [],
+            symbols_types: symbolTypes
+        };
+        this.lastBid = null;
+        this.lastAsk = null;
+        this.askLineRef = null;
+    }
+
+    DatafeedChartApi.prototype.onReady = function(callback) {
+        console.log('[onReady]: Method call');
+        var self = this;
+        setTimeout(function() {
+            callback(self.configurationData);
+        }, 0);
+    };
+
+    DatafeedChartApi.prototype.getAllSymbols = function() {
+        var self = this;
+        if (this.symbols.size > 0) {
+            return Promise.resolve(this.symbols);
         }
-        
-        window.addEventListener('error', function(e) {
-            log('error', '❌ Error: ' + e.message);
-        });
-        
-        log('info', '📜 Scripts loaded');
-        
-        let chartWidget = null;
-        
-        window.addEventListener('DOMContentLoaded', function() {
-            log('info', '📱 DOM ready');
+
+        return fetch(window.API_BASE_URL + API_ROUTES.GET_SYMBOLS)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                var temporaryMap = new Map();
+                
+                for (var i = 0; i < data.exchange.length; i++) {
+                    var exchangeParts = data.exchange[i].split('_');
+                    var exchangeName = exchangeParts[0];
+                    var serverName = exchangeParts[1];
+                    
+                    for (var j = 0; j < data.symbols[i].length; j++) {
+                        var symbol = data.symbols[i][j];
+                        var fullName = exchangeName + ':' + serverName + ':' + symbol;
+                        var isCryptoSymbol = /BTC|ETH|DOT|ADA|XRP|LTC|NEO|XMR|DOG|DAS/.test(symbol.slice(0, 3));
+                        var symbolType = (['MT5', 'DXTrade', 'CTrader'].indexOf(exchangeName) !== -1 && !isCryptoSymbol) ? 'Forex' : 'Crypto';
+                        var pricescale = /BTC|ETH/.test(symbol.slice(0, 3)) ? 100 : 100000;
+
+                        var symbolInfo = {
+                            symbol: symbol,
+                            ticker: fullName,
+                            full_name: fullName,
+                            name: symbol,
+                            description: symbol,
+                            exchange: exchangeName + ':' + serverName,
+                            listed_exchange: exchangeName,
+                            type: symbolType,
+                            session: symbolType === 'Forex' ? '2200-0000:1|0000-0000:2345|0000-2100:6' : '24x7',
+                            timezone: 'Etc/UTC',
+                            minmov: 1,
+                            pricescale: pricescale,
+                            has_intraday: true,
+                            intraday_multipliers: ['1', '5', '15', '30', '60', '240'],
+                            has_weekly_and_monthly: false,
+                            format: 'price',
+                            supported_resolutions: self.configurationData.supported_resolutions,
+                            volume_precision: 8,
+                            data_status: 'streaming',
+                            visible_plots_set: 'ohlcv'
+                        };
+
+                        temporaryMap.set(symbolInfo.full_name, symbolInfo);
+                    }
+                }
+                
+                self.symbols = temporaryMap;
+                return self.symbols;
+            });
+    };
+
+    DatafeedChartApi.prototype.searchSymbols = function(userInput, exchange, symbolType, onResultReadyCallback) {
+        console.log('[searchSymbols]: Method call');
+        this.getAllSymbols().then(function(symbols) {
+            var symbolsArray = [];
+            symbols.forEach(function(symbol) {
+                symbolsArray.push(symbol);
+            });
             
-            try {
-                if (typeof TradingView === 'undefined') {
-                    log('error', '❌ TradingView not found');
-                    document.body.innerHTML = '<div style="color:white;padding:20px;font-family:Arial;">Error: TradingView library not loaded.</div>';
+            var newSymbols = symbolsArray.filter(function(symbol) {
+                var isExchangeValid = symbolType === symbol.type;
+                var isFullSymbolContainsInput = symbol.full_name.toLowerCase().indexOf(userInput.toLowerCase()) !== -1;
+                return isExchangeValid && isFullSymbolContainsInput;
+            });
+            
+            onResultReadyCallback(newSymbols);
+        });
+    };
+
+    DatafeedChartApi.prototype.resolveSymbol = function(symbolName, onSymbolResolvedCallback, onResolveErrorCallback) {
+        console.log('[resolveSymbol]: Method call', symbolName);
+        this.getAllSymbols().then(function(symbols) {
+            var symbolItem = symbols.get(symbolName);
+            if (!symbolItem) {
+                console.log('[resolveSymbol]: Cannot resolve symbol', symbolName);
+                onResolveErrorCallback('Cannot resolve symbol');
+                return;
+            }
+            console.log('[resolveSymbol]: Symbol resolved', symbolName);
+            onSymbolResolvedCallback(symbolItem);
+        });
+    };
+
+    DatafeedChartApi.prototype.getBars = function(symbolInfo, resolution, periodParams, onHistoryCallback, onErrorCallback) {
+        var from = periodParams.from;
+        var to = periodParams.to;
+        var firstDataRequest = periodParams.firstDataRequest;
+        var countBack = periodParams.countBack;
+        
+        console.log('[getBars]: Method call', symbolInfo, resolution, from, to);
+
+        var urlParameters = {
+            symbol: symbolInfo.name,
+            exchange: symbolInfo.exchange.split(':')[0],
+            server: symbolInfo.exchange.split(':')[1],
+            tf: resolution,
+            from: (from * 1000).toString(),
+            to: (to * 1000).toString(),
+            limit: '2000'
+        };
+
+        if (countBack !== undefined) {
+            urlParameters.requestedBars = countBack.toString();
+        }
+
+        var query = Object.keys(urlParameters)
+            .map(function(name) {
+                return name + '=' + encodeURIComponent(urlParameters[name]);
+            })
+            .join('&');
+
+        var self = this;
+        fetch(window.API_BASE_URL + API_ROUTES.GET_PRICES + '?' + query)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if ((data.status && data.status === 'error') || data.Data.length === 0) {
+                    onHistoryCallback([], { noData: true });
                     return;
                 }
                 
-                log('success', '✅ TradingView found, initializing...');
+                var bars = data.Data.map(function(bar) {
+                    return {
+                        time: bar.time * 1000,
+                        low: bar.low,
+                        high: bar.high,
+                        open: bar.open,
+                        close: bar.close,
+                        volume: bar.volume
+                    };
+                });
+
+                if (firstDataRequest) {
+                    self.lastBarsCache.set(symbolInfo.full_name + '_' + resolution, bars[bars.length - 1]);
+                }
                 
-                chartWidget = new TradingView.widget({
-                    fullscreen: false,
-                    autosize: true,
-                    symbol: '${symbol}',
-                    interval: '1D',
-                    container: "tv_chart_container",
-                    datafeed: new Datafeeds.UDFCompatibleDatafeed(
-                        "https://demo-feed-data.tradingview.com"
-                    ),
-                    library_path: "charting_library/",
-                    locale: "en",
-                    disabled_features: [
-                        "use_localstorage_for_settings",
-                        "symbol_info",
-                        "display_market_status",
-                        "header_symbol_search",
-                        "header_compare",
-                        "header_undo_redo"
-                    ],
-                    enabled_features: [
-                        "study_templates",
-                        "hide_left_toolbar_by_default"
-                    ],
-                    charts_storage_url: 'https://saveload.tradingview.com',
-                    charts_storage_api_version: "1.1",
-                    client_id: 'tradingview.com',
-                    user_id: 'public_user_id',
-                    theme: 'dark',
-                    toolbar_bg: '#1a1a1a',
-                    overrides: {
-                        "paneProperties.background": "#0f0f0f",
-                        "paneProperties.backgroundType": "solid",
-                        "paneProperties.backgroundGradientStartColor": "#0f0f0f",
-                        "paneProperties.backgroundGradientEndColor": "#0f0f0f",
-                        "paneProperties.vertGridProperties.color": "#2a2a2a",
-                        "paneProperties.horzGridProperties.color": "#2a2a2a",
-                        "symbolWatermarkProperties.transparency": 100,
-                        "scalesProperties.textColor": "#9ca3af",
-                        "scalesProperties.backgroundColor": "#1a1a1a"
+                console.log('[getBars]: returned ' + bars.length + ' bar(s)');
+                onHistoryCallback(bars, { noData: bars.length === 0 });
+            })
+            .catch(function(error) {
+                console.log('[getBars]: Get error', error);
+                onErrorCallback(error.message);
+            });
+    };
+
+    DatafeedChartApi.prototype.subscribeBars = function(symbolInfo, resolution, onRealtimeCallback, subscriberUID, onResetCacheNeededCallback) {
+        console.log('[subscribeBars]: Method call with subscriberUID:', subscriberUID);
+        
+        var self = this;
+        this.resetCache.set(symbolInfo.full_name + '_' + resolution, onResetCacheNeededCallback);
+
+        if (!window.WS_TOKEN) {
+            console.error('No WS_TOKEN available for WebSocket connection');
+            return;
+        }
+
+        var wsUrl = window.WSS_BASE_URL + WSS_ROUTES.GET_PRICES + '?auth_key=' + window.WS_TOKEN;
+        var socket = new WebSocket(wsUrl);
+
+        socket.onopen = function() {
+            console.log('WebSocket connection opened for', subscriberUID);
+            var parts = symbolInfo.full_name.split(':');
+            var exchange = parts[0];
+            var server = parts[1];
+            var name = parts[2];
+            var subscribeMessage = 'SubAdd:0~' + exchange + '~' + server + '~' + name;
+            socket.send(subscribeMessage);
+        };
+
+        socket.onmessage = function(event) {
+            try {
+                var data = event.data;
+                if (typeof data !== 'string' || data.indexOf('~') === -1) {
+                    return;
+                }
+
+                var parts = data.split('~');
+                if (parts.length < 6) {
+                    return;
+                }
+
+                var bid = parseFloat(parts[4]);
+                var ask = parseFloat(parts[5]);
+                var marketPrice = (ask + bid) / 2;
+
+                var symbolData = {
+                    exchange: parts[0],
+                    server: parts[1],
+                    symbol: parts[2],
+                    time: parseInt(parts[3]) || Date.now(),
+                    bid: bid,
+                    ask: ask,
+                    marketPrice: marketPrice
+                };
+
+                if (!symbolData.bid || !symbolData.ask) return;
+
+                var lastBar = self.lastBarsCache.get(symbolInfo.full_name + '_' + resolution);
+                
+                self.lastBid = symbolData.bid || self.lastBid;
+                self.lastAsk = symbolData.ask || self.lastAsk;
+                var tradeTime = symbolData.time || Date.now();
+
+                var nextBarTime;
+                if (resolution === '1D') {
+                    nextBarTime = self.getNextDailyBarTime(lastBar ? lastBar.time : tradeTime);
+                } else if (parseInt(resolution) >= 60) {
+                    nextBarTime = self.getNextHourlyBarTime(lastBar ? lastBar.time : tradeTime, parseInt(resolution) / 60);
+                } else {
+                    nextBarTime = self.getNextMinutesBarTime(lastBar ? lastBar.time : tradeTime, parseInt(resolution));
+                }
+
+                var bar;
+                if (tradeTime >= nextBarTime) {
+                    bar = {
+                        time: nextBarTime,
+                        open: symbolData.bid,
+                        high: symbolData.bid,
+                        low: symbolData.bid,
+                        close: symbolData.bid
+                    };
+                    console.log('[subscribeBars]: Generate new bar', bar);
+                } else {
+                    if (!lastBar) {
+                        bar = {
+                            time: nextBarTime,
+                            open: symbolData.bid,
+                            high: symbolData.bid,
+                            low: symbolData.bid,
+                            close: symbolData.bid
+                        };
+                    } else {
+                        bar = {
+                            time: lastBar.time,
+                            open: lastBar.open,
+                            high: Math.max(lastBar.high, symbolData.bid),
+                            low: Math.min(lastBar.low, symbolData.bid),
+                            close: symbolData.bid
+                        };
                     }
-                });
-                
-                chartWidget.onChartReady(() => {
-                    log('success', '🎉 Chart initialized!');
-                    
-                    // Hide symbol info after chart loads
-                    setTimeout(() => {
-                        const symbolElements = document.querySelectorAll([
-                            '.chart-markup-table',
-                            '.pane-legend',
-                            '[data-name="legend"]',
-                            '.legend-source-item'
-                        ].join(', '));
-                        
-                        symbolElements.forEach(el => {
-                            if (el) el.style.display = 'none';
-                        });
-                        
-                        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                            type: 'chartReady'
-                        }));
-                    }, 1000);
-                });
-                
+                }
+
+                onRealtimeCallback(bar);
+                self.lastBarsCache.set(symbolInfo.full_name + '_' + resolution, bar);
             } catch (error) {
-                log('error', '❌ Init error: ' + error.message);
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+
+        socket.onclose = function() {
+            console.log('WebSocket closed for', subscriberUID);
+        };
+
+        this.subscribers.set(subscriberUID, socket);
+    };
+
+    DatafeedChartApi.prototype.unsubscribeBars = function(subscriberUID) {
+        console.log('[unsubscribeBars]: Method call with subscriberUID:', subscriberUID);
+        var socket = this.subscribers.get(subscriberUID);
+        if (socket) {
+            socket.close();
+            this.subscribers.delete(subscriberUID);
+        }
+    };
+
+    DatafeedChartApi.prototype.getNextDailyBarTime = function(barTime) {
+        var date = new Date(barTime);
+        date.setUTCDate(date.getUTCDate() + 1);
+        date.setUTCHours(0, 0, 0, 0);
+        return date.getTime();
+    };
+
+    DatafeedChartApi.prototype.getNextHourlyBarTime = function(barTime, intervalHours) {
+        var date = new Date(barTime);
+        var hoursToAdd = this.hoursToAdd(date.getUTCHours(), intervalHours);
+        date.setUTCHours(date.getUTCHours() + hoursToAdd);
+        date.setUTCMinutes(0, 0, 0);
+        return date.getTime();
+    };
+
+    DatafeedChartApi.prototype.getNextMinutesBarTime = function(barTime, intervalMinutes) {
+        var date = new Date(barTime);
+        var minutesToAdd = this.minutesToAdd(date.getUTCMinutes(), intervalMinutes);
+        date.setUTCMinutes(date.getUTCMinutes() + minutesToAdd);
+        date.setUTCSeconds(0, 0);
+        return date.getTime();
+    };
+
+    DatafeedChartApi.prototype.minutesToAdd = function(currentMinute, interval) {
+        var remainder = currentMinute % interval;
+        return remainder === 0 ? interval : interval - remainder;
+    };
+
+    DatafeedChartApi.prototype.hoursToAdd = function(currentHour, interval) {
+        var remainder = currentHour % interval;
+        return remainder === 0 ? interval : interval - remainder;
+    };
+
+    var tvWidget = null;
+    var shapesMap = new Map();
+    var lastBar = null;
+    var config = null;
+    var currentTrades = [];
+    var currentOrders = [];
+    var colors = {};
+    var currency = 'USD';
+    var askLine = null;
+    var datafeed = null;
+
+    function sendMessage(type, data) {
+        if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: type, data: data }));
+        }
+    }
+
+    function receiveMessage(event) {
+        try {
+            var message = JSON.parse(event.data);
+            handleMessage(message);
+        } catch (error) {
+            console.error('Error parsing message:', error);
+        }
+    }
+
+    function handleMessage(message) {
+        switch (message.type) {
+            case 'SET_WS_TOKEN':
+                window.WS_TOKEN = message.data.token;
+                console.log('WS_TOKEN set');
+                break;
+
+            case 'UPDATE_TRADES':
+                currentTrades = message.data.openTrades || [];
+                currentOrders = message.data.openOrders || [];
+                currency = message.data.currency || 'USD';
+                colors = message.data.colors || {};
+                updateChartLines();
+                break;
+
+            case 'CHANGE_SYMBOL':
+                if (tvWidget && message.data.symbol) {
+                    var currentResolution = tvWidget.activeChart().resolution();
+                    tvWidget.setSymbol(message.data.symbol, currentResolution, function() {
+                        console.log('Symbol changed to:', message.data.symbol);
+                    });
+                }
+                break;
+
+            case 'REVERT_TP':
+            case 'REVERT_SL':
+            case 'REVERT_ORDER':
+                updateChartLines();
+                break;
+
+            case 'TP_CALCULATED':
+            case 'SL_CALCULATED':
+                break;
+        }
+    }
+
+    function requestCalculation(type, data) {
+        return new Promise(function(resolve) {
+            var id = Math.random().toString(36).substr(2, 9);
+            var handler = function(event) {
+                try {
+                    var message = JSON.parse(event.data);
+                    if (message.type === type + '_CALCULATED' && message.data.id === id) {
+                        window.removeEventListener('message', handler);
+                        resolve(message.data.result);
+                    }
+                } catch (error) {
+                    console.error('Error in calculation handler:', error);
+                }
+            };
+            window.addEventListener('message', handler);
+            sendMessage(type, Object.assign({}, data, { id: id }));
+        });
+    }
+
+    function formatCurrency(value, curr) {
+        return parseFloat(value).toLocaleString('en-US', {
+            style: 'currency',
+            currency: curr || currency,
+        });
+    }
+
+    function clearShapes() {
+        shapesMap.forEach(function(shape) {
+            try {
+                shape.remove();
+            } catch (error) {
+                console.error('Error removing shape:', error);
             }
         });
-        
-        // Function to update symbol dynamically
-        window.updateSymbol = function(newSymbol) {
-            if (chartWidget && chartWidget.setSymbol) {
-                chartWidget.setSymbol(newSymbol, chartWidget.activeChart().resolution());
-                log('info', '📊 Symbol updated to: ' + newSymbol);
-            }
-        };
-        
-        // Function to inject position lines
-        window.injectPositionLines = function(trades, orders, currency) {
-            log('info', '📍 Injecting position lines...');
-            
-            // Remove existing lines
-            const existingLines = document.querySelectorAll('.custom-position-line');
-            existingLines.forEach(line => line.remove());
-            
-            const container = document.getElementById('tv_chart_container');
-            if (!container) {
-                log('error', '❌ Chart container not found');
-                return;
-            }
-            
-            const chartHeight = container.offsetHeight;
-            const priceScale = chartWidget.activeChart().getPriceScale();
-            
-            // Helper function to calculate Y position
-            function getPriceYPosition(price) {
-                // This is a simplified calculation
-                // In production, you'd use the actual price scale API
-                const chartTop = 100; // Approximate top offset
-                const chartBottom = chartHeight - 100; // Approximate bottom offset
-                const priceRange = priceScale.getVisibleRange();
-                if (!priceRange) return chartHeight / 2;
-                
-                const relativePosition = (price - priceRange.from) / (priceRange.to - priceRange.from);
-                return chartBottom - (relativePosition * (chartBottom - chartTop));
-            }
-            
-            // Helper function to create position line
-            function createPositionLine(price, text, color, type = 'position') {
-                const line = document.createElement('div');
-                line.className = 'custom-position-line';
-                line.style.backgroundColor = color;
-                line.style.borderTop = '2px solid ' + color;
-                line.style.top = getPriceYPosition(price) + 'px';
-                
-                const label = document.createElement('div');
-                label.className = 'position-label';
-                label.style.backgroundColor = color;
-                label.style.color = type === 'position' ? '${LABEL_COLOR}' : '#ffffff';
-                label.textContent = text;
-                line.appendChild(label);
-                
-                return line;
-            }
-            
-            // Add trade lines
-            trades.forEach(trade => {
-                // Position line
-                const positionPrice = parseFloat(trade.entry);
-                const positionText = trade.position_type.toUpperCase() + ' ' + positionPrice;
-                const positionLine = createPositionLine(positionPrice, positionText, '${POSITION_COLOR}');
-                container.appendChild(positionLine);
-                
-                // SL line
-                if (trade.sl && trade.sl > 0) {
-                    const slPrice = parseFloat(trade.sl);
-                    const slAmount = parseFloat(trade.trade_loss || 0).toLocaleString('en-US', {
-                        style: 'currency',
-                        currency: currency
+        shapesMap.clear();
+    }
+
+function updateChartLines() {
+    if (!tvWidget) return;
+
+    clearShapes();
+
+    var chart = tvWidget.activeChart();
+    if (!chart) return;
+
+    var symbol = chart.symbolExt();
+    if (!symbol) return;
+
+    // Extract just the symbol name (last part after ':')
+    var symbolParts = symbol.name.split(':');
+    var chartSymbol = symbolParts[symbolParts.length - 1]; // e.g., "BTCUSD"
+
+    currentTrades.forEach(function(openTrade) {
+        // Compare just the symbol names, not the full exchange:server:symbol
+        if (chartSymbol !== openTrade.symbol) return;
+
+            var positionLine = chart
+                .createOrderLine()
+                .onCancel(function() {
+                    sendMessage('CLOSE_POSITION', { orderId: openTrade.order_id });
+                })
+                .onModify(function() {
+                    sendMessage('EDIT_POSITION', { orderId: openTrade.order_id });
+                })
+                .setPrice(openTrade.entry)
+                .setQuantity(openTrade.quantity.toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                }))
+                .setText(openTrade.position_type.toUpperCase() + ' ' + openTrade.entry)
+                .setLineColor(colors.position || '#FFA500')
+                .setBodyBorderColor(colors.position || '#FFA500')
+                .setQuantityBorderColor(colors.position || '#FFA500')
+                .setQuantityBackgroundColor(colors.position || '#FFA500')
+                .setCancelButtonBorderColor(colors.position || '#FFA500')
+                .setCancelButtonIconColor(colors.position || '#FFA500')
+                .setBodyTextColor('#000000');
+
+            shapesMap.set('position_' + openTrade.order_id, positionLine);
+
+            if (openTrade.sl) {
+                var slLine = chart
+                    .createOrderLine()
+                    .setPrice(openTrade.sl)
+                    .setQuantity(formatCurrency(openTrade.trade_loss, currency))
+                    .setText('SL ' + openTrade.position_type.toUpperCase() + ' ' + openTrade.entry + ' [' + openTrade.quantity + ']')
+                    .setLineColor(colors.sl || '#FF0000')
+                    .setBodyBorderColor(colors.sl || '#FF0000')
+                    .setQuantityBorderColor(colors.sl || '#FF0000')
+                    .setQuantityBackgroundColor(colors.sl || '#FF0000')
+                    .setBodyTextColor('#000000')
+                    .onMove(function() {
+                        var price = slLine.getPrice();
+                        if (price) {
+                            sendMessage('UPDATE_SL', {
+                                orderId: openTrade.order_id,
+                                price: price,
+                            });
+                        }
+                    })
+                    .onMoving(function() {
+                        var currentPrice = slLine.getPrice();
+                        if (currentPrice) {
+                            requestCalculation('CALCULATE_SL', {
+                                currentPrice: currentPrice,
+                                entryPrice: openTrade.entry,
+                                currentSl: openTrade.sl,
+                                value: openTrade.trade_loss,
+                                positionType: openTrade.position_type,
+                            }).then(function(loss) {
+                                slLine.setQuantity(formatCurrency(loss, currency));
+                            });
+                        }
                     });
-                    const slText = 'SL ' + trade.position_type.toUpperCase() + ' ' + trade.entry + ' [' + trade.quantity + '] ' + slAmount;
-                    const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'sl');
-                    container.appendChild(slLine);
+
+                shapesMap.set('sl_' + openTrade.order_id, slLine);
+            }
+
+            if (openTrade.tp) {
+                var tpLine = chart
+                    .createOrderLine()
+                    .setPrice(openTrade.tp)
+                    .setQuantity(formatCurrency(openTrade.trade_profit, currency))
+                    .setText('TP ' + openTrade.position_type.toUpperCase() + ' ' + openTrade.entry + ' [' + openTrade.quantity + ']')
+                    .setLineColor(colors.tp || '#12de1f')
+                    .setBodyBorderColor(colors.tp || '#12de1f')
+                    .setQuantityBorderColor(colors.tp || '#12de1f')
+                    .setQuantityBackgroundColor(colors.tp || '#12de1f')
+                    .setBodyTextColor('#000000')
+                    .onMove(function() {
+                        var price = tpLine.getPrice();
+                        if (price) {
+                            sendMessage('UPDATE_TP', {
+                                orderId: openTrade.order_id,
+                                price: price,
+                            });
+                        }
+                    })
+                    .onMoving(function() {
+                        var currentPrice = tpLine.getPrice();
+                        if (currentPrice) {
+                            requestCalculation('CALCULATE_TP', {
+                                currentPrice: currentPrice,
+                                entry: openTrade.entry,
+                                initialPrice: openTrade.tp,
+                                value: openTrade.trade_profit,
+                            }).then(function(profit) {
+                                tpLine.setQuantity(formatCurrency(profit, currency));
+                            });
+                        }
+                    });
+
+                shapesMap.set('tp_' + openTrade.order_id, tpLine);
+            }
+        });
+
+        currentOrders.forEach(function(openOrder) {
+            if (symbol.name !== openOrder.symbol) return;
+
+            function setLineColor(line, color) {
+                line
+                    .setLineColor(color)
+                    .setBodyBorderColor(color)
+                    .setQuantityBorderColor(color)
+                    .setQuantityBackgroundColor(color)
+                    .setCancelButtonBorderColor(color)
+                    .setCancelButtonIconColor(color);
+            }
+
+            if (openOrder.sl) {
+                var orderSlLine = chart
+                    .createOrderLine()
+                    .setPrice(openOrder.sl)
+                    .setText('SL ' + openOrder.order_type + ' ' + openOrder.price + ' [' + openOrder.quantity + ']')
+                    .onMove(function() {
+                        var price = orderSlLine.getPrice();
+                        if (price) {
+                            sendMessage('UPDATE_ORDER', {
+                                orderId: openOrder.order_id,
+                                price: price,
+                                type: 'sl',
+                            });
+                        }
+                    })
+                    .onCancel(function() {
+                        sendMessage('UPDATE_ORDER', {
+                            orderId: openOrder.order_id,
+                            sl: null,
+                        });
+                    });
+
+                setLineColor(orderSlLine, colors.sl || '#FF0000');
+                shapesMap.set('order_sl_' + openOrder.order_id, orderSlLine);
+            }
+
+            if (openOrder.tp) {
+                var orderTpLine = chart
+                    .createOrderLine()
+                    .setPrice(openOrder.tp)
+                    .setText('TP ' + openOrder.order_type + ' ' + openOrder.price + ' [' + openOrder.quantity + ']')
+                    .onMove(function() {
+                        var price = orderTpLine.getPrice();
+                        if (price) {
+                            sendMessage('UPDATE_ORDER', {
+                                orderId: openOrder.order_id,
+                                price: price,
+                                type: 'tp',
+                            });
+                        }
+                    })
+                    .onCancel(function() {
+                        sendMessage('UPDATE_ORDER', {
+                            orderId: openOrder.order_id,
+                            tp: null,
+                        });
+                    });
+
+                setLineColor(orderTpLine, colors.tp || '#12de1f');
+                shapesMap.set('order_tp_' + openOrder.order_id, orderTpLine);
+            }
+
+            var initialColor = openOrder.position_type === 'long' 
+                ? (colors.tp || '#12de1f') 
+                : (colors.sl || '#FF0000');
+
+            var orderLine = chart
+                .createOrderLine()
+                .setPrice(openOrder.price)
+                .setQuantity(openOrder.quantity.toString())
+                .setText(openOrder.order_type + ' ' + openOrder.price)
+                .setBodyTextColor('#000000')
+                .setExtendLeft(false)
+                .setLineLength(50)
+                .onModify(function() {
+                    sendMessage('EDIT_ORDER', { orderId: openOrder.order_id });
+                })
+                .onMoving(function() {
+                    if (!orderLine || !lastBar) return;
+                    
+                    var price = orderLine.getPrice();
+                    var currentPrice = lastBar.close;
+                    if (!price || !currentPrice) return;
+
+                    var newColor;
+                    if (currentPrice < price) {
+                        newColor = openOrder.order_type === 'LIMIT' 
+                            ? (colors.sl || '#FF0000') 
+                            : (colors.tp || '#12de1f');
+                    } else {
+                        newColor = openOrder.order_type === 'LIMIT' 
+                            ? (colors.tp || '#12de1f') 
+                            : (colors.sl || '#FF0000');
+                    }
+                    setLineColor(orderLine, newColor);
+                })
+                .onMove(function() {
+                    if (!orderLine || !lastBar) return;
+                    
+                    var price = orderLine.getPrice();
+                    var currentPrice = lastBar.close;
+                    if (!price || !currentPrice) return;
+
+                    var positionType = openOrder.position_type;
+                    if (currentPrice < price) {
+                        positionType = openOrder.order_type === 'LIMIT' ? 'SHORT' : 'LONG';
+                    } else {
+                        positionType = openOrder.order_type === 'LIMIT' ? 'LONG' : 'SHORT';
+                    }
+
+                    sendMessage('UPDATE_ORDER', {
+                        orderId: openOrder.order_id,
+                        price: price,
+                        positionType: positionType,
+                        updateQuantity: false,
+                    });
+                })
+                .onCancel(function() {
+                    sendMessage('CANCEL_ORDER', { orderId: openOrder.order_id });
+                });
+
+            setLineColor(orderLine, initialColor);
+            shapesMap.set('order_' + openOrder.order_id, orderLine);
+        });
+    }
+
+    function initTradingView(widgetConfig) {
+        if (!window.TradingView) {
+            console.error('TradingView not loaded');
+            setTimeout(function() {
+                initTradingView(widgetConfig);
+            }, 500);
+            return;
+        }
+
+        var bg = '#100E0F';
+        datafeed = new DatafeedChartApi();
+
+        var widgetOptions = {
+            theme: 'dark',
+            symbol: widgetConfig.symbol,
+            interval: widgetConfig.interval || 'D',
+            container: 'tv_chart_container',
+            datafeed: datafeed,
+            locale: 'en',
+            disabled_features: [
+                'use_localstorage_for_settings',
+                'legend_widget',
+                'symbol_search_hot_key',
+                'popup_hints',
+                'header_compare',
+                'header_symbol_search',
+                'left_toolbar',
+            ],
+            enabled_features: [
+                'chart_crosshair_menu',
+                'snapshot_trading_drawings',
+                'header_in_fullscreen_mode',
+                'side_toolbar_in_fullscreen_mode',
+            ],
+            library_path: 'charting_library/',
+            charts_storage_url: widgetConfig.apiBaseUrl,
+            charts_storage_api_version: '1.1',
+            client_id: 'Curo Labs',
+            user_id: widgetConfig.userId,
+            fullscreen: widgetConfig.fullscreen || false,
+            autosize: widgetConfig.autosize !== false,
+            timezone: 'Etc/UTC',
+            auto_save_delay: 60,
+            loading_screen: {
+                backgroundColor: bg,
+            },
+            overrides: {
+                'paneProperties.background': bg,
+                'paneProperties.backgroundType': 'solid',
+                'paneProperties.topMargin': 1,
+                'paneProperties.bottomMargin': 1,
+            },
+            load_last_chart: true,
+        };
+
+        tvWidget = new window.TradingView.widget(widgetOptions);
+
+        tvWidget.onChartReady(function() {
+            console.log('TradingView chart ready');
+            sendMessage('CHART_READY', {});
+
+            tvWidget.subscribe('onPlusClick', function(event) {
+                var chart = tvWidget.activeChart();
+                var symbolObj = chart.symbolExt();
+                
+                sendMessage('PLUS_CLICK', {
+                    price: event.price,
+                    marketPrice: lastBar ? lastBar.close : event.price,
+                    symbol: symbolObj ? symbolObj.name : '',
+                });
+            });
+
+            tvWidget.subscribe('onTick', function(tick) {
+                lastBar = tick;
+                
+                if (askLine) {
+                    try {
+                        askLine.remove();
+                    } catch (e) {}
                 }
                 
-                // TP line
-                if (trade.tp && trade.tp > 0) {
-                    const tpPrice = parseFloat(trade.tp);
-                    const tpAmount = parseFloat(trade.trade_profit || 0).toLocaleString('en-US', {
-                        style: 'currency',
-                        currency: currency
-                    });
-                    const tpText = 'TP ' + trade.position_type.toUpperCase() + ' ' + trade.entry + ' [' + trade.quantity + '] ' + tpAmount;
-                    const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'tp');
-                    container.appendChild(tpLine);
+                var chart = tvWidget.activeChart();
+                if (chart && tick.close) {
+                    askLine = chart
+                        .createPositionLine()
+                        .setText('')
+                        .setQuantity('')
+                        .setLineStyle(1)
+                        .setLineWidth(1)
+                        .setPrice(tick.close)
+                        .setLineColor(colors.sl || '#FF0000');
                 }
             });
-            
-            // Add order lines
-            orders.forEach(order => {
-                const orderPrice = parseFloat(order.price);
-                const orderText = order.order_type + ' ' + orderPrice;
-                const orderColor = order.position_type === 'long' ? '${TP_COLOR}' : '${SL_COLOR}';
-                const orderLine = createPositionLine(orderPrice, orderText, orderColor, 'order');
-                container.appendChild(orderLine);
-                
-                // Order SL
-                if (order.sl && order.sl > 0) {
-                    const slPrice = parseFloat(order.sl);
-                    const slText = 'SL ' + order.order_type + ' ' + order.price + ' [' + order.quantity + ']';
-                    const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'order-sl');
-                    container.appendChild(slLine);
-                }
-                
-                // Order TP
-                if (order.tp && order.tp > 0) {
-                    const tpPrice = parseFloat(order.tp);
-                    const tpText = 'TP ' + order.order_type + ' ' + order.price + ' [' + order.quantity + ']';
-                    const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'order-tp');
-                    container.appendChild(tpLine);
+
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    var chart = tvWidget.activeChart();
+                    if (chart) {
+                        chart.resetData();
+                    }
                 }
             });
-            
-            log('success', '✅ Position lines injected');
-        };
+        });
+    }
+
+    window.addEventListener('message', receiveMessage);
+    document.addEventListener('message', receiveMessage);
+
+    function waitForConfig() {
+        if (window.chartConfig) {
+            config = window.chartConfig;
+            initTradingView(config);
+        } else {
+            setTimeout(waitForConfig, 100);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', waitForConfig);
+    } else {
+        waitForConfig();
+    }
+})();
     </script>
-</head>
-<body style="margin:0px;background:#0f0f0f;">
-    <div id="tv_chart_container"></div>
 </body>
-</html>`, [symbol, baseUrl]);
+</html>`;
+    }, [symbolPrefix, props.symbol, props.interval, props.userId, props.fullscreen, props.autosize]);
 
-  // Update symbol when it changes
-  useEffect(() => {
-    if (webViewRef && isChartReady && symbol) {
-      const script = `window.updateSymbol('${symbol}'); true;`;
-      webViewRef.injectJavaScript(script);
-    }
-  }, [webViewRef, isChartReady, symbol]);
+    return (
+        <>
+            <View style={styles.container}>
+                <WebView
+                    ref={webViewRef}
+                    source={{ html: htmlContent, baseUrl: baseUrl }}
+                    onMessage={handleWebViewMessage}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    startInLoadingState={true}
+                    originWhitelist={['*']}
+                    mixedContentMode="compatibility"
+                    allowFileAccess={true}
+                    allowUniversalAccessFromFileURLs={true}
+                />
+            </View>
 
-  // Inject position lines when data changes
-  const injectPositionLines = useCallback(() => {
-    if (!webViewRef || !isChartReady || (!relevantTrades.length && !relevantOrders.length)) {
-      return;
-    }
-
-    const script = `
-      window.injectPositionLines(
-        ${JSON.stringify(relevantTrades)},
-        ${JSON.stringify(relevantOrders)},
-        '${currency}'
-      );
-      true;
-    `;
-    
-    webViewRef.injectJavaScript(script);
-  }, [webViewRef, isChartReady, relevantTrades, relevantOrders, currency]);
-
-  // Inject lines when trades/orders change
-  useEffect(() => {
-    if (isChartReady && (relevantTrades.length > 0 || relevantOrders.length > 0)) {
-      const timer = setTimeout(() => {
-        injectPositionLines();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isChartReady, injectPositionLines, relevantTrades, relevantOrders]);
-
-  // Handle messages from WebView
-  const onMessage = useCallback((event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      const icon = data.type === 'error' ? '🔴' : 
-                  data.type === 'success' ? '🎉' : '💬';
-      console.log(`${icon} WebView: ${data.message}`);
-      
-      if (data.type === 'chartReady') {
-        setIsChartReady(true);
-      }
-    } catch (e) {
-      console.log('💬 WebView:', event.nativeEvent.data);
-    }
-  }, []);
-
-  // Loading state
-//   if (!accountDetails || !selectedAccountId) {
-//     return (
-//       <View style={styles.loadingContainer}>
-//         <TrendingUp size={32} color="#00d4aa" />
-//         <Text style={styles.loadingText}>Loading account details...</Text>
-//       </View>
-//     );
-//   }
-
-  return (
-    <View style={styles.container}>
-      <WebView
-        ref={setWebViewRef}
-        source={{ 
-          html: htmlContent,
-          baseUrl: baseUrl
-        }}
-        originWhitelist={['*']}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        allowFileAccess={true}
-        allowFileAccessFromFileURLs={true}
-        allowUniversalAccessFromFileURLs={true}
-        startInLoadingState={true}
-        
-        onLoadStart={() => console.log('📱 WebView: Load started')}
-        onLoadEnd={() => console.log('🏁 WebView: Load ended')}
-        
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error('❌ WebView error:', nativeEvent);
-        }}
-        
-        onMessage={onMessage}
-        
-        renderLoading={() => (
-          <View style={styles.loadingOverlay}>
-            <TrendingUp size={32} color="#00d4aa" />
-            <Text style={styles.loadingText}>
-              Loading {symbol} chart...
-            </Text>
-          </View>
-        )}
-        
-        style={styles.webview}
-      />
-    </View>
-  );
-};
+            {currentPosition ? (
+                <>
+                    <ClosePositionBottomSheet
+                        isOpen={closePositionDialogVisible}
+                        onClose={() => {
+                            setClosePositionDialogVisible(false);
+                            setTimeout(() => setCurrentPosition(null), 100);
+                        }}
+                        openTrade={currentPosition}
+                    />
+                    <EditPositionBottomSheet
+                        isOpen={editPositionDialogVisible}
+                        onClose={() => {
+                            setEditPositionDialogVisible(false);
+                            setTimeout(() => setCurrentPosition(null), 100);
+                        }}
+                        openTrade={currentPosition}
+                    />
+                </>
+            ) : null}
+        </>
+    );
+});
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f0f0f',
-    gap: 12,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f0f0f',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
+    container: {
+        flex: 1,
+    },
 });
 
 export default TradingChart;

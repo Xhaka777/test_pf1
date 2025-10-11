@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, ActivityIndicator, Image, ScrollView, Button, Dimensions } from 'react-native'
+import { View, Text, TouchableOpacity, SafeAreaView, StyleSheet, ActivityIndicator, Image, ScrollView, Button, Dimensions, Alert } from 'react-native'
 import React, { useEffect, useMemo, useState } from 'react'
 import Header from '@/components/Header/header';
 import { TradingWidget } from '@/components/TradingWidget';
@@ -11,6 +11,10 @@ import { useActiveSymbol } from '@/hooks/use-active-symbol';
 import { useUser } from '@clerk/clerk-expo';
 import { Loader } from 'lucide-react-native';
 import TradingChart from '@/components/TradingChart';
+import { useAuthenticatedApi } from '@/api/services/api';
+import { GetPricesData } from '@/api/schema';
+import { ApiRoutes } from '@/api/types';
+
 
 type TradeProps = {
   navigation: NativeStackNavigationProp<any>;
@@ -22,6 +26,7 @@ const Trade = ({ navigation }: TradeProps) => {
   const { selectedAccountId, isLoading: accountsLoading } = useAccounts();
   const [activeSymbol] = useActiveSymbol();
   const { isLoaded: userLoaded, user } = useUser();
+  const details = useUser();
 
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -92,19 +97,17 @@ const Trade = ({ navigation }: TradeProps) => {
           userId={user.id}
         />
       )} */}
-        <TradingView
-          symbol={activeSymbol}
+
+      {selectedAccountId && accountDetails && user && (
+        <TradingChart
+          symbol={activeSymbol || 'BTCUSD'}
           selectedAccountId={selectedAccountId}
           accountDetails={accountDetails}
-          userId={`${details.user.id}`}
-          className={cn(
-            'flex-1',
-            isMobile ? 'max-h-[60vh]' : 'min-h-[600px] max-h-[90vh]',
-          )}
+          userId={`${details.user?.id}`}
+          className="flex-1"
         />
-
-      <TradingChart />
-
+      )}
+      {/* <TradingChart/> */}
       <TradingButtons />
     </SafeAreaView>
   );

@@ -2,6 +2,10 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
 
+export function getAPIBaseUrl() {
+  return process.env.EXPO_PUBLIC_SERVER_URL;
+}
+
 type FetchApiOptions = AxiosRequestConfig & {
   formData?: FormData;
   returnMethod?: 'json' | 'blob';
