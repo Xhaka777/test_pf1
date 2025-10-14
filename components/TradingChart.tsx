@@ -27,6 +27,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@clerk/clerk-expo';
 import { tokenManager } from '@/utils/websocket-token-manager';
 import * as FileSystem from 'expo-file-system';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
+
 
 interface TradingViewChartProps {
     selectedAccountId: number;
@@ -75,6 +77,10 @@ const TradingChart = memo(function TradingViewChart(
     const [currentOrder, setCurrentOrder] = useState<
         OpenTradesData['open_orders'][number] | null
     >(null);
+
+    //for close position bottom sheet
+    const closePositionBottomSheetRef = useRef<BottomSheetModal>(null);
+    const [closePositionDialogLoading, setClosePositionDialogLoading] = useState(false);
 
     // Send WebSocket token when ready
     useEffect(() => {
@@ -279,7 +285,11 @@ const TradingChart = memo(function TradingViewChart(
                     );
                     if (closePosition) {
                         setCurrentPosition(closePosition);
-                        setTimeout(() => setClosePositionDialogVisible(true), 100);
+                        setClosePositionDialogVisible(true);
+                        // Present the bottom sheet
+                        setTimeout(() => {
+                            closePositionBottomSheetRef.current?.present();
+                        }, 100);
                     }
                     break;
                 case 'EDIT_POSITION':
@@ -1636,26 +1646,20 @@ tvWidget.onChartReady(function() {
                 />
             </View>
 
-            {currentPosition ? (
-                <>
-                    <ClosePositionBottomSheet
-                        isOpen={closePositionDialogVisible}
-                        onClose={() => {
-                            setClosePositionDialogVisible(false);
-                            setTimeout(() => setCurrentPosition(null), 100);
-                        }}
-                        openTrade={currentPosition}
-                    />
-                    <EditPositionBottomSheet
-                        isOpen={editPositionDialogVisible}
-                        onClose={() => {
-                            setEditPositionDialogVisible(false);
-                            setTimeout(() => setCurrentPosition(null), 100);
-                        }}
-                        openTrade={currentPosition}
-                    />
-                </>
-            ) : null}
+            {currentPosition && (
+                <ClosePositionBottomSheet
+                    ref={closePositionBottomSheetRef}
+                    isOpen={closePositionDialogVisible}
+                    onClose={() => {
+                        setClosePositionDialogVisible(false);
+                        closePositionBottomSheetRef.current?.dismiss();
+                        setTimeout(() => setCurrentPosition(null), 100);
+                    }}
+                    openTrade={currentPosition}
+                    onLoadingChange={setClosePositionDialogLoading}
+                />
+            )}
+
         </>
     );
 });
