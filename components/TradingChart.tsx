@@ -282,7 +282,6 @@ const TradingChart = memo(function TradingViewChart(
                         setTimeout(() => setClosePositionDialogVisible(true), 100);
                     }
                     break;
-
                 case 'EDIT_POSITION':
                     const editData = message.data;
                     const editPosition = openTrades?.open_trades.find(
@@ -558,16 +557,16 @@ const TradingChart = memo(function TradingViewChart(
         return `${exchange}:${server}:`;
     }, [props.accountDetails]);
 
-// Add this useEffect
-useEffect(() => {
-    if (openTrades) {
-        console.log('===== FULL OPEN TRADES RESPONSE =====');
-        console.log('Account:', openTrades.account);
-        console.log('Open trades count:', openTrades.open_trades?.length);
-        console.log('Open trades:', JSON.stringify(openTrades.open_trades, null, 2));
-        console.log('Open orders count:', openTrades.open_orders?.length);
-    }
-}, [openTrades]);
+    // Add this useEffect
+    useEffect(() => {
+        if (openTrades) {
+            console.log('===== FULL OPEN TRADES RESPONSE =====');
+            console.log('Account:', openTrades.account);
+            console.log('Open trades count:', openTrades.open_trades?.length);
+            console.log('Open trades:', JSON.stringify(openTrades.open_trades, null, 2));
+            console.log('Open orders count:', openTrades.open_orders?.length);
+        }
+    }, [openTrades]);
 
     // Send open trades/orders to WebView when they change
     useEffect(() => {
@@ -593,6 +592,34 @@ useEffect(() => {
             });
         }
     }, [isReady, openTrades, currency, sendToWebView]);
+
+    // Add this NEW useEffect to convert and send positions
+useEffect(() => {
+    if (isReady && openTrades) {
+        const currentSymbol = props.symbol;
+        
+        const positions = openTrades.open_trades
+            .filter(trade => trade.symbol === currentSymbol)
+            .map(trade => ({
+                id: trade.order_id,
+                symbol: trade.symbol,
+                qty: trade.position_type === 'long' ? trade.quantity : -trade.quantity,
+                side: trade.position_type === 'long' ? 1 : -1,
+                avgPrice: trade.entry,
+                profit: trade.pl,
+                last: trade.entry, // This should ideally be current market price
+                price: trade.entry,
+                type: 2, // Position type
+            }));
+
+        console.log('[TradingChart] Sending positions to broker:', positions);
+
+        sendToWebView({
+            type: 'SET_POSITIONS',
+            data: { positions }
+        });
+    }
+}, [isReady, openTrades, props.symbol, sendToWebView]);
 
     // Send symbol changes to WebView
     useEffect(() => {
@@ -657,10 +684,12 @@ useEffect(() => {
         window.API_BASE_URL = '${apiBaseUrl}';
         window.WSS_BASE_URL = '${wssBaseUrl}';
         window.WS_TOKEN = null;
+        window.currentPositions = []; // Store positions
     </script>
     <script type="text/javascript" src="charting_library/charting_library.standalone.js"></script>
     <script type="text/javascript" src="datafeeds/udf/dist/bundle.js"></script>
     <script>
+
 (function() {
     var API_ROUTES = {
         GET_SYMBOLS: '/get_symbols',
@@ -1006,6 +1035,37 @@ useEffect(() => {
         return remainder === 0 ? interval : interval - remainder;
     };
 
+class CustomBroker {
+    constructor(host) {
+        this.host = host;
+        console.log('[CustomBroker] Initialized');
+    }
+
+    positions() {
+        console.log('[CustomBroker] positions() called, returning:', window.currentPositions);
+        return Promise.resolve(window.currentPositions || []);
+    }
+
+    orders() {
+        console.log('[CustomBroker] orders() called');
+        return Promise.resolve([]);
+    }
+
+    chartContextMenuActions() {
+        return Promise.resolve([]);
+    }
+
+    isTradable() {
+        return Promise.resolve(false); // Disable trading UI
+    }
+
+    accountManagerInfo() {
+        return Promise.resolve({
+            accountTitle: 'Trading Account',
+        });
+    }
+}
+
     var tvWidget = null;
     var shapesMap = new Map();
     var lastBar = null;
@@ -1053,6 +1113,25 @@ useEffect(() => {
                     tvWidget.setSymbol(message.data.symbol, currentResolution, function() {
                         console.log('Symbol changed to:', message.data.symbol);
                     });
+                }
+                break;
+
+            case 'SET_POSITIONS':
+                console.log('[handleMessage] SET_POSITIONS received:', message.data.positions);
+                window.currentPositions = message.data.positions || [];
+                
+                // Force broker to refresh positions
+                if (tvWidget && tvWidget.chart) {
+                    try {
+                        var chart = tvWidget.chart();
+                        // Trigger a refresh by calling the internal update
+                        console.log('[handleMessage] Triggering position refresh');
+                        
+                        // The broker API will automatically query positions() again
+                        // We just need to ensure the widget knows data has changed
+                    } catch (e) {
+                        console.error('[handleMessage] Error refreshing positions:', e);
+                    }
                 }
                 break;
 
@@ -1362,7 +1441,7 @@ function updateChartLines() {
         }
 
         var bg = '#100E0F';
-        datafeed = new DatafeedChartApi();
+        var datafeed = new DatafeedChartApi();
 
         var widgetOptions = {
             theme: 'dark',
@@ -1386,6 +1465,17 @@ function updateChartLines() {
                 'header_in_fullscreen_mode',
                 'side_toolbar_in_fullscreen_mode',
             ],
+            broker_factory: function(host) {
+                    return new CustomBroker(host);
+            },
+            broker_config: {
+                configFlags: {
+                    supportPositions: true,
+                    supportOrders: false,
+                    supportClosePosition: false,
+                    supportPLUpdate: true,
+                },
+            },
             library_path: 'charting_library/',
             charts_storage_url: widgetConfig.apiBaseUrl,
             charts_storage_api_version: '1.1',
@@ -1398,6 +1488,14 @@ function updateChartLines() {
             loading_screen: {
                 backgroundColor: bg,
             },
+            trading_customization: {
+                    position: {
+                        lineBuyColor: '#31C48D', // Green for long
+                        lineSellColor: '#EF4444', // Red for short
+                        lineWidth: 2,
+                        quantityTextColor: '#FFFFFF',
+                    },
+            },
             overrides: {
                 'paneProperties.background': bg,
                 'paneProperties.backgroundType': 'solid',
@@ -1409,52 +1507,52 @@ function updateChartLines() {
 
         tvWidget = new window.TradingView.widget(widgetOptions);
 
-        tvWidget.onChartReady(function() {
-            console.log('TradingView chart ready');
-            sendMessage('CHART_READY', {});
+tvWidget.onChartReady(function() {
+    console.log('TradingView chart ready');
+    sendMessage('CHART_READY', {});
 
-            tvWidget.subscribe('onPlusClick', function(event) {
-                var chart = tvWidget.activeChart();
-                var symbolObj = chart.symbolExt();
-                
-                sendMessage('PLUS_CLICK', {
-                    price: event.price,
-                    marketPrice: lastBar ? lastBar.close : event.price,
-                    symbol: symbolObj ? symbolObj.name : '',
-                });
-            });
-
-            tvWidget.subscribe('onTick', function(tick) {
-                lastBar = tick;
-                
-                if (askLine) {
-                    try {
-                        askLine.remove();
-                    } catch (e) {}
-                }
-                
-                var chart = tvWidget.activeChart();
-                if (chart && tick.close) {
-                    askLine = chart
-                        .createPositionLine()
-                        .setText('')
-                        .setQuantity('')
-                        .setLineStyle(1)
-                        .setLineWidth(1)
-                        .setPrice(tick.close)
-                        .setLineColor(colors.sl || '#FF0000');
-                }
-            });
-
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    var chart = tvWidget.activeChart();
-                    if (chart) {
-                        chart.resetData();
-                    }
-                }
-            });
+    tvWidget.subscribe('onPlusClick', function(event) {
+        var chart = tvWidget.activeChart();
+        var symbolObj = chart.symbolExt();
+        
+        sendMessage('PLUS_CLICK', {
+            price: event.price,
+            marketPrice: lastBar ? lastBar.close : event.price,
+            symbol: symbolObj ? symbolObj.name : '',
         });
+    });
+
+    tvWidget.subscribe('onTick', function(tick) {
+        lastBar = tick;
+        
+        if (askLine) {
+            try {
+                askLine.remove();
+            } catch (e) {}
+        }
+        
+        var chart = tvWidget.activeChart();
+        if (chart && tick.close) {
+            askLine = chart
+                .createPositionLine()
+                .setText('')
+                .setQuantity('')
+                .setLineStyle(1)
+                .setLineWidth(1)
+                .setPrice(tick.close)
+                .setLineColor(colors.sl || '#FF0000');
+        }
+    });
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            var chart = tvWidget.activeChart();
+            if (chart) {
+                chart.resetData();
+            }
+        }
+    });
+});
     }
 
     window.addEventListener('message', receiveMessage);

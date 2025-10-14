@@ -14,6 +14,8 @@ import TradingChart from '@/components/TradingChart';
 import { useAuthenticatedApi } from '@/api/services/api';
 import { GetPricesData } from '@/api/schema';
 import { ApiRoutes } from '@/api/types';
+import SimpleTradingViewPositions from '@/components/SimpleTradingViewPositions';
+import TradingView from '@/components/TradingView';
 
 
 type TradeProps = {
@@ -33,6 +35,25 @@ const Trade = ({ navigation }: TradeProps) => {
   const isLoading = useMemo(() => {
     return !userLoaded || !user || accountsLoading || accountDetailsLoading || !selectedAccountId;
   }, [userLoaded, user, accountsLoading, accountDetailsLoading, selectedAccountId]);
+
+  const positions = [
+    {
+      symbol: 'AAPL',
+      side: 'LONG',
+      quantity: 10,
+      entryPrice: 170.50,
+      currentPrice: 173.68,
+      profit: 31.80,
+    },
+    {
+      symbol: 'AAPL',
+      side: 'SHORT',
+      quantity: 5,
+      entryPrice: 175.00,
+      currentPrice: 173.68,
+      profit: 6.60,
+    }
+  ];
 
   // useEffect(() => {
   //   if (!isLoading) {
@@ -81,6 +102,30 @@ const Trade = ({ navigation }: TradeProps) => {
   console.log('activeSymbol', activeSymbol)
   // console.log('accountDetails', accountDetails)
 
+  const samplePositions = [
+    {
+      id: '1',
+      symbol: 'AAPL',
+      side: "LONG" as "LONG",
+      entry: 173.68,
+      quantity: 12,
+      tp: 180,
+      sl: 165,
+      profit: 75.84,
+      loss: -104.16
+    },
+    {
+      id: '2',
+      symbol: 'AAPL',
+      side: "SHORT" as "SHORT",
+      entry: 175.50,
+      quantity: 10,
+      tp: 170,
+      sl: 178,
+      profit: 55.00,
+      loss: -25.00
+    }
+  ];
 
   return (
     <SafeAreaView className='flex-1 bg-[#100E0F]'>
@@ -108,6 +153,8 @@ const Trade = ({ navigation }: TradeProps) => {
         />
       )}
       {/* <TradingChart/> */}
+      {/* <SimpleTradingViewPositions positions={samplePositions}/> */}
+      {/* <TradingView/> */}
       <TradingButtons />
     </SafeAreaView>
   );
