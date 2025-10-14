@@ -47,7 +47,7 @@ interface WebViewMessage {
 
 const SL_COLOR = '#FF0000';
 const TP_COLOR = '#12de1f';
-const POSITION_COLOR = '#FFA500';
+const POSITION_COLOR = '#582c11';
 
 const TradingChart = memo(function TradingViewChart(
     props: TradingViewChartProps,
@@ -594,32 +594,32 @@ const TradingChart = memo(function TradingViewChart(
     }, [isReady, openTrades, currency, sendToWebView]);
 
     // Add this NEW useEffect to convert and send positions
-useEffect(() => {
-    if (isReady && openTrades) {
-        const currentSymbol = props.symbol;
-        
-        const positions = openTrades.open_trades
-            .filter(trade => trade.symbol === currentSymbol)
-            .map(trade => ({
-                id: trade.order_id,
-                symbol: trade.symbol,
-                qty: trade.position_type === 'long' ? trade.quantity : -trade.quantity,
-                side: trade.position_type === 'long' ? 1 : -1,
-                avgPrice: trade.entry,
-                profit: trade.pl,
-                last: trade.entry, // This should ideally be current market price
-                price: trade.entry,
-                type: 2, // Position type
-            }));
+    useEffect(() => {
+        if (isReady && openTrades) {
+            const currentSymbol = props.symbol;
 
-        console.log('[TradingChart] Sending positions to broker:', positions);
+            const positions = openTrades.open_trades
+                .filter(trade => trade.symbol === currentSymbol)
+                .map(trade => ({
+                    id: trade.order_id,
+                    symbol: trade.symbol,
+                    qty: trade.position_type === 'long' ? trade.quantity : -trade.quantity,
+                    side: trade.position_type === 'long' ? 1 : -1,
+                    avgPrice: trade.entry,
+                    profit: trade.pl,
+                    last: trade.entry, // This should ideally be current market price
+                    price: trade.entry,
+                    type: 2, // Position type
+                }));
 
-        sendToWebView({
-            type: 'SET_POSITIONS',
-            data: { positions }
-        });
-    }
-}, [isReady, openTrades, props.symbol, sendToWebView]);
+            console.log('[TradingChart] Sending positions to broker:', positions);
+
+            sendToWebView({
+                type: 'SET_POSITIONS',
+                data: { positions }
+            });
+        }
+    }, [isReady, openTrades, props.symbol, sendToWebView]);
 
     // Send symbol changes to WebView
     useEffect(() => {
@@ -675,6 +675,43 @@ useEffect(() => {
     <style>
         body { margin: 0; padding: 0; overflow: hidden; }
         #tv_chart_container { height: 100vh; width: 100vw; }
+
+    /* Header (top toolbar) */
+    .header-widget, .chart-controls-bar {
+      background-color: #100E0F !important;
+      color: #fff !important;
+    }
+
+    /* Timeframes toolbar */
+    .timeframes-toolbar, .timeframe-group, .apply-common-tooltip {
+      background-color: #100E0F !important;
+      color: #fff !important;
+    }
+
+    /* Bottom toolbar (date range area) */
+    .layout__area--bottom {
+      background-color: #100E0F !important;
+    }
+
+    /* Buttons */
+    .button, .apply-common-tooltip {
+      color: #fff !important;
+    }
+
+    /* Time scale background */
+    div[class*="timescale"] {
+      background-color: #100E0F !important;
+    }
+
+    /* Any remaining toolbar elements */
+    div[class*="toolbar-"] {
+      background-color: #100E0F !important;
+    }
+    
+    /* Target all potential header areas */
+    div[class*="header-"], div[class*="top-"] {
+      background-color: #100E0F !important;
+    }
     </style>
 </head>
 <body>
@@ -1501,6 +1538,10 @@ function updateChartLines() {
                 'paneProperties.backgroundType': 'solid',
                 'paneProperties.topMargin': 1,
                 'paneProperties.bottomMargin': 1,
+                'paneProperties.backgroundGradientStartColor': bg,
+                'paneProperties.backgroundGradientEndColor': bg,
+                'scalesProperties.backgroundColor': bg,
+                'mainSeriesProperties.style': 1,
             },
             load_last_chart: true,
         };
