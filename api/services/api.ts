@@ -1,6 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
+import { useNetwork } from '@/providers/network';
 
 export function getAPIBaseUrl() {
   return process.env.EXPO_PUBLIC_SERVER_URL;
@@ -16,6 +17,7 @@ const MAX_AUTH_RETRIES = 2;
 
 export function useAuthenticatedApi<T>() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { setNetworkError } = useNetwork();
 
   const fetchFromApi = async (
     endpoint: string,
@@ -30,7 +32,6 @@ export function useAuthenticatedApi<T>() {
       ...axiosOptions
     } = options;
 
-    // ✅ CRITICAL: Wait for Clerk to load
     if (!isLoaded) {
       await new Promise(resolve => setTimeout(resolve, 100));
       if (!isLoaded) {
@@ -38,22 +39,20 @@ export function useAuthenticatedApi<T>() {
       }
     }
 
-    // ✅ CRITICAL: Check sign-in state
     if (!isSignedIn) {
       throw new Error('Please sign in to continue.');
     }
 
-    // ✅ CRITICAL: Get valid token with automatic refresh
     let clerkToken: string | null;
-    
+
     try {
       // Force fresh token on retries (this is the key to fixing 401/403 errors)
       if (_retryCount > 0) {
         console.log('[API] Retry attempt, forcing fresh token');
         await clerkTokenManager.clearCache();
       }
-      
-      clerkToken = await clerkTokenManager.getToken(() => 
+
+      clerkToken = await clerkTokenManager.getToken(() =>
         getToken({ skipCache: _retryCount > 0 })
       );
     } catch (tokenError) {
@@ -65,7 +64,6 @@ export function useAuthenticatedApi<T>() {
       throw new Error('Could not obtain authentication token.');
     }
 
-    // ✅ Build request
     const headers = {
       ...(formData ? {} : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${clerkToken}`,
@@ -89,13 +87,12 @@ export function useAuthenticatedApi<T>() {
     try {
       const response: AxiosResponse<T> = await axios(axiosConfig);
 
-      // ✅ CRITICAL: Handle 401/403 automatically
       if (response.status === 401 || response.status === 403) {
         console.warn(`[API] ${response.status} error on ${endpoint}`);
 
         if (_retryCount < MAX_AUTH_RETRIES) {
           console.log(`[API] Auto-retry ${_retryCount + 1}/${MAX_AUTH_RETRIES}`);
-          
+
           // Small delay before retry
           await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -110,10 +107,9 @@ export function useAuthenticatedApi<T>() {
         throw new Error('Session expired. Please sign in again.');
       }
 
-      // ✅ Handle other errors
       if (response.status >= 400) {
-        const errorMessage = 
-          response.data?.message || 
+        const errorMessage =
+          response.data?.message ||
           response.data?.error ||
           `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
@@ -121,25 +117,30 @@ export function useAuthenticatedApi<T>() {
 
       return response.data;
     } catch (error) {
-      // ✅ CRITICAL: Retry on network/connection errors
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
+
+        if (!error.response && error.code === 'ERR_NETWORK') {
+          console.error('[API] Network error detected');
+          setNetworkError(true); // Trigger error screen
+          throw new Error('Network connection lost');
+        }
 
         // Auto-retry auth errors
         if ((status === 401 || status === 403) && _retryCount < MAX_AUTH_RETRIES) {
           console.log('[API] Caught auth error, retrying...');
           await new Promise(resolve => setTimeout(resolve, 300));
-          
+
           return fetchFromApi(endpoint, {
             ...options,
             _retryCount: _retryCount + 1,
           });
         }
 
-        const errorMessage = 
-          error.response?.data?.message || 
+        const errorMessage =
+          error.response?.data?.message ||
           error.response?.data?.error ||
-          error.message || 
+          error.message ||
           'Request failed';
 
         throw new Error(errorMessage);

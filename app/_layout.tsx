@@ -1,3 +1,4 @@
+// app/_layout.tsx
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -21,12 +22,10 @@ import { NetworkProvider, useNetwork } from '@/providers/network';
 import ConnectionErrorScreen from '@/components/ConnectionErrorScreen';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
-
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 if (!publishableKey) {
-  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env',
-  )
+  throw new Error('Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
 }
 
 const tokenCache = {
@@ -38,12 +37,52 @@ const tokenCache = {
   },
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const { hasNetworkError } = useNetwork();
+// Create a wrapper component for the app content that checks network
+function AppContent() {
+const { hasNetworkError, isConnected, isInternetReachable } = useNetwork();
 
+  // Log network state changes
+  useEffect(() => {
+    console.log('[AppContent] Network state:', {
+      hasNetworkError,
+      isConnected,
+      isInternetReachable
+    });
+  }, [hasNetworkError, isConnected, isInternetReachable]);
+
+  // Show connection error screen if there's a network error
+  if (hasNetworkError) {
+    console.log('[AppContent] Showing ConnectionErrorScreen');
+    return <ConnectionErrorScreen />;
+  }
+
+  return (
+    <Stack>
+      <Stack.Screen name='index' options={{ headerShown: false }} />
+      <Stack.Screen name='(auth)' options={{ headerShown: false }} />
+      <Stack.Screen
+        name='(tabs)'
+        options={{
+          headerShown: false,
+          animation: 'none'
+        }}
+      />
+      <Stack.Screen
+        name='menu'
+        options={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
+        }}
+      />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -56,7 +95,6 @@ export default function RootLayout() {
 
     initAuth();
 
-    // ✅ CRITICAL: Clear cache on sign out
     return () => {
       clerkTokenManager.clearCache();
     };
@@ -78,7 +116,6 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  // Simple app state listener (WebSocketManager no longer needed)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
@@ -90,7 +127,6 @@ export default function RootLayout() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
-    // Simple cleanup
     return () => {
       subscription?.remove();
       console.log('[App] App terminating');
@@ -99,10 +135,6 @@ export default function RootLayout() {
 
   if (!loaded) {
     return null;
-  }
-
-  if (hasNetworkError) {
-    return <ConnectionErrorScreen />;
   }
 
   return (
@@ -117,28 +149,7 @@ export default function RootLayout() {
                     <AccountDetailsProvider>
                       <CurrencySymbolProvider>
                         <OpenPositionsProvider>
-                          <Stack>
-                            <Stack.Screen name='index' options={{ headerShown: false }} />
-                            <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-                            <Stack.Screen
-                              name='(tabs)'
-                              options={{
-                                headerShown: false,
-                                animation: 'none' // No animation to avoid glitching
-                              }}
-                            />
-                            <Stack.Screen
-                              name='menu'
-                              options={{
-                                headerShown: false,
-                                // Menu slides in from right to left
-                                animation: 'slide_from_right',
-                                // Enable gesture navigation
-                                gestureEnabled: true,
-                                gestureDirection: 'horizontal',
-                              }}
-                            />
-                          </Stack>
+                          <AppContent />
                         </OpenPositionsProvider>
                       </CurrencySymbolProvider>
                     </AccountDetailsProvider>

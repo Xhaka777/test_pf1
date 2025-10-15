@@ -1,5 +1,4 @@
-// providers/network.tsx
-import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
+import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useCallback, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { AppState, AppStateStatus } from 'react-native';
 
@@ -8,7 +7,7 @@ interface NetworkContextType {
   isInternetReachable: boolean | null;
   connectionType: string | null;
   hasNetworkError: boolean;
-  retryConnection: () => void;
+  retryConnection: () => Promise<boolean>;
   setNetworkError: (hasError: boolean) => void;
 }
 
@@ -17,7 +16,7 @@ const NetworkContext = createContext<NetworkContextType>({
   isInternetReachable: true,
   connectionType: null,
   hasNetworkError: false,
-  retryConnection: () => {},
+  retryConnection: async () => true,
   setNetworkError: () => {},
 });
 
@@ -27,47 +26,110 @@ export function NetworkProvider({ children }: PropsWithChildren) {
   const [connectionType, setConnectionType] = useState<string | null>(null);
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  
+  // Use ref to prevent multiple simultaneous checks
+  const isCheckingRef = useRef(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor network connectivity
+  // Function to check network state
+  const checkNetworkState = useCallback(async (): Promise<boolean> => {
+    if (isCheckingRef.current) {
+      console.log('[NetworkProvider] Already checking network, skipping');
+      return !hasNetworkError;
+    }
+
+    isCheckingRef.current = true;
+
+    try {
+      const state = await NetInfo.fetch();
+      console.log('[NetworkProvider] Network check result:', {
+        isConnected: state.isConnected,
+        isInternetReachable: state.isInternetReachable,
+        type: state.type,
+      });
+
+      const connected = state.isConnected ?? false;
+      const reachable = state.isInternetReachable;
+
+      setIsConnected(connected);
+      setIsInternetReachable(reachable);
+      setConnectionType(state.type);
+
+      // Determine if there's a network error
+      const hasError = !connected || reachable === false;
+
+      if (hasError) {
+        console.log('[NetworkProvider] ❌ Network error detected');
+        setHasNetworkError(true);
+        return false;
+      } else {
+        console.log('[NetworkProvider] ✅ Network connection is good');
+        setHasNetworkError(false);
+        return true;
+      }
+    } catch (error) {
+      console.error('[NetworkProvider] Error checking network:', error);
+      setHasNetworkError(true);
+      return false;
+    } finally {
+      isCheckingRef.current = false;
+    }
+  }, [hasNetworkError]);
+
+  // Debounced network check to prevent rapid state changes
+  const debouncedNetworkCheck = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      checkNetworkState();
+    }, 300); // 300ms debounce
+  }, [checkNetworkState]);
+
+  // Initial check on mount
   useEffect(() => {
     console.log('[NetworkProvider] Setting up network monitoring');
+    checkNetworkState();
+  }, [checkNetworkState]);
 
+  // Monitor network connectivity with NetInfo
+  useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       console.log('[NetworkProvider] Network state changed:', {
         isConnected: state.isConnected,
         isInternetReachable: state.isInternetReachable,
         type: state.type,
-        details: state.details
       });
 
-      setIsConnected(state.isConnected ?? false);
-      setIsInternetReachable(state.isInternetReachable);
+      const connected = state.isConnected ?? false;
+      const reachable = state.isInternetReachable;
+
+      setIsConnected(connected);
+      setIsInternetReachable(reachable);
       setConnectionType(state.type);
 
-      // Clear network error when connection is restored
-      if (state.isConnected && state.isInternetReachable) {
-        console.log('[NetworkProvider] Connection restored, clearing network error');
-        setHasNetworkError(false);
-      } else if (!state.isConnected || state.isInternetReachable === false) {
+      // Update error state with debouncing to handle rapid changes
+      if (!connected || reachable === false) {
         console.log('[NetworkProvider] Connection lost, setting network error');
         setHasNetworkError(true);
-      }
-    });
-
-    // Check initial connection state
-    NetInfo.fetch().then(state => {
-      console.log('[NetworkProvider] Initial network state:', state);
-      setIsConnected(state.isConnected ?? false);
-      setIsInternetReachable(state.isInternetReachable);
-      setConnectionType(state.type);
-
-      if (!state.isConnected || state.isInternetReachable === false) {
-        setHasNetworkError(true);
+      } else if (connected && reachable === true) {
+        // Connection restored - clear error immediately
+        console.log('[NetworkProvider] Connection restored, clearing network error immediately');
+        setHasNetworkError(false);
+        
+        // Clear any pending debounced checks
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
       }
     });
 
     return () => {
       console.log('[NetworkProvider] Cleaning up network monitoring');
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
       unsubscribe();
     };
   }, []);
@@ -80,17 +142,7 @@ export function NetworkProvider({ children }: PropsWithChildren) {
       // When app becomes active, recheck network status
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         console.log('[NetworkProvider] App became active, rechecking network...');
-        NetInfo.fetch().then(state => {
-          setIsConnected(state.isConnected ?? false);
-          setIsInternetReachable(state.isInternetReachable);
-          setConnectionType(state.type);
-
-          if (state.isConnected && state.isInternetReachable) {
-            setHasNetworkError(false);
-          } else {
-            setHasNetworkError(true);
-          }
-        });
+        setTimeout(() => checkNetworkState(), 500);
       }
       
       setAppState(nextAppState);
@@ -98,53 +150,40 @@ export function NetworkProvider({ children }: PropsWithChildren) {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState]);
+  }, [appState, checkNetworkState]);
 
-  const retryConnection = async () => {
+  const retryConnection = useCallback(async (): Promise<boolean> => {
     console.log('[NetworkProvider] Manual retry requested');
     
-    try {
-      const state = await NetInfo.fetch();
-      console.log('[NetworkProvider] Retry - Network state:', state);
-      
-      setIsConnected(state.isConnected ?? false);
-      setIsInternetReachable(state.isInternetReachable);
-      setConnectionType(state.type);
+    // Wait a moment before checking
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const result = await checkNetworkState();
+    console.log('[NetworkProvider] Retry result:', result);
+    return result;
+  }, [checkNetworkState]);
 
-      if (state.isConnected && state.isInternetReachable) {
-        console.log('[NetworkProvider] Retry successful - connection restored');
-        setHasNetworkError(false);
-        return true;
-      } else {
-        console.log('[NetworkProvider] Retry failed - still no connection');
-        setHasNetworkError(true);
-        return false;
-      }
-    } catch (error) {
-      console.error('[NetworkProvider] Error during retry:', error);
-      setHasNetworkError(true);
-      return false;
-    }
-  };
-
-  const setNetworkError = (hasError: boolean) => {
+  const setNetworkErrorManually = useCallback((hasError: boolean) => {
     console.log('[NetworkProvider] Manual network error state change:', hasError);
     setHasNetworkError(hasError);
-  };
+  }, []);
 
-  // Show error screen if:
-  // 1. No network connection
-  // 2. Network connected but no internet access
-  // 3. Manual network error set by app components
-  const shouldShowError = !isConnected || isInternetReachable === false || hasNetworkError;
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const contextValue: NetworkContextType = {
     isConnected,
     isInternetReachable,
     connectionType,
-    hasNetworkError: shouldShowError,
+    hasNetworkError,
     retryConnection,
-    setNetworkError,
+    setNetworkError: setNetworkErrorManually,
   };
 
   return (
