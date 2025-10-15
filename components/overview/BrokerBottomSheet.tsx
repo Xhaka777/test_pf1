@@ -268,7 +268,7 @@ const BrokerBottomSheet = ({
                 {/* Action Button */}
                 <TouchableOpacity
                     onPress={handleActionButtonPress}
-                    className={`mx-2 px-4 py-3 rounded-lg mb-10 ${buttonConfig.style}`}
+                    className={`mx-2 px-4 py-3 rounded-lg ${buttonConfig.style}`}
                 >
                     <Text className={`font-InterSemiBold text-center ${buttonConfig.textStyle}`}>
                         {buttonConfig.text}
@@ -278,7 +278,7 @@ const BrokerBottomSheet = ({
                 {context === 'menu' && onArchivePress && (
                     <TouchableOpacity
                         onPress={handleArchivePress}
-                        className="px-4 py-3 mx-2 mt-2 rounded-lg border border-gray-600 flex-row items-center justify-center"
+                        className="px-4 py-3 mx-2 mt-3 mb-2 rounded-lg border border-gray-600 flex-row items-center justify-center"
                     >
                         <Archive size={16} color='#fff' />
                         <Text className="text-white font-InterSemiBold ml-2">

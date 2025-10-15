@@ -11,19 +11,12 @@ import ProfileBottomSheet from '@/components/ProfileBottomSheet';
 import ConfirmBottomSheet from '@/components/ConfirmBottomSheet';
 import DemoAccBottomSheet from '@/components/AccountBottomSheet';
 import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet';
-import SeachInput from '@/components/SearchInput';
 import NoPropFirmAccounts from '@/components/NoPropFirmAccounts';
 import NoBrokerAccount from '@/components/NoBrokerAccount';
-
-import { EvaluatedAccountIcon } from '@/components/icons/EvaluatedAccountIcon';
-import { FundedAccountIcon } from '@/components/icons/FundedAccountIcon';
-import AccountIcon from '@/components/icons/AccountIcon';
-import { PracticeIcon } from '@/components/icons/PracticeIcon';
 import { useArchiveAccountMutation, useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
 import { AccountStatusEnum } from '@/constants/enums';
 import { useAccounts } from '@/providers/accounts';
 import { useGetMetrics } from '@/api/hooks/metrics';
-import { set } from 'date-fns';
 import { ArchiveAccountModal } from '@/components/ArchiveAccountModal';
 
 const Menu = () => {
