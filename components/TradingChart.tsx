@@ -28,6 +28,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { tokenManager } from '@/utils/websocket-token-manager';
 import * as FileSystem from 'expo-file-system';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
+import { Asset } from 'expo-asset';
 
 
 interface TradingViewChartProps {
@@ -48,7 +49,7 @@ interface WebViewMessage {
 }
 
 const SL_COLOR = '#FF0000';
-const TP_COLOR = '#12de1f';
+const TP_COLOR = '#49c596';
 const POSITION_COLOR = '#582c11';
 
 const TradingChart = memo(function TradingViewChart(
@@ -686,42 +687,71 @@ const TradingChart = memo(function TradingViewChart(
         body { margin: 0; padding: 0; overflow: hidden; }
         #tv_chart_container { height: 100vh; width: 100vw; }
 
-    /* Header (top toolbar) */
-    .header-widget, .chart-controls-bar {
-      background-color: #100E0F !important;
-      color: #fff !important;
-    }
+        /* ⭐ THEME CSS FROM WEB TEAM - Adapted for React Native */
+        .theme-dark:root {
+            --tv-color-platform-background: hsl(330 6.7% 5.9%);
+            --tv-color-pane-background: hsl(330 6.7% 5.9%);
+        }
 
-    /* Timeframes toolbar */
-    .timeframes-toolbar, .timeframe-group, .apply-common-tooltip {
-      background-color: #100E0F !important;
-      color: #fff !important;
-    }
+        .layout__area--top {
+            border-bottom: 1px solid hsl(340 3.3% 17.8%);
+        }
 
-    /* Bottom toolbar (date range area) */
-    .layout__area--bottom {
-      background-color: #100E0F !important;
-    }
+        .layout__area--left {
+            border-right: 1px solid hsl(340 3.3% 17.8%);
+            top: 39px !important;
+        }
 
-    /* Buttons */
-    .button, .apply-common-tooltip {
-      color: #fff !important;
-    }
+        #header-toolbar-symbol-search {
+            pointer-events: none;
+            width: auto;
+        }
 
-    /* Time scale background */
-    div[class*="timescale"] {
-      background-color: #100E0F !important;
-    }
+        #header-toolbar-symbol-search svg {
+            display: none;
+        }
 
-    /* Any remaining toolbar elements */
-    div[class*="toolbar-"] {
-      background-color: #100E0F !important;
-    }
-    
-    /* Target all potential header areas */
-    div[class*="header-"], div[class*="top-"] {
-      background-color: #100E0F !important;
-    }
+        /* ⭐ ADDITIONAL STYLING TO ENSURE #100E0F BACKGROUND */
+        /* Your color #100E0F is equivalent to hsl(330 6.7% 5.9%) */
+        
+        /* Header (top toolbar) */
+        .header-widget, .chart-controls-bar {
+            background-color: #100E0F !important;
+            color: #fff !important;
+        }
+
+        /* Timeframes toolbar */
+        .timeframes-toolbar, 
+        .timeframe-group, 
+        .apply-common-tooltip {
+            background-color: #100E0F !important;
+            color: #fff !important;
+        }
+
+        /* Bottom toolbar (date range area) */
+        .layout__area--bottom {
+            background-color: #100E0F !important;
+        }
+
+        /* Buttons */
+        .button, .apply-common-tooltip {
+            color: #fff !important;
+        }
+
+        /* Time scale background */
+        div[class*="timescale"] {
+            background-color: #100E0F !important;
+        }
+
+        /* Any remaining toolbar elements */
+        div[class*="toolbar-"] {
+            background-color: #100E0F !important;
+        }
+        
+        /* Target all potential header areas */
+        div[class*="header-"], div[class*="top-"] {
+            background-color: #100E0F !important;
+        }
     </style>
 </head>
 <body>
@@ -1317,10 +1347,10 @@ function updateChartLines() {
                     .setPrice(openTrade.tp)
                     .setQuantity(formatCurrency(openTrade.trade_profit, currency))
                     .setText('TP ' + openTrade.position_type.toUpperCase() + ' ' + openTrade.entry + ' [' + openTrade.quantity + ']')
-                    .setLineColor(colors.tp || '#12de1f')
-                    .setBodyBorderColor(colors.tp || '#12de1f')
-                    .setQuantityBorderColor(colors.tp || '#12de1f')
-                    .setQuantityBackgroundColor(colors.tp || '#12de1f')
+                    .setLineColor(colors.tp || '#49c596')
+                    .setBodyBorderColor(colors.tp || '#49c596')
+                    .setQuantityBorderColor(colors.tp || '#49c596')
+                    .setQuantityBackgroundColor(colors.tp || '#49c596')
                     .setBodyTextColor('#000000')
                     .onMove(function() {
                         var price = tpLine.getPrice();
@@ -1537,7 +1567,7 @@ function updateChartLines() {
             },
             trading_customization: {
                     position: {
-                        lineBuyColor: '#31C48D', // Green for long
+                        lineBuyColor: '#49c596', // Green for long
                         lineSellColor: '#EF4444', // Red for short
                         lineWidth: 2,
                         quantityTextColor: '#FFFFFF',
@@ -1548,18 +1578,44 @@ function updateChartLines() {
                 'paneProperties.backgroundType': 'solid',
                 'paneProperties.topMargin': 1,
                 'paneProperties.bottomMargin': 1,
-                'paneProperties.backgroundGradientStartColor': bg,
-                'paneProperties.backgroundGradientEndColor': bg,
-                'scalesProperties.backgroundColor': bg,
-                'mainSeriesProperties.style': 1,
             },
-            load_last_chart: true,
+         load_last_chart: true,
         };
 
         tvWidget = new window.TradingView.widget(widgetOptions);
 
 tvWidget.onChartReady(function() {
     console.log('TradingView chart ready');
+
+                // ⭐ ADD THIS: Set custom CSS properties for theme
+            try {
+                // Your custom color #100E0F converted to RGB
+                var customBg = 'rgb(16, 14, 15)'; // #100E0F
+                var customBorder = 'rgb(68, 63, 66)'; // hsl(340 3.3% 17.8%)
+                
+                // Platform and pane background
+                tvWidget.setCSSCustomProperty('--tv-color-platform-background', customBg);
+                tvWidget.setCSSCustomProperty('--tv-color-pane-background', customBg);
+                
+                // Toolbar colors
+                tvWidget.setCSSCustomProperty('--tv-color-toolbar-button-text', '#ffffff');
+                tvWidget.setCSSCustomProperty('--tv-color-toolbar-button-text-hover', '#ffffff');
+                tvWidget.setCSSCustomProperty('--tv-color-toolbar-button-background-hover', 'rgba(255, 255, 255, 0.1)');
+                
+                // Pop-up menu colors
+                tvWidget.setCSSCustomProperty('--tv-color-popup-background', customBg);
+                tvWidget.setCSSCustomProperty('--tv-color-popup-element-text', '#ffffff');
+                tvWidget.setCSSCustomProperty('--tv-color-popup-element-text-hover', '#ffffff');
+                tvWidget.setCSSCustomProperty('--tv-color-popup-element-background-hover', 'rgba(255, 255, 255, 0.1)');
+                
+                // Toolbar divider
+                tvWidget.setCSSCustomProperty('--tv-color-toolbar-divider-background', customBorder);
+                
+                console.log('✅ Custom CSS properties applied successfully');
+            } catch (error) {
+                console.error('❌ Error setting CSS properties:', error);
+            }
+
     sendMessage('CHART_READY', {});
 
     tvWidget.subscribe('onPlusClick', function(event) {

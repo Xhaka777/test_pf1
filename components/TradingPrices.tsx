@@ -157,6 +157,8 @@ export function TradingPrices() {
         isLoadingAll
     } = useCurrencySymbol();
 
+    // console.log("allSymbols", allSymbols)
+
     const [open, setOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'forex' | 'stocks' | 'favorites'>('forex');

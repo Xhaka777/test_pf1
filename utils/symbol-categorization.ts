@@ -1,5 +1,4 @@
 // utils/symbol-categorization.ts
-
 export type SymbolCategory = 'forex' | 'stocks' | 'crypto' | 'metals' | 'commodities' | 'indices';
 
 // Define symbol lists by category
@@ -39,9 +38,9 @@ export const SYMBOL_CATEGORIES = {
     "GBPPLN", "EURAUD", "SGDJPY"
   ],
   
-  // Crypto
+  // Crypto - keeping this for reference, but we'll map it to forex in the categorization logic
   crypto: [
-    "BTCUSD", "ETHUSD"
+    "BTCUSD", "ETHUSD", "BTCEUR", "ETHEUR", "BTCGBP", "ETHGBP"
   ]
 };
 
@@ -81,7 +80,7 @@ export function filterSymbolsByCategory<T extends { symbol: string }>(
 
 /**
  * For the TradingPrices component, we'll group categories into tabs
- * Forex tab: forex symbols
+ * Forex tab: forex symbols + crypto (crypto trades like forex)
  * Stocks tab: indices, metals, commodities (everything else except crypto and forex)
  */
 export function getSymbolsForTab<T extends { symbol: string }>(
@@ -89,7 +88,11 @@ export function getSymbolsForTab<T extends { symbol: string }>(
   tab: 'forex' | 'stocks'
 ): T[] {
   if (tab === 'forex') {
-    return filterSymbolsByCategory(symbols, 'forex');
+    // Forex tab includes regular forex pairs AND crypto pairs
+    return symbols.filter(item => {
+      const category = getSymbolCategory(item.symbol);
+      return category === 'forex' || category === 'crypto';
+    });
   } else if (tab === 'stocks') {
     // Stocks tab includes indices, metals, and commodities
     return symbols.filter(item => {
@@ -103,15 +106,33 @@ export function getSymbolsForTab<T extends { symbol: string }>(
 /**
  * Get all symbols that match the symbol name patterns from your provider data
  * This function handles the case where provider data might have different naming
+ * 
+ * IMPORTANT: Crypto symbols are categorized as 'forex' for tab purposes
  */
 export function categorizeProviderSymbol(symbol: string): SymbolCategory | null {
   // Direct match first
   const directMatch = getSymbolCategory(symbol);
-  if (directMatch) return directMatch;
+  if (directMatch) {
+    // If it's crypto, return 'forex' for tab categorization purposes
+    if (directMatch === 'crypto') {
+      return 'forex';
+    }
+    return directMatch;
+  }
   
   // For provider symbols that might have different formats
-  // Handle cases like "FTSE RAFI US1000" -> should be categorized as indices/stocks
   const upperSymbol = symbol.toUpperCase();
+  
+  const cryptoCurrencies = [
+    'BTC', 'ETH', 'LTC', 'XRP', 'ADA', 'DOT', 'SOL', 
+    'AVAX', 'MATIC', 'LINK', 'UNI', 'ATOM', 'XLM', 'DOGE',
+    'SHIB', 'BCH', 'XMR', 'EOS', 'TRX', 'XTZ'
+  ];
+  
+  // Check if symbol starts with any crypto currency (e.g., BTCEUR, ETHUSD, etc.)
+  if (cryptoCurrencies.some(crypto => upperSymbol.startsWith(crypto))) {
+    return 'forex'; 
+  }
   
   // Check for common stock/ETF patterns
   if (
@@ -131,17 +152,21 @@ export function categorizeProviderSymbol(symbol: string): SymbolCategory | null 
   }
   
   // Check for forex patterns (currency pairs)
+  // Standard 6-letter pairs like EURUSD or pairs with slash like EUR/USD
   if (/^[A-Z]{6}$/.test(symbol) || /^[A-Z]{3}\/[A-Z]{3}$/.test(symbol)) {
-    return 'forex';
+    // Make sure it's not a crypto pair (already handled above)
+    if (!cryptoCurrencies.some(crypto => upperSymbol.startsWith(crypto))) {
+      return 'forex';
+    }
   }
   
-  // Check for crypto patterns
+  // Fallback: Check if it contains crypto keywords
   if (
     upperSymbol.includes('BTC') ||
     upperSymbol.includes('ETH') ||
     upperSymbol.includes('CRYPTO')
   ) {
-    return 'crypto';
+    return 'forex'; // Crypto goes to forex tab
   }
   
   // Default to indices (stocks tab) for unknown symbols
