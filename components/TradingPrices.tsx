@@ -383,11 +383,11 @@ export function TradingPrices() {
         <>
             {/* Search Container */}
             <View className="p-4 bg-propfirmone-main">
-                <View className="flex-row items-center bg-[#252223] border border-[#2F2C2D] rounded-lg px-3">
+                <View className="flex-row items-center bg-[#252223] border border-[#2F2C2D] rounded-lg py-2 px-3">
                     <SearchIcon />
                     <TextInput
                         ref={searchInputRef}
-                        className="flex-1 ml-2 text-lg font-Inter text-white"
+                        className="flex-1 ml-2 mb-1 text-lg font-Inter text-white"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         placeholder={t('Search')}
