@@ -136,8 +136,6 @@ export function AccountInfo({
     }, [maxDrawdownInUnits, metricsData, profitTargetInUnits]);
 
     // Add debugging - remove this in production
-    console.log('AccountInfo - accountDetails:', accountDetails);
-    console.log('AccountInfo - metricsData:', metricsData);
 
     // Early return if no data
     if (!accountDetails || !metricsData) {

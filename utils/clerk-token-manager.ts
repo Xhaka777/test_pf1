@@ -11,11 +11,12 @@ class ClerkTokenManager {
   private tokenData: TokenData | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
+  private refreshLock: Promise<string | null> | null = null;
 
-  // Clerk tokens typically last 1 hour, but we'll refresh at 50 minutes to be safe
-  private readonly TOKEN_LIFETIME_MS = 50 * 60 * 1000; // 50 minutes
-  private readonly STORAGE_KEY = 'clerk_token_persistent';
-  private readonly BUFFER_TIME_MS = 5 * 60 * 1000; // 5 minutes buffer
+  // Clerk JWT tokens last 1 hour, refresh at 55 minutes
+  private readonly TOKEN_LIFETIME_MS = 55 * 60 * 1000;
+  private readonly STORAGE_KEY = 'clerk_token_cache';
+  private readonly SAFETY_BUFFER_MS = 2 * 60 * 1000; // 2 minutes safety buffer
 
   private constructor() { }
 
@@ -26,165 +27,115 @@ class ClerkTokenManager {
     return ClerkTokenManager.instance;
   }
 
-  /**
-   * Initialize the token manager - call this early in app lifecycle
-   */
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
 
-    if (this.initPromise) {
-      return this.initPromise;
-    }
-
-    this.initPromise = this._doInitialize();
-    await this.initPromise;
-  }
-
-  private async _doInitialize(): Promise<void> {
-    try {
-      // console.log('[ClerkTokenManager] Initializing...');
-
-      // Try to load existing token from storage
-      const storedData = await AsyncStorage.getItem(this.STORAGE_KEY);
-
-      if (storedData) {
-        const parsed: TokenData = JSON.parse(storedData);
-
-        // Check if token is still valid (not expired + buffer)
-        const now = Date.now();
-        const isValid = now < (parsed.expiresAt - this.BUFFER_TIME_MS);
-
-        if (isValid) {
-          this.tokenData = parsed;
-          // console.log('[ClerkTokenManager] Loaded valid token from storage');
-          // console.log('[ClerkTokenManager] Token expires in:', Math.round((parsed.expiresAt - now) / 60000), 'minutes');
-        } else {
-          // console.log('[ClerkTokenManager] Stored token expired, will refresh');
-          await AsyncStorage.removeItem(this.STORAGE_KEY);
+    this.initPromise = (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
+        if (stored) {
+          const parsed: TokenData = JSON.parse(stored);
+          if (this.isTokenValid(parsed)) {
+            this.tokenData = parsed;
+            console.log('[ClerkToken] Restored valid token from cache');
+          } else {
+            await AsyncStorage.removeItem(this.STORAGE_KEY);
+          }
         }
-      } else {
-        console.log('[ClerkTokenManager] No stored token found');
+      } catch (error) {
+        console.error('[ClerkToken] Init error:', error);
+      } finally {
+        this.isInitialized = true;
+        this.initPromise = null;
       }
+    })();
 
-      this.isInitialized = true;
-    } catch (error) {
-      // console.error('[ClerkTokenManager] Initialization error:', error);
-      this.isInitialized = true; // Don't block the app
-    }
+    return this.initPromise;
   }
 
-  /**
-   * Get a valid token - returns immediately if cached, otherwise fetches new one
-   */
-  public async getToken(getClerkTokenFn: () => Promise<string | null>): Promise<string | null> {
+  private isTokenValid(tokenData: TokenData | null): boolean {
+    if (!tokenData) return false;
+    return Date.now() < (tokenData.expiresAt - this.SAFETY_BUFFER_MS);
+  }
+
+  public async getToken(
+    getClerkTokenFn: () => Promise<string | null>
+  ): Promise<string | null> {
     await this.initialize();
 
-    // If we have a valid cached token, return it immediately
-    if (this.hasValidToken()) {
-      // console.log('[ClerkTokenManager] Returning cached token');
+    // Return cached token if valid
+    if (this.isTokenValid(this.tokenData)) {
       return this.tokenData!.token;
     }
 
-    // Need to fetch a new token
-    // console.log('[ClerkTokenManager] Fetching new token from Clerk');
-    return this.refreshToken(getClerkTokenFn);
-  }
+    // Wait for existing refresh if in progress (prevents duplicate requests)
+    if (this.refreshLock) {
+      console.log('[ClerkToken] Waiting for active refresh...');
+      return this.refreshLock;
+    }
 
-  /**
-   * Check if current token is valid
-   */
-  private hasValidToken(): boolean {
-    if (!this.tokenData) return false;
+    // Start new refresh with lock
+    this.refreshLock = this.performRefresh(getClerkTokenFn);
 
-    const now = Date.now();
-    const isNotExpired = now < (this.tokenData.expiresAt - this.BUFFER_TIME_MS);
-
-    return isNotExpired;
-  }
-
-  /**
-   * Refresh the token from Clerk and persist it
-   */
-  public async refreshToken(getClerkTokenFn: () => Promise<string | null>): Promise<string | null> {
     try {
+      return await this.refreshLock;
+    } finally {
+      this.refreshLock = null;
+    }
+  }
+
+  private async performRefresh(
+    getClerkTokenFn: () => Promise<string | null>
+  ): Promise<string | null> {
+    try {
+      console.log('[ClerkToken] Refreshing token...');
+      
+      // Get fresh token from Clerk (skipCache ensures fresh token)
       const newToken = await getClerkTokenFn();
 
       if (!newToken) {
-        // console.warn('[ClerkTokenManager] Clerk returned null token');
+        console.error('[ClerkToken] Clerk returned null token');
+        this.tokenData = null;
+        await AsyncStorage.removeItem(this.STORAGE_KEY);
         return null;
       }
 
-      // Create new token data
       const now = Date.now();
-      const newTokenData: TokenData = {
+      this.tokenData = {
         token: newToken,
         issuedAt: now,
         expiresAt: now + this.TOKEN_LIFETIME_MS,
       };
 
-      // Update memory cache
-      this.tokenData = newTokenData;
+      // Persist to storage (fire and forget)
+      AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.tokenData)).catch(
+        err => console.error('[ClerkToken] Cache save failed:', err)
+      );
 
-      // Persist to storage
-      await this.persistToken(newTokenData);
-
-      // console.log('[ClerkTokenManager] New token cached and persisted');
-      // console.log('[ClerkTokenManager] Token expires in:', Math.round(this.TOKEN_LIFETIME_MS / 60000), 'minutes');
-
+      console.log('[ClerkToken] ✅ Token refreshed successfully');
       return newToken;
     } catch (error) {
-      // console.error('[ClerkTokenManager] Error refreshing token:', error);
+      console.error('[ClerkToken] Refresh failed:', error);
+      this.tokenData = null;
       return null;
     }
   }
 
-  /**
-   * Persist token to storage
-   */
-  private async persistToken(tokenData: TokenData): Promise<void> {
-    try {
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(tokenData));
-    } catch (error) {
-      // console.error('[ClerkTokenManager] Error persisting token:', error);
-      // Don't throw - token is still in memory
-    }
-  }
-
-  /**
-   * Force refresh token (useful when you know it's invalid)
-   */
-  public async forceRefresh(getClerkTokenFn: () => Promise<string | null>): Promise<string | null> {
-    // console.log('[ClerkTokenManager] Force refresh requested');
-    this.tokenData = null;
-    await AsyncStorage.removeItem(this.STORAGE_KEY);
-    return this.refreshToken(getClerkTokenFn);
-  }
-
-  /**
-   * Clear all cached data
-   */
   public async clearCache(): Promise<void> {
-    // console.log('[ClerkTokenManager] Clearing cache');
+    console.log('[ClerkToken] Clearing cache');
     this.tokenData = null;
-    await AsyncStorage.removeItem(this.STORAGE_KEY);
+    this.refreshLock = null;
+    await AsyncStorage.removeItem(this.STORAGE_KEY).catch(() => {});
   }
 
-  /**
-   * Get token info for debugging
-   */
-  public getTokenInfo(): { hasToken: boolean; expiresIn?: number; isValid?: boolean } {
-    if (!this.tokenData) {
-      return { hasToken: false };
-    }
-
-    const now = Date.now();
-    const expiresIn = Math.max(0, this.tokenData.expiresAt - now);
-    const isValid = this.hasValidToken();
-
+  public getTokenInfo() {
+    if (!this.tokenData) return { hasToken: false };
+    
     return {
       hasToken: true,
-      expiresIn: Math.round(expiresIn / 60000), // in minutes
-      isValid
+      isValid: this.isTokenValid(this.tokenData),
+      expiresIn: Math.round((this.tokenData.expiresAt - Date.now()) / 60000)
     };
   }
 }

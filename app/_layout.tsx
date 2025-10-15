@@ -1,4 +1,3 @@
-// app/_layout.tsx - FIXED VERSION with proper screen transitions
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -46,11 +45,21 @@ export default function RootLayout() {
   const { hasNetworkError } = useNetwork();
 
   useEffect(() => {
-    clerkTokenManager.initialize().then(() => {
-      console.log('[App] Token manager ready');
-    }).catch((error) => {
-      console.error('[App] Token manager initialization failed:', error);
-    });
+    const initAuth = async () => {
+      try {
+        await clerkTokenManager.initialize();
+        console.log('Auth system ready');
+      } catch (error) {
+        console.error('Auth init failed:', error);
+      }
+    };
+
+    initAuth();
+
+    // ✅ CRITICAL: Clear cache on sign out
+    return () => {
+      clerkTokenManager.clearCache();
+    };
   }, []);
 
   const [loaded] = useFonts({

@@ -1,4 +1,3 @@
-// providers/accounts.tsx
 import {
     createContext,
     PropsWithChildren,
@@ -63,7 +62,6 @@ const AccountsContext = createContext<AccountsContextType>(defaultContextValue);
 export function AccountsProvider({ children }: PropsWithChildren) {
     const { isSignedIn, isLoaded } = useAuth();
 
-    // Only make API calls when user is properly authenticated
     const {
         data: accountsData,
         isLoading: isQueryLoading,
@@ -73,15 +71,29 @@ export function AccountsProvider({ children }: PropsWithChildren) {
         enabled: isLoaded && isSignedIn,
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
-        staleTime: 2 * 60 * 1000, // 2 minutes
+        staleTime: 2 * 60 * 1000,
+
         retry: (failureCount, error) => {
-            // Don't retry authentication errors
-            if (error?.message?.includes('Authentication') || 
-                error?.message?.includes('Unauthorized')) {
+            const errorMsg = error?.message?.toLowerCase() || '';
+
+            // Don't retry if explicitly not authorized (bad permissions)
+            if (errorMsg.includes('permission') || errorMsg.includes('forbidden')) {
+                console.log('[Accounts] Permission denied, not retrying');
                 return false;
             }
+
+            // Auto-retry auth errors up to 2 times (token will refresh automatically)
+            if (errorMsg.includes('not authorized') ||
+                errorMsg.includes('unauthorized') ||
+                errorMsg.includes('session expired')) {
+                return failureCount < 2;
+            }
+
+            // Standard retry for other errors
             return failureCount < 3;
         },
+
+        retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(1.5, attemptIndex), 5000),
     });
 
     // Local state for selected accounts
@@ -97,7 +109,7 @@ export function AccountsProvider({ children }: PropsWithChildren) {
             try {
                 const storedId = await AsyncStorage.getItem(ACCOUNT_ID_KEY);
                 const initialId = storedId ? parseInt(storedId, 10) : 0;
-                
+
                 // Validate the stored ID
                 if (initialId && !isNaN(initialId) && initialId > 0) {
                     setSelectedAccountIdState(initialId);
@@ -138,7 +150,7 @@ export function AccountsProvider({ children }: PropsWithChildren) {
 
         console.log('[AccountsProvider] Setting selected account ID:', id);
         setSelectedAccountIdState(id);
-        
+
         try {
             if (id > 0) {
                 await AsyncStorage.setItem(ACCOUNT_ID_KEY, id.toString());
@@ -150,36 +162,71 @@ export function AccountsProvider({ children }: PropsWithChildren) {
         }
     }, []);
 
-    // Auto-select active account when data loads
+    // Auto-select active account when data loads with PRIORITY
     useEffect(() => {
-        // Wait for authentication, initialization, and data
         if (!isSignedIn || !isLoaded || !accountsData || !isInitialized) {
             return;
         }
 
-        // Check if the currently selected account still exists
         const selectedAccountExists = combinedAccounts.some(
             account => account.id === selectedAccountId
         );
 
-        // If no account is selected or the selected account doesn't exist anymore
         if (!selectedAccountId || selectedAccountId <= 0 || !selectedAccountExists) {
-            console.log('[AccountsProvider] Auto-selecting account...', {
-                selectedAccountId,
-                selectedAccountExists,
-                availableAccounts: combinedAccounts.length
-            });
+            console.log('[AccountsProvider] Auto-selecting account with priority...');
 
-            // Try to find an active account first
-            const activeAccount = combinedAccounts.find(
-                account => account.status === AccountStatusEnum.ACTIVE
+            // ✅ FIX: Prioritize by account type
+            let accountToSelect: Account | undefined;
+
+            // Priority 1: Active Evaluation accounts
+            accountToSelect = combinedAccounts.find(
+                account =>
+                    account.status === AccountStatusEnum.ACTIVE &&
+                    account.account_type === 'evaluation'
             );
 
-            // Fall back to the first available account
-            const accountToSelect = activeAccount || combinedAccounts[0];
+            // Priority 2: Active Funded accounts
+            if (!accountToSelect) {
+                accountToSelect = combinedAccounts.find(
+                    account =>
+                        account.status === AccountStatusEnum.ACTIVE &&
+                        account.account_type === 'funded'
+                );
+            }
+
+            // Priority 3: Active Live/Broker accounts
+            if (!accountToSelect) {
+                accountToSelect = combinedAccounts.find(
+                    account =>
+                        account.status === AccountStatusEnum.ACTIVE &&
+                        (account.account_type === 'broker' || account.account_type === 'live')
+                );
+            }
+
+            // Priority 4: Active Demo accounts
+            if (!accountToSelect) {
+                accountToSelect = combinedAccounts.find(
+                    account =>
+                        account.status === AccountStatusEnum.ACTIVE &&
+                        account.account_type === 'demo'
+                );
+            }
+
+            // Final fallback: Any active account
+            if (!accountToSelect) {
+                accountToSelect = combinedAccounts.find(
+                    account => account.status === AccountStatusEnum.ACTIVE
+                );
+            }
+
+            // Last resort: First account
+            if (!accountToSelect) {
+                accountToSelect = combinedAccounts[0];
+            }
 
             if (accountToSelect) {
-                console.log('[AccountsProvider] Auto-selecting account:', accountToSelect.id, accountToSelect.name);
+                console.log('[AccountsProvider] Auto-selected account with priority:',
+                    accountToSelect.id, accountToSelect.name, accountToSelect.account_type);
                 handleSetSelectedAccountId(accountToSelect.id);
             } else {
                 console.log('[AccountsProvider] No accounts available to select');

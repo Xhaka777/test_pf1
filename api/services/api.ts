@@ -9,13 +9,13 @@ export function getAPIBaseUrl() {
 type FetchApiOptions = AxiosRequestConfig & {
   formData?: FormData;
   returnMethod?: 'json' | 'blob';
-  _retryCount?: number; // Internal retry counter
+  _retryCount?: number;
 };
 
-const MAX_RETRY_ATTEMPTS = 1; // Only retry once for 401
+const MAX_AUTH_RETRIES = 2;
 
 export function useAuthenticatedApi<T>() {
-  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
 
   const fetchFromApi = async (
     endpoint: string,
@@ -23,46 +23,49 @@ export function useAuthenticatedApi<T>() {
   ): Promise<T> => {
     const {
       formData,
-      returnMethod,
+      returnMethod = 'json',
       body,
       data,
       _retryCount = 0,
       ...axiosOptions
     } = options;
 
+    // ✅ CRITICAL: Wait for Clerk to load
     if (!isLoaded) {
-      console.warn('[API] Clerk not loaded yet');
-      throw new Error('Authentication not initialized. Please wait...');
-    }
-
-    if (!isSignedIn) {
-      console.warn('[API] User not signed in');
-      throw new Error('User not authenticated. Please sign in.');
-    }
-
-    // Get token (with retry logic for 401)
-    let clerkToken: string | null = null;
-    try {
-      // If this is a retry after 401, force a fresh token
-      const shouldForceRefresh = _retryCount > 0;
-
-      if (shouldForceRefresh) {
-        console.log('[API] 🔄 Forcing token refresh after 401...');
-        await clerkTokenManager.clearCache();
-        clerkToken = await getToken({ skipCache: true });
-      } else {
-        clerkToken = await clerkTokenManager.getToken(getToken);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!isLoaded) {
+        throw new Error('Authentication is still loading. Please try again.');
       }
+    }
+
+    // ✅ CRITICAL: Check sign-in state
+    if (!isSignedIn) {
+      throw new Error('Please sign in to continue.');
+    }
+
+    // ✅ CRITICAL: Get valid token with automatic refresh
+    let clerkToken: string | null;
+    
+    try {
+      // Force fresh token on retries (this is the key to fixing 401/403 errors)
+      if (_retryCount > 0) {
+        console.log('[API] Retry attempt, forcing fresh token');
+        await clerkTokenManager.clearCache();
+      }
+      
+      clerkToken = await clerkTokenManager.getToken(() => 
+        getToken({ skipCache: _retryCount > 0 })
+      );
     } catch (tokenError) {
-      console.error('[API] Failed to get Clerk token:', tokenError);
-      throw new Error('Failed to get authentication token');
+      console.error('[API] Token fetch failed:', tokenError);
+      throw new Error('Authentication error. Please sign in again.');
     }
 
     if (!clerkToken) {
-      console.error('[API] Clerk token is null');
-      throw new Error('Authentication token not available');
+      throw new Error('Could not obtain authentication token.');
     }
 
+    // ✅ Build request
     const headers = {
       ...(formData ? {} : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${clerkToken}`,
@@ -76,108 +79,70 @@ export function useAuthenticatedApi<T>() {
       method: axiosOptions.method || (requestData ? 'POST' : 'GET'),
       headers,
       data: requestData,
-      baseURL: process.env.EXPO_PUBLIC_SERVER_URL,
+      baseURL: getAPIBaseUrl(),
       url: endpoint,
       responseType: returnMethod === 'blob' ? 'blob' : 'json',
       timeout: 30000,
       validateStatus: (status) => status < 500,
     };
 
-    console.log('[API] Making request:', {
-      method: axiosConfig.method,
-      url: `${axiosConfig.baseURL}${endpoint}`,
-      hasAuth: !!clerkToken,
-      tokenPrefix: clerkToken?.substring(0, 10) + '...',
-      hasData: !!requestData,
-      retryCount: _retryCount,
-    });
-
     try {
       const response: AxiosResponse<T> = await axios(axiosConfig);
 
-      console.log('[API] Request successful:', {
-        status: response.status,
-        endpoint,
-        dataKeys: response.data && typeof response.data === 'object'
-          ? Object.keys(response.data)
-          : 'primitive'
-      });
+      // ✅ CRITICAL: Handle 401/403 automatically
+      if (response.status === 401 || response.status === 403) {
+        console.warn(`[API] ${response.status} error on ${endpoint}`);
 
-      // ✨ AUTOMATIC TOKEN REFRESH LOGIC ✨
-      if (response.status === 401) {
-        console.warn('[API] 🔐 Received 401 Unauthorized');
-
-        if (_retryCount < MAX_RETRY_ATTEMPTS) {
-          console.log('[API] 🔄 Attempting automatic token refresh and retry...');
-
-          // ✅ SAFE CHANGE: Add small delay before retry
-          await new Promise(resolve => setTimeout(resolve, 500));
+        if (_retryCount < MAX_AUTH_RETRIES) {
+          console.log(`[API] Auto-retry ${_retryCount + 1}/${MAX_AUTH_RETRIES}`);
+          
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 300));
 
           return fetchFromApi(endpoint, {
             ...options,
             _retryCount: _retryCount + 1,
           });
-        } else {
-          // ✅ SAFE CHANGE: Don't sign out immediately, just throw error
-          console.error('[API] ❌ Token refresh failed after retries');
-          await clerkTokenManager.clearCache();
-
-          // Let React Query handle the error instead of force sign out
-          throw new Error('Authentication failed. Please sign in again.');
         }
+
+        // Max retries exceeded
+        await clerkTokenManager.clearCache();
+        throw new Error('Session expired. Please sign in again.');
       }
 
-      if (response.status === 403) {
-        console.warn('[API] 🚫 Received 403 Forbidden');
-        throw new Error('Access denied. You do not have permission to access this resource.');
-      }
-
+      // ✅ Handle other errors
       if (response.status >= 400) {
-        const errorMessage = response.data?.message || `HTTP ${response.status} error`;
+        const errorMessage = 
+          response.data?.message || 
+          response.data?.error ||
+          `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
       }
 
-      return returnMethod === 'blob' ? response.data : response.data;
+      return response.data;
     } catch (error) {
-      console.error(`[API] Request failed (${endpoint}):`, {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        responseData: error.response?.data
-      });
-
+      // ✅ CRITICAL: Retry on network/connection errors
       if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-        const status = error.response?.status || 0;
+        const status = error.response?.status;
 
-        // Handle 401 in error response (shouldn't reach here due to validateStatus, but just in case)
-        if (status === 401 && _retryCount < MAX_RETRY_ATTEMPTS) {
-          console.log('[API] 🔄 Caught 401 in error handler, retrying...');
+        // Auto-retry auth errors
+        if ((status === 401 || status === 403) && _retryCount < MAX_AUTH_RETRIES) {
+          console.log('[API] Caught auth error, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
           return fetchFromApi(endpoint, {
             ...options,
             _retryCount: _retryCount + 1,
           });
         }
 
-        if (status === 401) {
-          await clerkTokenManager.clearCache();
-          try {
-            await signOut();
-          } catch (signOutError) {
-            console.error('[API] Error during sign out:', signOutError);
-          }
-          throw new Error('Session expired. Please sign in again.');
-        } else if (status === 403) {
-          throw new Error('Access denied. You do not have permission.');
-        } else if (status === 404) {
-          throw new Error(`Resource not found: ${endpoint}`);
-        } else if (status === 429) {
-          throw new Error('Too many requests. Please try again later.');
-        } else if (status >= 500) {
-          throw new Error('Server error. Please try again later.');
-        }
+        const errorMessage = 
+          error.response?.data?.message || 
+          error.response?.data?.error ||
+          error.message || 
+          'Request failed';
 
-        throw new Error(`API Error (${status}): ${errorMessage}`);
+        throw new Error(errorMessage);
       }
 
       throw error;
