@@ -1584,10 +1584,9 @@ function updateChartLines() {
 
         tvWidget = new window.TradingView.widget(widgetOptions);
 
-tvWidget.onChartReady(function() {
-    console.log('TradingView chart ready');
+        tvWidget.onChartReady(function() {
+             console.log('TradingView chart ready');
 
-                // ⭐ ADD THIS: Set custom CSS properties for theme
             try {
                 // Your custom color #100E0F converted to RGB
                 var customBg = 'rgb(16, 14, 15)'; // #100E0F
