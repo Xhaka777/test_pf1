@@ -8,13 +8,25 @@
     "scheme": "myapp",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*",
+      "assets/charting_assets/**/*"
+    ],
+    "metro": {
+      "assetExts": ["js", "json", "png", "jpg", "jpeg", "gif", "webp", "svg"],
+      "sourceExts": ["js", "jsx", "json", "ts", "tsx", "cjs", "mjs"]
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.propfirmmatch.app",
       "infoPlist": {
         "NSPhotoLibraryAddUsageDescription": "This app needs access to save trading screenshots to your photo library",
         "NSPhotoLibraryUsageDescription": "This app needs access to save trading screenshots to your photo library",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       },
       "appleTeamId": "292S5A9L2S"
     },
@@ -42,7 +54,7 @@
     },
     "plugins": [
       "expo-router",
- [
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#100E0F",

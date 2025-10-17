@@ -1,7 +1,6 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
-import { useNetwork } from '@/providers/network';
 
 export function getAPIBaseUrl() {
   return process.env.EXPO_PUBLIC_SERVER_URL;
@@ -17,7 +16,6 @@ const MAX_AUTH_RETRIES = 2;
 
 export function useAuthenticatedApi<T>() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const { setNetworkError } = useNetwork();
 
   const fetchFromApi = async (
     endpoint: string,
@@ -33,7 +31,7 @@ export function useAuthenticatedApi<T>() {
     } = options;
 
     if (!isLoaded) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
       if (!isLoaded) {
         throw new Error('Authentication is still loading. Please try again.');
       }
@@ -46,15 +44,20 @@ export function useAuthenticatedApi<T>() {
     let clerkToken: string | null;
 
     try {
-      // Force fresh token on retries (this is the key to fixing 401/403 errors)
-      if (_retryCount > 0) {
-        console.log('[API] Retry attempt, forcing fresh token');
-        await clerkTokenManager.clearCache();
+      // ✅ Add more debugging and better token handling
+      console.log('[API] Requesting token from Clerk...');
+
+      clerkToken = await clerkTokenManager.getToken(async () => {
+        const token = await getToken({ skipCache: _retryCount > 0 });
+        console.log('[API] Clerk token received:', token ? 'SUCCESS' : 'NULL');
+        return token;
+      });
+
+      if (!clerkToken) {
+        console.error('[API] ClerkTokenManager returned null token');
+        throw new Error('Could not obtain authentication token.');
       }
 
-      clerkToken = await clerkTokenManager.getToken(() =>
-        getToken({ skipCache: _retryCount > 0 })
-      );
     } catch (tokenError) {
       console.error('[API] Token fetch failed:', tokenError);
       throw new Error('Authentication error. Please sign in again.');
@@ -119,12 +122,6 @@ export function useAuthenticatedApi<T>() {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
-
-        if (!error.response && error.code === 'ERR_NETWORK') {
-          console.error('[API] Network error detected');
-          setNetworkError(true); // Trigger error screen
-          throw new Error('Network connection lost');
-        }
 
         // Auto-retry auth errors
         if ((status === 401 || status === 403) && _retryCount < MAX_AUTH_RETRIES) {

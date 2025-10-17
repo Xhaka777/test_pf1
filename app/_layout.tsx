@@ -16,11 +16,11 @@ import { AccountsProvider } from '@/providers/accounts';
 import { CurrencySymbolProvider } from '@/providers/currency-symbols';
 import { AccountDetailsProvider } from '@/providers/account-details';
 import { OpenPositionsProvider } from '@/providers/open-positions';
-import { AppState } from 'react-native';
+import { ActivityIndicator, AppState, View } from 'react-native';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
-import { NetworkProvider, useNetwork } from '@/providers/network';
 import ConnectionErrorScreen from '@/components/ConnectionErrorScreen';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { useNetwork } from '@/hooks/useNetwork';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -41,20 +41,21 @@ SplashScreen.preventAutoHideAsync();
 
 // Create a wrapper component for the app content that checks network
 function AppContent() {
-const { hasNetworkError, isConnected, isInternetReachable } = useNetwork();
+  const isConnected = useNetwork(); // ADD THIS LINE instead
 
-  // Log network state changes
-  useEffect(() => {
-    console.log('[AppContent] Network state:', {
-      hasNetworkError,
-      isConnected,
-      isInternetReachable
-    });
-  }, [hasNetworkError, isConnected, isInternetReachable]);
+  // 3. REPLACE the existing network check with this:
+  if (isConnected === null) {
+    // Still checking connection
+    return (
+      <View className="flex-1 bg-[#100E0F] justify-center items-center">
+        <ActivityIndicator size="large" color="#ec4899" />
+      </View>
+    );
+  }
 
-  // Show connection error screen if there's a network error
-  if (hasNetworkError) {
-    console.log('[AppContent] Showing ConnectionErrorScreen');
+  if (!isConnected) {
+    // No connection - show offline screen
+    console.log('[App] 🚫 No connection - showing offline screen');
     return <ConnectionErrorScreen />;
   }
 
@@ -141,7 +142,7 @@ export default function RootLayout() {
     <KeyboardProvider>
       <GestureHandlerRootView className='flex-1'>
         <BottomSheetModalProvider>
-          <NetworkProvider>
+          {/* <NetworkProvider> */}
             <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
               <ClerkLoaded>
                 <QueryProvider>
@@ -158,7 +159,7 @@ export default function RootLayout() {
                 </QueryProvider>
               </ClerkLoaded>
             </ClerkProvider>
-          </NetworkProvider>
+          {/* </NetworkProvider> */}
         </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </KeyboardProvider>

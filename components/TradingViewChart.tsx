@@ -207,193 +207,193 @@ export default function TradingViewChart({
   };
 
   // Function to inject position lines into the chart
-  const injectPositionLines = useCallback(() => {
-    if (!webViewRef || (!relevantTrades.length && !relevantOrders.length)) return;
+  // const injectPositionLines = useCallback(() => {
+  //   if (!webViewRef || (!relevantTrades.length && !relevantOrders.length)) return;
 
-    const trades = relevantTrades;
-    const orders = relevantOrders;
+  //   const trades = relevantTrades;
+  //   const orders = relevantOrders;
 
-    const injectionScript = `
-      (function() {
-        // Remove existing position lines
-        const existingLines = document.querySelectorAll('.custom-position-line');
-        existingLines.forEach(line => line.remove());
+  //   const injectionScript = `
+  //     (function() {
+  //       // Remove existing position lines
+  //       const existingLines = document.querySelectorAll('.custom-position-line');
+  //       existingLines.forEach(line => line.remove());
 
-        // Function to create position line
-        function createPositionLine(price, text, color, type = 'position') {
-          const line = document.createElement('div');
-          line.className = 'custom-position-line';
-          line.style.cssText = \`
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            background-color: \${color};
-            z-index: 1000;
-            pointer-events: none;
-            border-top: 2px solid \${color};
-          \`;
+  //       // Function to create position line
+  //       function createPositionLine(price, text, color, type = 'position') {
+  //         const line = document.createElement('div');
+  //         line.className = 'custom-position-line';
+  //         line.style.cssText = \`
+  //           position: absolute;
+  //           width: 100%;
+  //           height: 2px;
+  //           background-color: \${color};
+  //           z-index: 1000;
+  //           pointer-events: none;
+  //           border-top: 2px solid \${color};
+  //         \`;
 
-          const label = document.createElement('div');
-          label.style.cssText = \`
-            position: absolute;
-            right: 10px;
-            top: -12px;
-            background-color: \${color};
-            color: \${type === 'position' ? '${LABEL_COLOR}' : '#ffffff'};
-            padding: 2px 8px;
-            font-size: 11px;
-            font-weight: bold;
-            border-radius: 4px;
-            white-space: nowrap;
-          \`;
-          label.textContent = text;
-          line.appendChild(label);
+  //         const label = document.createElement('div');
+  //         label.style.cssText = \`
+  //           position: absolute;
+  //           right: 10px;
+  //           top: -12px;
+  //           background-color: \${color};
+  //           color: \${type === 'position' ? '${LABEL_COLOR}' : '#ffffff'};
+  //           padding: 2px 8px;
+  //           font-size: 11px;
+  //           font-weight: bold;
+  //           border-radius: 4px;
+  //           white-space: nowrap;
+  //         \`;
+  //         label.textContent = text;
+  //         line.appendChild(label);
 
-          return line;
-        }
+  //         return line;
+  //       }
 
-        // Function to get price position (simplified - assumes linear scale)
-        function getPricePosition(price) {
-          // This is a simplified calculation - real implementation would need
-          // to get the actual chart scale and viewport
-          const chartContainer = document.querySelector('#tradingview_chart, .tv-lightweight-charts, [class*="chart"]');
-          if (!chartContainer) return null;
+  //       // Function to get price position (simplified - assumes linear scale)
+  //       function getPricePosition(price) {
+  //         // This is a simplified calculation - real implementation would need
+  //         // to get the actual chart scale and viewport
+  //         const chartContainer = document.querySelector('#tradingview_chart, .tv-lightweight-charts, [class*="chart"]');
+  //         if (!chartContainer) return null;
           
-          const rect = chartContainer.getBoundingClientRect();
-          // This is a rough estimation - you'd need actual price scale
-          const relativePosition = 0.5; // Middle of chart for demo
-          return rect.top + (rect.height * relativePosition);
-        }
+  //         const rect = chartContainer.getBoundingClientRect();
+  //         // This is a rough estimation - you'd need actual price scale
+  //         const relativePosition = 0.5; // Middle of chart for demo
+  //         return rect.top + (rect.height * relativePosition);
+  //       }
 
-        // Add position lines for trades
-        ${JSON.stringify(trades)}.forEach(trade => {
-          const container = document.querySelector('#tradingview_chart') || document.body;
+  //       // Add position lines for trades
+  //       ${JSON.stringify(trades)}.forEach(trade => {
+  //         const container = document.querySelector('#tradingview_chart') || document.body;
           
-          // Position line
-          const positionPrice = parseFloat(trade.entry);
-          const positionText = \`\${trade.position_type.toUpperCase()} \${positionPrice}\`;
-          const positionLine = createPositionLine(positionPrice, positionText, '${POSITION_COLOR}');
+  //         // Position line
+  //         const positionPrice = parseFloat(trade.entry);
+  //         const positionText = \`\${trade.position_type.toUpperCase()} \${positionPrice}\`;
+  //         const positionLine = createPositionLine(positionPrice, positionText, '${POSITION_COLOR}');
           
-          // Calculate position - this is simplified
-          const yPosition = getPricePosition(positionPrice);
-          if (yPosition) {
-            positionLine.style.top = yPosition + 'px';
-            container.appendChild(positionLine);
-          }
+  //         // Calculate position - this is simplified
+  //         const yPosition = getPricePosition(positionPrice);
+  //         if (yPosition) {
+  //           positionLine.style.top = yPosition + 'px';
+  //           container.appendChild(positionLine);
+  //         }
 
-          // SL line
-          if (trade.sl && trade.sl > 0) {
-            const slPrice = parseFloat(trade.sl);
-            const slAmount = parseFloat(trade.trade_loss || 0).toLocaleString('en-US', {
-              style: 'currency',
-              currency: '${currency}'
-            });
-            const slText = \`SL \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${slAmount}\`;
-            const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'sl');
+  //         // SL line
+  //         if (trade.sl && trade.sl > 0) {
+  //           const slPrice = parseFloat(trade.sl);
+  //           const slAmount = parseFloat(trade.trade_loss || 0).toLocaleString('en-US', {
+  //             style: 'currency',
+  //             currency: '${currency}'
+  //           });
+  //           const slText = \`SL \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${slAmount}\`;
+  //           const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'sl');
             
-            const slYPosition = getPricePosition(slPrice);
-            if (slYPosition) {
-              slLine.style.top = slYPosition + 'px';
-              container.appendChild(slLine);
-            }
-          }
+  //           const slYPosition = getPricePosition(slPrice);
+  //           if (slYPosition) {
+  //             slLine.style.top = slYPosition + 'px';
+  //             container.appendChild(slLine);
+  //           }
+  //         }
 
-          // TP line
-          if (trade.tp && trade.tp > 0) {
-            const tpPrice = parseFloat(trade.tp);
-            const tpAmount = parseFloat(trade.trade_profit || 0).toLocaleString('en-US', {
-              style: 'currency',
-              currency: '${currency}'
-            });
-            const tpText = \`TP \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${tpAmount}\`;
-            const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'tp');
+  //         // TP line
+  //         if (trade.tp && trade.tp > 0) {
+  //           const tpPrice = parseFloat(trade.tp);
+  //           const tpAmount = parseFloat(trade.trade_profit || 0).toLocaleString('en-US', {
+  //             style: 'currency',
+  //             currency: '${currency}'
+  //           });
+  //           const tpText = \`TP \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${tpAmount}\`;
+  //           const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'tp');
             
-            const tpYPosition = getPricePosition(tpPrice);
-            if (tpYPosition) {
-              tpLine.style.top = tpYPosition + 'px';
-              container.appendChild(tpLine);
-            }
-          }
-        });
+  //           const tpYPosition = getPricePosition(tpPrice);
+  //           if (tpYPosition) {
+  //             tpLine.style.top = tpYPosition + 'px';
+  //             container.appendChild(tpLine);
+  //           }
+  //         }
+  //       });
 
-        // Add order lines
-        ${JSON.stringify(orders)}.forEach(order => {
-          const container = document.querySelector('#tradingview_chart') || document.body;
+  //       // Add order lines
+  //       ${JSON.stringify(orders)}.forEach(order => {
+  //         const container = document.querySelector('#tradingview_chart') || document.body;
           
-          const orderPrice = parseFloat(order.price);
-          const orderText = \`\${order.order_type} \${orderPrice}\`;
-          const orderColor = order.position_type === 'long' ? '${TP_COLOR}' : '${SL_COLOR}';
-          const orderLine = createPositionLine(orderPrice, orderText, orderColor, 'order');
+  //         const orderPrice = parseFloat(order.price);
+  //         const orderText = \`\${order.order_type} \${orderPrice}\`;
+  //         const orderColor = order.position_type === 'long' ? '${TP_COLOR}' : '${SL_COLOR}';
+  //         const orderLine = createPositionLine(orderPrice, orderText, orderColor, 'order');
           
-          const yPosition = getPricePosition(orderPrice);
-          if (yPosition) {
-            orderLine.style.top = yPosition + 'px';
-            container.appendChild(orderLine);
-          }
+  //         const yPosition = getPricePosition(orderPrice);
+  //         if (yPosition) {
+  //           orderLine.style.top = yPosition + 'px';
+  //           container.appendChild(orderLine);
+  //         }
 
-          // Order SL line
-          if (order.sl && order.sl > 0) {
-            const slPrice = parseFloat(order.sl);
-            const slText = \`SL \${order.order_type} \${order.price} [\${order.quantity}]\`;
-            const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'order-sl');
+  //         // Order SL line
+  //         if (order.sl && order.sl > 0) {
+  //           const slPrice = parseFloat(order.sl);
+  //           const slText = \`SL \${order.order_type} \${order.price} [\${order.quantity}]\`;
+  //           const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'order-sl');
             
-            const slYPosition = getPricePosition(slPrice);
-            if (slYPosition) {
-              slLine.style.top = slYPosition + 'px';
-              container.appendChild(slLine);
-            }
-          }
+  //           const slYPosition = getPricePosition(slPrice);
+  //           if (slYPosition) {
+  //             slLine.style.top = slYPosition + 'px';
+  //             container.appendChild(slLine);
+  //           }
+  //         }
 
-          // Order TP line
-          if (order.tp && order.tp > 0) {
-            const tpPrice = parseFloat(order.tp);
-            const tpText = \`TP \${order.order_type} \${order.price} [\${order.quantity}]\`;
-            const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'order-tp');
+  //         // Order TP line
+  //         if (order.tp && order.tp > 0) {
+  //           const tpPrice = parseFloat(order.tp);
+  //           const tpText = \`TP \${order.order_type} \${order.price} [\${order.quantity}]\`;
+  //           const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'order-tp');
             
-            const tpYPosition = getPricePosition(tpPrice);
-            if (tpYPosition) {
-              tpLine.style.top = tpYPosition + 'px';
-              container.appendChild(tpLine);
-            }
-          }
-        });
+  //           const tpYPosition = getPricePosition(tpPrice);
+  //           if (tpYPosition) {
+  //             tpLine.style.top = tpYPosition + 'px';
+  //             container.appendChild(tpLine);
+  //           }
+  //         }
+  //       });
 
-        // Re-inject lines when chart updates
-        const observer = new MutationObserver(function(mutations) {
-          mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-              // Delay to allow chart to render
-              setTimeout(() => {
-                if (document.querySelectorAll('.custom-position-line').length === 0) {
-                  // Lines were cleared, re-inject them
-                  arguments.callee();
-                }
-              }, 1000);
-            }
-          });
-        });
+  //       // Re-inject lines when chart updates
+  //       const observer = new MutationObserver(function(mutations) {
+  //         mutations.forEach(function(mutation) {
+  //           if (mutation.type === 'childList') {
+  //             // Delay to allow chart to render
+  //             setTimeout(() => {
+  //               if (document.querySelectorAll('.custom-position-line').length === 0) {
+  //                 // Lines were cleared, re-inject them
+  //                 arguments.callee();
+  //               }
+  //             }, 1000);
+  //           }
+  //         });
+  //       });
 
-        const chartContainer = document.querySelector('#tradingview_chart');
-        if (chartContainer) {
-          observer.observe(chartContainer, { childList: true, subtree: true });
-        }
-      })();
-      true; // Return true to indicate successful injection
-    `;
+  //       const chartContainer = document.querySelector('#tradingview_chart');
+  //       if (chartContainer) {
+  //         observer.observe(chartContainer, { childList: true, subtree: true });
+  //       }
+  //     })();
+  //     true; // Return true to indicate successful injection
+  //   `;
 
-    webViewRef.injectJavaScript(injectionScript);
-  }, [webViewRef, relevantTrades, relevantOrders, currency]);
+  //   webViewRef.injectJavaScript(injectionScript);
+  // }, [webViewRef, relevantTrades, relevantOrders, currency]);
 
   // Inject position lines when data changes
-  useEffect(() => {
-    if (webViewRef && (relevantTrades.length > 0 || relevantOrders.length > 0)) {
-      // Delay injection to ensure chart is loaded
-      const timer = setTimeout(() => {
-        injectPositionLines();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [injectPositionLines, relevantTrades, relevantOrders]);
+  // useEffect(() => {
+  //   if (webViewRef && (relevantTrades.length > 0 || relevantOrders.length > 0)) {
+  //     // Delay injection to ensure chart is loaded
+  //     const timer = setTimeout(() => {
+  //       injectPositionLines();
+  //     }, 2000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [injectPositionLines, relevantTrades, relevantOrders]);
 
   const getTradingViewHTML = (symbol: string) => `
   <!DOCTYPE html>
@@ -548,7 +548,7 @@ export default function TradingViewChart({
       if (data.type === 'chartReady') {
         // Chart is ready, inject position lines after a delay
         setTimeout(() => {
-          injectPositionLines();
+          // injectPositionLines();
         }, 1000);
       } else if (data.type === 'priceAtPosition') {
         // Update the current price from the chart calculation

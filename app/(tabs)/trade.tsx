@@ -134,16 +134,16 @@ const Trade = ({ navigation }: TradeProps) => {
       <TradingWidget />
 
       {/* Use the enhanced TradingViewChart with provider-like logic */}
-      {/* {selectedAccountId && accountDetails && user && (
+      {selectedAccountId && accountDetails && user && (
         <TradingViewChart
           symbol={activeSymbol || 'BTCUSD'}
           selectedAccountId={selectedAccountId}
           accountDetails={accountDetails}
           userId={user.id}
         />
-      )} */}
+      )}
 
-      {selectedAccountId && accountDetails && user && (
+      {/* {selectedAccountId && accountDetails && user && (
         <TradingChart
           symbol={activeSymbol || 'BTCUSD'}
           selectedAccountId={selectedAccountId}
@@ -151,7 +151,7 @@ const Trade = ({ navigation }: TradeProps) => {
           userId={`${details.user?.id}`}
           className="flex-1"
         />
-      )}
+      )} */}
       {/* <TradingChart/> */}
       {/* <SimpleTradingViewPositions positions={samplePositions}/> */}
       {/* <TradingView/> */}

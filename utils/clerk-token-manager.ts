@@ -90,12 +90,26 @@ class ClerkTokenManager {
   ): Promise<string | null> {
     try {
       console.log('[ClerkToken] Refreshing token...');
-      
-      // Get fresh token from Clerk (skipCache ensures fresh token)
-      const newToken = await getClerkTokenFn();
+
+      // ✅ Add retry logic for null tokens
+      let newToken: string | null = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (!newToken && attempts < maxAttempts) {
+        attempts++;
+        console.log(`[ClerkToken] Token attempt ${attempts}/${maxAttempts}`);
+
+        newToken = await getClerkTokenFn();
+
+        if (!newToken && attempts < maxAttempts) {
+          console.log('[ClerkToken] Got null token, waiting before retry...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
 
       if (!newToken) {
-        console.error('[ClerkToken] Clerk returned null token');
+        console.error('[ClerkToken] All token attempts failed - Clerk returned null token');
         this.tokenData = null;
         await AsyncStorage.removeItem(this.STORAGE_KEY);
         return null;
@@ -126,12 +140,12 @@ class ClerkTokenManager {
     console.log('[ClerkToken] Clearing cache');
     this.tokenData = null;
     this.refreshLock = null;
-    await AsyncStorage.removeItem(this.STORAGE_KEY).catch(() => {});
+    await AsyncStorage.removeItem(this.STORAGE_KEY).catch(() => { });
   }
 
   public getTokenInfo() {
     if (!this.tokenData) return { hasToken: false };
-    
+
     return {
       hasToken: true,
       isValid: this.isTokenValid(this.tokenData),
