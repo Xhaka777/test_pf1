@@ -1,3 +1,4 @@
+// hooks/useNetwork.tsx - SIMPLE AND RELIABLE VERSION
 import { useEffect, useState } from "react";
 import NetInfo from "@react-native-community/netinfo";
 
@@ -5,16 +6,18 @@ export function useNetwork() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Function to check connection status
     const checkConnection = (state: any) => {
-      // Connected AND has internet access (or internet reachability is unknown)
-      const connected = state.isConnected && state.isInternetReachable !== false;
-      console.log('[Network]', {
+      console.log('[Network] Raw state:', {
         isConnected: state.isConnected,
         isInternetReachable: state.isInternetReachable,
-        type: state.type,
-        result: connected
+        type: state.type
       });
+
+      // ✅ SIMPLE LOGIC: Only care about isConnected, ignore isInternetReachable
+      // iOS NetInfo isInternetReachable is unreliable and gives false positives
+      const connected = state.isConnected === true;
+      
+      console.log('[Network] Simple result - connected:', connected);
       setIsConnected(connected);
     };
 

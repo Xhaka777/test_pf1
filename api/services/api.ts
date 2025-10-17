@@ -31,7 +31,7 @@ export function useAuthenticatedApi<T>() {
     } = options;
 
     if (!isLoaded) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (!isLoaded) {
         throw new Error('Authentication is still loading. Please try again.');
       }
@@ -44,20 +44,15 @@ export function useAuthenticatedApi<T>() {
     let clerkToken: string | null;
 
     try {
-      // ✅ Add more debugging and better token handling
-      console.log('[API] Requesting token from Clerk...');
-
-      clerkToken = await clerkTokenManager.getToken(async () => {
-        const token = await getToken({ skipCache: _retryCount > 0 });
-        console.log('[API] Clerk token received:', token ? 'SUCCESS' : 'NULL');
-        return token;
-      });
-
-      if (!clerkToken) {
-        console.error('[API] ClerkTokenManager returned null token');
-        throw new Error('Could not obtain authentication token.');
+      // Force fresh token on retries (this is the key to fixing 401/403 errors)
+      if (_retryCount > 0) {
+        console.log('[API] Retry attempt, forcing fresh token');
+        await clerkTokenManager.clearCache();
       }
 
+      clerkToken = await clerkTokenManager.getToken(() =>
+        getToken({ skipCache: _retryCount > 0 })
+      );
     } catch (tokenError) {
       console.error('[API] Token fetch failed:', tokenError);
       throw new Error('Authentication error. Please sign in again.');
