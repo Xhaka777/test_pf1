@@ -6,6 +6,8 @@ import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import 'react-native-reanimated';
 import 'react-native-gesture-handler'
+// Add this import for PostHog random values - IMPORTANT for PostHog to work
+import 'react-native-get-random-values';
 import '../global.css'
 import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo'
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -16,6 +18,7 @@ import { AccountsProvider } from '@/providers/accounts';
 import { CurrencySymbolProvider } from '@/providers/currency-symbols';
 import { AccountDetailsProvider } from '@/providers/account-details';
 import { OpenPositionsProvider } from '@/providers/open-positions';
+import { PostHogProvider } from '@/providers/posthog'; // Add PostHog provider import
 import { AppState } from 'react-native';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -35,7 +38,7 @@ const tokenCache = {
   },
 };
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync();
 
 // Create a wrapper component for the app content that checks network
 function AppContent() {
@@ -108,11 +111,11 @@ export default function RootLayout() {
     "Inter-SemiBold": require("../assets/fonts/Inter-SemiBold.ttf")
   })
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+  // useEffect(() => {
+  //   if (loaded) {
+  //     SplashScreen.hideAsync();
+  //   }
+  // }, [loaded]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
@@ -142,18 +145,21 @@ export default function RootLayout() {
           {/* <NetworkProvider> */}
             <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
               <ClerkLoaded>
-                <QueryProvider>
-                  <AccountsProvider>
-                    <AccountDetailsProvider>
-                      <CurrencySymbolProvider>
-                        <OpenPositionsProvider>
-                          <AppContent />
-                        </OpenPositionsProvider>
-                      </CurrencySymbolProvider>
-                    </AccountDetailsProvider>
-                  </AccountsProvider>
-                  <StatusBar style="auto" />
-                </QueryProvider>
+                {/* 🎯 Add PostHog provider here - after Clerk for user identification */}
+                <PostHogProvider>
+                  <QueryProvider>
+                    <AccountsProvider>
+                      <AccountDetailsProvider>
+                        <CurrencySymbolProvider>
+                          <OpenPositionsProvider>
+                            <AppContent />
+                          </OpenPositionsProvider>
+                        </CurrencySymbolProvider>
+                      </AccountDetailsProvider>
+                    </AccountsProvider>
+                    <StatusBar style="auto" />
+                  </QueryProvider>
+                </PostHogProvider>
               </ClerkLoaded>
             </ClerkProvider>
           {/* </NetworkProvider> */}

@@ -13,8 +13,25 @@
       "assets/charting_assets/**/*"
     ],
     "metro": {
-      "assetExts": ["js", "json", "png", "jpg", "jpeg", "gif", "webp", "svg"],
-      "sourceExts": ["js", "jsx", "json", "ts", "tsx", "cjs", "mjs"]
+      "assetExts": [
+        "js",
+        "json",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "svg"
+      ],
+      "sourceExts": [
+        "js",
+        "jsx",
+        "json",
+        "ts",
+        "tsx",
+        "cjs",
+        "mjs"
+      ]
     },
     "ios": {
       "supportsTablet": true,
@@ -55,13 +72,6 @@
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#100E0F",
-          "image": "./assets/images/splash.png"
-        }
-      ],
-      [
         "expo-media-library",
         {
           "photosPermission": "Allow PropFirmMatch to access your photos to save trading screenshots.",
@@ -70,7 +80,8 @@
         }
       ],
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

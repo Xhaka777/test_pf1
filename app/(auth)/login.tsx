@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -16,11 +16,12 @@ import OAuth from '@/components/OAuth'; // Ensure OAuth component accepts the 'e
 import { useOAuth, useSignIn } from '@clerk/clerk-expo';
 import { useWarmUpBrowser } from '@/lib/useWarmUpBrowser';
 import { LogoDropdown } from '@/components/LogoDropdown';
-
+import { usePostHogTracking } from '@/hooks/usePostHogTracking'; // Add PostHog tracking
 
 export default function LoginScreen() {
-
     const { signIn, setActive, isLoaded } = useSignIn();
+    const { trackScreenView, trackAuthAction, trackError } = usePostHogTracking(); // Add tracking hooks
+    
     //Warm up the browser for OAuth (improves performance)
     useWarmUpBrowser();
 
@@ -38,8 +39,15 @@ export default function LoginScreen() {
 
     const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
 
+    // Track screen view when component mounts
+    useEffect(() => {
+        trackScreenView('login_screen');
+    }, [trackScreenView]);
+
     const onGoogleSignInPress = useCallback(async () => {
         if (!isLoaded) return;
+
+        trackAuthAction('google_login_attempted', { method: 'google_oauth' });
 
         setGoogleLoading(true);
         try {
@@ -47,19 +55,40 @@ export default function LoginScreen() {
 
             if (createdSessionId) {
                 await setActive({ session: createdSessionId });
+                
+                trackAuthAction('login_success', { 
+                    method: 'google_oauth',
+                    success: true 
+                });
+                
                 router.replace('/(tabs)/overview');
             }
         } catch (err: any) {
-            Alert.alert("Error", err.errors ? err.errors[0].longMessage : "Google sign-in failed");
+            const errorMessage = err.errors ? err.errors[0].longMessage : "Google sign-in failed";
+            
+            trackAuthAction('login_failed', { 
+                method: 'google_oauth',
+                success: false,
+                error: errorMessage
+            });
+            
+            trackError(errorMessage, {
+                screen: 'login',
+                function: 'onGoogleSignInPress'
+            });
+            
+            Alert.alert("Error", errorMessage);
             console.error(JSON.stringify(err, null, 2));
         } finally {
             setGoogleLoading(false);
         }
-    }, [isLoaded]);
-
+    }, [isLoaded, trackAuthAction, trackError]);
 
     const onSignInPress = useCallback(async () => {
         if (!isLoaded) return;
+        
+        trackAuthAction('email_login_attempted', { method: 'email_password' });
+        
         console.log('po hin mrena!')
         try {
             console.log('form.email', form.email)
@@ -72,16 +101,42 @@ export default function LoginScreen() {
 
             if (signInAttempt.status === 'complete') {
                 await setActive({ session: signInAttempt.createdSessionId });
+                
+                trackAuthAction('login_success', { 
+                    method: 'email_password',
+                    success: true 
+                });
+                
                 router.replace('/(tabs)/overview');
             } else {
                 console.log(JSON.stringify(signInAttempt, null, 2));
+                
+                trackAuthAction('login_failed', { 
+                    method: 'email_password',
+                    success: false,
+                    error: 'Login incomplete'
+                });
+                
                 Alert.alert("Error", "Log in failed. Please try again.")
             }
         } catch (error: any) {
             console.log(JSON.stringify(error, null, 2));
-            Alert.alert("Error", error.errors[0].longMessage)
+            const errorMessage = error.errors[0].longMessage;
+            
+            trackAuthAction('login_failed', { 
+                method: 'email_password',
+                success: false,
+                error: errorMessage
+            });
+            
+            trackError(errorMessage, {
+                screen: 'login',
+                function: 'onSignInPress'
+            });
+            
+            Alert.alert("Error", errorMessage)
         }
-    }, [isLoaded, form])
+    }, [isLoaded, form, trackAuthAction, trackError])
 
     const [isDropdownVisible, setIsDropdownVisible] = useState(false);
 

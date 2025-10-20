@@ -10,6 +10,7 @@ import { useAccounts } from '@/providers/accounts';
 import { useActiveSymbol } from '@/hooks/use-active-symbol';
 import { useUser } from '@clerk/clerk-expo';
 import TradingChart from '@/components/TradingChart';
+import { usePostHogTracking } from '@/hooks/usePostHogTracking';
 
 
 type TradeProps = {
@@ -23,6 +24,7 @@ const Trade = ({ navigation }: TradeProps) => {
   const [activeSymbol] = useActiveSymbol();
   const { isLoaded: userLoaded, user } = useUser();
   const details = useUser();
+  const { trackScreenView, trackEvent, trackError } = usePostHogTracking();
 
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -30,6 +32,54 @@ const Trade = ({ navigation }: TradeProps) => {
     return !userLoaded || !user || accountsLoading || accountDetailsLoading || !selectedAccountId;
   }, [userLoaded, user, accountsLoading, accountDetailsLoading, selectedAccountId]);
 
+  // Track screen view when component mounts
+  useEffect(() => {
+    if (!isLoading && !isInitializing) {
+      trackScreenView('trading_chart', {
+        symbol: activeSymbol,
+        account_id: selectedAccountId,
+        exchange: accountDetails?.exchange,
+        account_type: accountDetails?.account_type,
+        has_account_details: !!accountDetails
+      });
+    }
+  }, [isLoading, isInitializing, activeSymbol, selectedAccountId, accountDetails, trackScreenView]);
+
+  // Track symbol changes
+  useEffect(() => {
+    if (activeSymbol && !isLoading) {
+      trackEvent('trading_symbol_changed', {
+        symbol: activeSymbol,
+        account_id: selectedAccountId,
+        exchange: accountDetails?.exchange,
+        previous_symbol: null // You could track previous symbol if needed
+      });
+    }
+  }, [activeSymbol, selectedAccountId, accountDetails, isLoading, trackEvent]);
+
+  // Track account changes in trading
+  useEffect(() => {
+    if (selectedAccountId && accountDetails && !isLoading) {
+      trackEvent('trading_account_changed', {
+        account_id: selectedAccountId,
+        account_name: accountDetails.name,
+        account_type: accountDetails.account_type,
+        exchange: accountDetails.exchange,
+        balance: accountDetails.balance,
+        currency: accountDetails.currency
+      });
+    }
+  }, [selectedAccountId, accountDetails, isLoading, trackEvent]);
+
+  // Track loading errors
+  useEffect(() => {
+    if (!userLoaded && user === null) {
+      trackError('User authentication failed in trading screen', {
+        screen: 'trading',
+        context: 'user_loading'
+      });
+    }
+  }, [userLoaded, user, trackError]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -65,14 +115,13 @@ const Trade = ({ navigation }: TradeProps) => {
     );
   }
 
-  // // Minimal logging for debugging (instead of massive data dumps)
+  // Minimal logging for debugging (instead of massive data dumps)
   console.log('[Trade] Rendering with:', {
     selectedAccountId,
     activeSymbol,
     hasAccountDetails: !!accountDetails,
     hasUser: !!user
   });
-
 
   // console.log('selectedAccountId', selectedAccountId)
   console.log('activeSymbol', activeSymbol)
