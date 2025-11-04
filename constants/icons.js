@@ -9,6 +9,7 @@ import dollar_chart_sign from '../assets/icons/dollar-chart-sign.png';
 import wallet from '../assets/icons/wallet.png';
 import red_wallet from '../assets/icons/red_wallet.png';
 import cTrader from '../assets/icons/ctrader.svg';
+import apple from '../assets/icons/apple.png';
 
 export default {
     overview,
@@ -21,5 +22,6 @@ export default {
     dollar_chart_sign,
     wallet,
     red_wallet,
-    cTrader
+    cTrader,
+    apple
 }

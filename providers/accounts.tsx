@@ -60,7 +60,7 @@ const defaultContextValue: AccountsContextType = {
 const AccountsContext = createContext<AccountsContextType>(defaultContextValue);
 
 export function AccountsProvider({ children }: PropsWithChildren) {
-    const { isSignedIn, isLoaded } = useAuth();
+    const { isSignedIn, isLoaded, userId } = useAuth();
 
     const {
         data: accountsData,
@@ -68,7 +68,7 @@ export function AccountsProvider({ children }: PropsWithChildren) {
         error: queryError,
         refetch
     } = useGetAccounts({
-        enabled: isLoaded && isSignedIn,
+        enabled: isLoaded && isSignedIn && !!userId,
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
         staleTime: 2 * 60 * 1000,

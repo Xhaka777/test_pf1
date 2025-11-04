@@ -45,7 +45,10 @@
           "NSAllowsLocalNetworking": true
         }
       },
-      "appleTeamId": "292S5A9L2S"
+      "appleTeamId": "292S5A9L2S",
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -81,7 +84,8 @@
       ],
       "expo-asset",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

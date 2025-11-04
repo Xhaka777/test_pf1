@@ -68,17 +68,19 @@ export default function SignUp() {
 
   const onPressVerify = async () => {
     if (!isLoaded) return;
+
     try {
       const completeSignUp = await signUp.attemptEmailAddressVerification({
         code: verification.code,
       });
+
       if (completeSignUp.status === "complete") {
         await setActive({ session: completeSignUp.createdSessionId });
-        setVerification({
-          ...verification,
-          state: "success",
-        });
-        setShowSuccessModal(true);
+
+        // Smooth navigation after session is ready
+        setTimeout(() => {
+          router.replace("/(tabs)/overview");
+        }, 300);
       } else {
         setVerification({
           ...verification,
@@ -89,11 +91,12 @@ export default function SignUp() {
     } catch (err: any) {
       setVerification({
         ...verification,
-        error: err.errors[0].longMessage,
+        error: err.errors?.[0]?.longMessage ?? "An error occurred",
         state: "failed",
       });
     }
   };
+
 
   return (
     <View className="flex-1 bg-black px-5">

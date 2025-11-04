@@ -1,4 +1,3 @@
-// app/_layout.tsx
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -38,26 +37,31 @@ const tokenCache = {
   },
 };
 
+// SplashScreen.setOptions({
+//   duration: 1000,
+//   fade: true,
+// });
+
 // SplashScreen.preventAutoHideAsync();
 
 // Create a wrapper component for the app content that checks network
 function AppContent() {
-// const { hasNetworkError, isConnected, isInternetReachable } = useNetwork();
+  // const { hasNetworkError, isConnected, isInternetReachable } = useNetwork();
 
-//   // Log network state changes
-//   useEffect(() => {
-//     console.log('[AppContent] Network state:', {
-//       hasNetworkError,
-//       isConnected,
-//       isInternetReachable
-//     });
-//   }, [hasNetworkError, isConnected, isInternetReachable]);
+  //   // Log network state changes
+  //   useEffect(() => {
+  //     console.log('[AppContent] Network state:', {
+  //       hasNetworkError,
+  //       isConnected,
+  //       isInternetReachable
+  //     });
+  //   }, [hasNetworkError, isConnected, isInternetReachable]);
 
-//   // Show connection error screen if there's a network error
-//   if (hasNetworkError) {
-//     console.log('[AppContent] Showing ConnectionErrorScreen');
-//     return <ConnectionErrorScreen />;
-//   }
+  //   // Show connection error screen if there's a network error
+  //   if (hasNetworkError) {
+  //     console.log('[AppContent] Showing ConnectionErrorScreen');
+  //     return <ConnectionErrorScreen />;
+  //   }
 
   return (
     <Stack>
@@ -143,25 +147,25 @@ export default function RootLayout() {
       <GestureHandlerRootView className='flex-1'>
         <BottomSheetModalProvider>
           {/* <NetworkProvider> */}
-            <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-              <ClerkLoaded>
-                {/* 🎯 Add PostHog provider here - after Clerk for user identification */}
-                <PostHogProvider>
-                  <QueryProvider>
-                    <AccountsProvider>
-                      <AccountDetailsProvider>
-                        <CurrencySymbolProvider>
-                          <OpenPositionsProvider>
-                            <AppContent />
-                          </OpenPositionsProvider>
-                        </CurrencySymbolProvider>
-                      </AccountDetailsProvider>
-                    </AccountsProvider>
-                    <StatusBar style="auto" />
-                  </QueryProvider>
-                </PostHogProvider>
-              </ClerkLoaded>
-            </ClerkProvider>
+          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+            <ClerkLoaded>
+              {/* 🎯 Add PostHog provider here - after Clerk for user identification */}
+              <PostHogProvider>
+                <QueryProvider>
+                  <AccountsProvider>
+                    <AccountDetailsProvider>
+                      <CurrencySymbolProvider>
+                        <OpenPositionsProvider>
+                          <AppContent />
+                        </OpenPositionsProvider>
+                      </CurrencySymbolProvider>
+                    </AccountDetailsProvider>
+                  </AccountsProvider>
+                  <StatusBar style="auto" />
+                </QueryProvider>
+              </PostHogProvider>
+            </ClerkLoaded>
+          </ClerkProvider>
           {/* </NetworkProvider> */}
         </BottomSheetModalProvider>
       </GestureHandlerRootView>

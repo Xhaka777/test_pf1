@@ -21,7 +21,7 @@ import { usePostHogTracking } from '@/hooks/usePostHogTracking'; // Add PostHog 
 export default function LoginScreen() {
     const { signIn, setActive, isLoaded } = useSignIn();
     const { trackScreenView, trackAuthAction, trackError } = usePostHogTracking(); // Add tracking hooks
-    
+
     //Warm up the browser for OAuth (improves performance)
     useWarmUpBrowser();
 
@@ -55,28 +55,28 @@ export default function LoginScreen() {
 
             if (createdSessionId) {
                 await setActive({ session: createdSessionId });
-                
-                trackAuthAction('login_success', { 
+
+                trackAuthAction('login_success', {
                     method: 'google_oauth',
-                    success: true 
+                    success: true
                 });
-                
+
                 router.replace('/(tabs)/overview');
             }
         } catch (err: any) {
             const errorMessage = err.errors ? err.errors[0].longMessage : "Google sign-in failed";
-            
-            trackAuthAction('login_failed', { 
+
+            trackAuthAction('login_failed', {
                 method: 'google_oauth',
                 success: false,
                 error: errorMessage
             });
-            
+
             trackError(errorMessage, {
                 screen: 'login',
                 function: 'onGoogleSignInPress'
             });
-            
+
             Alert.alert("Error", errorMessage);
             console.error(JSON.stringify(err, null, 2));
         } finally {
@@ -86,9 +86,22 @@ export default function LoginScreen() {
 
     const onSignInPress = useCallback(async () => {
         if (!isLoaded) return;
-        
+
+        const email = form.email.trim();
+        const password = form.password.trim();
+
+        if (!email && !password) {
+            Alert.alert("Missing Information", "Please enter your email and password.");
+            return;
+        } else if (!email) {
+            Alert.alert("Missing Information", "Please enter your email.");
+            return;
+        } else if (!password) {
+            Alert.alert("Missing Information", "Please enter your password.");
+            return;
+        }
         trackAuthAction('email_login_attempted', { method: 'email_password' });
-        
+
         console.log('po hin mrena!')
         try {
             console.log('form.email', form.email)
@@ -101,39 +114,39 @@ export default function LoginScreen() {
 
             if (signInAttempt.status === 'complete') {
                 await setActive({ session: signInAttempt.createdSessionId });
-                
-                trackAuthAction('login_success', { 
+
+                trackAuthAction('login_success', {
                     method: 'email_password',
-                    success: true 
+                    success: true
                 });
-                
+
                 router.replace('/(tabs)/overview');
             } else {
                 console.log(JSON.stringify(signInAttempt, null, 2));
-                
-                trackAuthAction('login_failed', { 
+
+                trackAuthAction('login_failed', {
                     method: 'email_password',
                     success: false,
                     error: 'Login incomplete'
                 });
-                
+
                 Alert.alert("Error", "Log in failed. Please try again.")
             }
         } catch (error: any) {
             console.log(JSON.stringify(error, null, 2));
             const errorMessage = error.errors[0].longMessage;
-            
-            trackAuthAction('login_failed', { 
+
+            trackAuthAction('login_failed', {
                 method: 'email_password',
                 success: false,
                 error: errorMessage
             });
-            
+
             trackError(errorMessage, {
                 screen: 'login',
                 function: 'onSignInPress'
             });
-            
+
             Alert.alert("Error", errorMessage)
         }
     }, [isLoaded, form, trackAuthAction, trackError])

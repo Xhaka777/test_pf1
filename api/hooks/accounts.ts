@@ -134,10 +134,12 @@ export function useFetchAccountTrades() {
 export function useGetPropFirmAccounts(
     options?: Partial<UseQueryOptions<PropFirmAccountsType, Error>>
 ) {
-    const { fetchFromApi } = useAuthenticatedApi<PropFirmAccountsType>();
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<PropFirmAccountsType>();
+
     return useQuery<PropFirmAccountsType>({
         queryKey: [QueryKeys.PROP_FIRM_ACCOUNTS],
         queryFn: () => fetchFromApi(ApiRoutes.PROP_FIRM_ACCOUNTS),
+        enabled: isLoaded && isSignedIn,
         staleTime: 0,
         select: (data) => ({
             ...data,
@@ -150,11 +152,12 @@ export function useGetPropFirmAccounts(
 export function useGetBrokerAccounts(
     options?: Partial<UseQueryOptions<BrokerAccountsSchemaType, Error>>,
 ) {
-    const { fetchFromApi } = useAuthenticatedApi<BrokerAccountsSchemaType>();
+    const { fetchFromApi, isLoaded, isSignedIn } = useAuthenticatedApi<BrokerAccountsSchemaType>();
 
     return useQuery<BrokerAccountsSchemaType>({
         queryKey: [QueryKeys.BROKER_ACCOUNTS],
         queryFn: () => fetchFromApi(ApiRoutes.BROKER_ACCOUNTS),
+        enabled: isLoaded && isSignedIn,
         staleTime: 0,
         // Filter to show only active accounts
         select: (data) => ({

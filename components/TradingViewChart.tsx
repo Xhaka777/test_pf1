@@ -92,308 +92,6 @@ export default function TradingViewChart({
 
   // Use the passed symbol or fallback to BTCUSD
   const chartSymbol = symbol || 'BTCUSD';
-  const currency = accountDetails?.currency || 'USD';
-
-  // Filter trades and orders for current symbol
-  const relevantTrades = useMemo(() => {
-    if (!openTradesData?.open_trades || !chartSymbol) return [];
-    return openTradesData.open_trades.filter(trade => trade.symbol === chartSymbol);
-  }, [openTradesData?.open_trades, chartSymbol]);
-
-  const relevantOrders = useMemo(() => {
-    if (!openTradesData?.open_orders || !chartSymbol) return [];
-    return openTradesData.open_orders.filter(order => order.symbol === chartSymbol);
-  }, [openTradesData?.open_orders, chartSymbol]);
-
-  // Provider-like functions (adapted from web code)
-  const clearDialogState = useCallback(() => {
-    setIsOpen(false);
-    setIsLoading(false);
-    setOrderMode(false);
-    setOrderType(null);
-    setPosition(null);
-    setOptions({
-      orderPrice: 0,
-      marketPrice: 0,
-      symbol: '',
-    });
-    form.reset();
-  }, [form]);
-
-  const requestPosition = useCallback(
-    (config: ChartTradingDialogRequestOptions) => {
-      setOptions(config);
-      setIsOpen(true); // Open the dialog immediately
-      return new Promise<ChartTradingDialogResponse>((resolve) => {
-        resolveRef.current = resolve;
-      });
-    },
-    [],
-  );
-
-  const onFormSubmit = useCallback(
-    async (formData: LimitOrderSchemaType) => {
-      if (!orderType) {
-        Alert.alert('Error', 'An error occurred while opening the order.');
-        return;
-      }
-
-      const tradeData = {
-        account: selectedAccountId,
-        symbol: options.symbol,
-        order_type: orderType,
-        position: position,
-        risk_multiplier: null,
-        quantity: formData.quantity.toString(),
-        price: options.orderPrice.toString(),
-        limit_price: options.orderPrice.toString(),
-      };
-
-      try {
-        const response = await createTradeMutation(
-          tradeData as unknown as OpenTradeInput,
-        );
-        if (response.status === StatusEnum.SUCCESS) {
-          Alert.alert('Success', 'Position has been successfully opened');
-          clearDialogState();
-          resolveRef.current?.({
-            submitted: true,
-            type: orderType,
-            status: response.status,
-          });
-        } else {
-          Alert.alert('Failed to open a position', response.message);
-        }
-      } catch (error) {
-        console.error('Error opening limit order:', error);
-        Alert.alert('Error', 'An error occurred while opening the limit order.');
-      }
-    },
-    [
-      clearDialogState,
-      createTradeMutation,
-      options.orderPrice,
-      options.symbol,
-      orderType,
-      position,
-      selectedAccountId,
-    ],
-  );
-
-  const handleCancel = useCallback(() => {
-    clearDialogState();
-    resolveRef.current?.({ submitted: false });
-  }, [clearDialogState]);
-
-  // Handle plus button press - using provider-like logic
-  const handlePlusPress = async () => {
-    if (!currentPrice) return;
-
-    // Get current market price (you might need to get this from your price feed)
-    const marketPrice = 118900; // This should come from your real-time price feed
-
-    // Use the provider-like requestPosition function
-    try {
-      const response = await requestPosition({
-        orderPrice: currentPrice,
-        marketPrice: marketPrice,
-        symbol: chartSymbol,
-      });
-
-      console.log('Position request completed:', response);
-    } catch (error) {
-      console.error('Error requesting position:', error);
-    }
-  };
-
-  // Function to inject position lines into the chart
-  // const injectPositionLines = useCallback(() => {
-  //   if (!webViewRef || (!relevantTrades.length && !relevantOrders.length)) return;
-
-  //   const trades = relevantTrades;
-  //   const orders = relevantOrders;
-
-  //   const injectionScript = `
-  //     (function() {
-  //       // Remove existing position lines
-  //       const existingLines = document.querySelectorAll('.custom-position-line');
-  //       existingLines.forEach(line => line.remove());
-
-  //       // Function to create position line
-  //       function createPositionLine(price, text, color, type = 'position') {
-  //         const line = document.createElement('div');
-  //         line.className = 'custom-position-line';
-  //         line.style.cssText = \`
-  //           position: absolute;
-  //           width: 100%;
-  //           height: 2px;
-  //           background-color: \${color};
-  //           z-index: 1000;
-  //           pointer-events: none;
-  //           border-top: 2px solid \${color};
-  //         \`;
-
-  //         const label = document.createElement('div');
-  //         label.style.cssText = \`
-  //           position: absolute;
-  //           right: 10px;
-  //           top: -12px;
-  //           background-color: \${color};
-  //           color: \${type === 'position' ? '${LABEL_COLOR}' : '#ffffff'};
-  //           padding: 2px 8px;
-  //           font-size: 11px;
-  //           font-weight: bold;
-  //           border-radius: 4px;
-  //           white-space: nowrap;
-  //         \`;
-  //         label.textContent = text;
-  //         line.appendChild(label);
-
-  //         return line;
-  //       }
-
-  //       // Function to get price position (simplified - assumes linear scale)
-  //       function getPricePosition(price) {
-  //         // This is a simplified calculation - real implementation would need
-  //         // to get the actual chart scale and viewport
-  //         const chartContainer = document.querySelector('#tradingview_chart, .tv-lightweight-charts, [class*="chart"]');
-  //         if (!chartContainer) return null;
-          
-  //         const rect = chartContainer.getBoundingClientRect();
-  //         // This is a rough estimation - you'd need actual price scale
-  //         const relativePosition = 0.5; // Middle of chart for demo
-  //         return rect.top + (rect.height * relativePosition);
-  //       }
-
-  //       // Add position lines for trades
-  //       ${JSON.stringify(trades)}.forEach(trade => {
-  //         const container = document.querySelector('#tradingview_chart') || document.body;
-          
-  //         // Position line
-  //         const positionPrice = parseFloat(trade.entry);
-  //         const positionText = \`\${trade.position_type.toUpperCase()} \${positionPrice}\`;
-  //         const positionLine = createPositionLine(positionPrice, positionText, '${POSITION_COLOR}');
-          
-  //         // Calculate position - this is simplified
-  //         const yPosition = getPricePosition(positionPrice);
-  //         if (yPosition) {
-  //           positionLine.style.top = yPosition + 'px';
-  //           container.appendChild(positionLine);
-  //         }
-
-  //         // SL line
-  //         if (trade.sl && trade.sl > 0) {
-  //           const slPrice = parseFloat(trade.sl);
-  //           const slAmount = parseFloat(trade.trade_loss || 0).toLocaleString('en-US', {
-  //             style: 'currency',
-  //             currency: '${currency}'
-  //           });
-  //           const slText = \`SL \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${slAmount}\`;
-  //           const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'sl');
-            
-  //           const slYPosition = getPricePosition(slPrice);
-  //           if (slYPosition) {
-  //             slLine.style.top = slYPosition + 'px';
-  //             container.appendChild(slLine);
-  //           }
-  //         }
-
-  //         // TP line
-  //         if (trade.tp && trade.tp > 0) {
-  //           const tpPrice = parseFloat(trade.tp);
-  //           const tpAmount = parseFloat(trade.trade_profit || 0).toLocaleString('en-US', {
-  //             style: 'currency',
-  //             currency: '${currency}'
-  //           });
-  //           const tpText = \`TP \${trade.position_type.toUpperCase()} \${trade.entry} [\${trade.quantity}] \${tpAmount}\`;
-  //           const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'tp');
-            
-  //           const tpYPosition = getPricePosition(tpPrice);
-  //           if (tpYPosition) {
-  //             tpLine.style.top = tpYPosition + 'px';
-  //             container.appendChild(tpLine);
-  //           }
-  //         }
-  //       });
-
-  //       // Add order lines
-  //       ${JSON.stringify(orders)}.forEach(order => {
-  //         const container = document.querySelector('#tradingview_chart') || document.body;
-          
-  //         const orderPrice = parseFloat(order.price);
-  //         const orderText = \`\${order.order_type} \${orderPrice}\`;
-  //         const orderColor = order.position_type === 'long' ? '${TP_COLOR}' : '${SL_COLOR}';
-  //         const orderLine = createPositionLine(orderPrice, orderText, orderColor, 'order');
-          
-  //         const yPosition = getPricePosition(orderPrice);
-  //         if (yPosition) {
-  //           orderLine.style.top = yPosition + 'px';
-  //           container.appendChild(orderLine);
-  //         }
-
-  //         // Order SL line
-  //         if (order.sl && order.sl > 0) {
-  //           const slPrice = parseFloat(order.sl);
-  //           const slText = \`SL \${order.order_type} \${order.price} [\${order.quantity}]\`;
-  //           const slLine = createPositionLine(slPrice, slText, '${SL_COLOR}', 'order-sl');
-            
-  //           const slYPosition = getPricePosition(slPrice);
-  //           if (slYPosition) {
-  //             slLine.style.top = slYPosition + 'px';
-  //             container.appendChild(slLine);
-  //           }
-  //         }
-
-  //         // Order TP line
-  //         if (order.tp && order.tp > 0) {
-  //           const tpPrice = parseFloat(order.tp);
-  //           const tpText = \`TP \${order.order_type} \${order.price} [\${order.quantity}]\`;
-  //           const tpLine = createPositionLine(tpPrice, tpText, '${TP_COLOR}', 'order-tp');
-            
-  //           const tpYPosition = getPricePosition(tpPrice);
-  //           if (tpYPosition) {
-  //             tpLine.style.top = tpYPosition + 'px';
-  //             container.appendChild(tpLine);
-  //           }
-  //         }
-  //       });
-
-  //       // Re-inject lines when chart updates
-  //       const observer = new MutationObserver(function(mutations) {
-  //         mutations.forEach(function(mutation) {
-  //           if (mutation.type === 'childList') {
-  //             // Delay to allow chart to render
-  //             setTimeout(() => {
-  //               if (document.querySelectorAll('.custom-position-line').length === 0) {
-  //                 // Lines were cleared, re-inject them
-  //                 arguments.callee();
-  //               }
-  //             }, 1000);
-  //           }
-  //         });
-  //       });
-
-  //       const chartContainer = document.querySelector('#tradingview_chart');
-  //       if (chartContainer) {
-  //         observer.observe(chartContainer, { childList: true, subtree: true });
-  //       }
-  //     })();
-  //     true; // Return true to indicate successful injection
-  //   `;
-
-  //   webViewRef.injectJavaScript(injectionScript);
-  // }, [webViewRef, relevantTrades, relevantOrders, currency]);
-
-  // Inject position lines when data changes
-  // useEffect(() => {
-  //   if (webViewRef && (relevantTrades.length > 0 || relevantOrders.length > 0)) {
-  //     // Delay injection to ensure chart is loaded
-  //     const timer = setTimeout(() => {
-  //       injectPositionLines();
-  //     }, 2000);
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [injectPositionLines, relevantTrades, relevantOrders]);
 
   const getTradingViewHTML = (symbol: string) => `
   <!DOCTYPE html>
@@ -467,43 +165,65 @@ export default function TradingViewChart({
       <script type="text/javascript">
           let chartWidget = null;
           
-          function initChart() {
-              chartWidget = new TradingView.widget({
-                  "width": "100%",
-                  "height": "100%",
-                  "symbol": "${symbol}",
-                  "timezone": "Etc/UTC",
-                  "theme": "dark",
-                  "style": "1",
-                  "locale": "en",
-                  "toolbar_bg": "#1a1a1a",
-                  "enable_publishing": false,
-                  "backgroundColor": "#0f0f0f",
-                  "gridColor": "#2a2a2a",
-                  "hide_top_toolbar": false,
-                  "hide_legend": true,
-                  "save_image": false,
-                  "container_id": "tradingview_chart",
-                  "autosize": true,
-                  "disabled_features": [
-                      "symbol_info",
-                      "display_market_status"
-                  ],
-                  "overrides": {
-                      "paneProperties.background": "#0f0f0f",
-                      "paneProperties.backgroundType": "solid",
-                      "paneProperties.backgroundGradientStartColor": "#0f0f0f",
-                      "paneProperties.backgroundGradientEndColor": "#0f0f0f",
-                      "paneProperties.vertGridProperties.color": "#2a2a2a",
-                      "paneProperties.horzGridProperties.color": "#2a2a2a",
-                      "symbolWatermarkProperties.transparency": 100,
-                      "scalesProperties.textColor": "#9ca3af",
-                      "scalesProperties.backgroundColor": "#1a1a1a"
-                  }
-              });
+         // In your getTradingViewHTML function, update the widget configuration:
 
-              // Notify React Native when chart is ready
-              chartWidget.onChartReady(() => {
+function initChart() {
+    chartWidget = new TradingView.widget({
+        "width": "100%",
+        "height": "100%",
+        "symbol": "${symbol}",
+        "timezone": "Etc/UTC",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#1a1a1a",
+        "enable_publishing": false,
+        "backgroundColor": "#0f0f0f",
+        "gridColor": "#2a2a2a",
+        "hide_top_toolbar": false,
+        "hide_legend": true,
+        "save_image": false,
+        "container_id": "tradingview_chart",
+        "autosize": true,
+        // Add these disabled features to remove volume and studies
+        "disabled_features": [
+            "symbol_info",
+            "display_market_status",
+            "volume_force_overlay",
+            "create_volume_indicator_by_default",
+            "studies_on_charts"
+        ],
+        // Add these enabled features for cleaner chart
+        "enabled_features": [
+            "hide_left_toolbar_by_default"
+        ],
+        "overrides": {
+            "paneProperties.background": "#0f0f0f",
+            "paneProperties.backgroundType": "solid",
+            "paneProperties.backgroundGradientStartColor": "#0f0f0f",
+            "paneProperties.backgroundGradientEndColor": "#0f0f0f",
+            "paneProperties.vertGridProperties.color": "#2a2a2a",
+            "paneProperties.horzGridProperties.color": "#2a2a2a",
+            "symbolWatermarkProperties.transparency": 100,
+            "scalesProperties.textColor": "#9ca3af",
+            "scalesProperties.backgroundColor": "#1a1a1a",
+            // Remove volume indicator
+            "volumePaneSize": "compat",
+            "mainSeriesProperties.showCountdown": false,
+            "mainSeriesProperties.visible": true,
+            // Hide volume bars specifically
+            "volumePaneSize": "small"
+        },
+        // Add studies_overrides to ensure no default studies
+        "studies_overrides": {
+            "volume.volume.color.0": "rgba(0,0,0,0)",
+            "volume.volume.color.1": "rgba(0,0,0,0)",
+            "volume.volume.transparency": 100
+        }
+    });
+
+          // After chart is ready, remove any volume studies
+ chartWidget.onChartReady(() => {
                   // Hide symbol info elements after chart loads
                   setTimeout(() => {
                       const symbolElements = document.querySelectorAll([
@@ -522,7 +242,7 @@ export default function TradingViewChart({
                       }));
                   }, 1000);
               });
-          }
+        }
           
           if (typeof TradingView !== 'undefined') {
               initChart();
