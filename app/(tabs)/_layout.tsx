@@ -1,8 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { svgTabIcons } from '@/components/icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/clerk-expo';
 
 interface TabIconProps {
   focused: boolean;
@@ -26,6 +27,15 @@ interface TabIconProps {
 // }
 
 export default function TabLayout() {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) {
+    return null; // loading state
+  }
+
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/login" />;
+  }
   // const insets = useSafeAreaInsets();
   return (
     <Tabs
@@ -65,10 +75,10 @@ export default function TabLayout() {
           title: 'Overview',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
-              <svgTabIcons.overview 
-                width={28} 
+              <svgTabIcons.overview
+                width={28}
                 height={28}
-                color={focused ? '#ec4899' : '#6b7280'} 
+                color={focused ? '#ec4899' : '#6b7280'}
               />
             </View>
           ),
@@ -80,10 +90,10 @@ export default function TabLayout() {
           title: 'Trade',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
-              <svgTabIcons.trade 
-                width={28} 
+              <svgTabIcons.trade
+                width={28}
                 height={28}
-                color={focused ? '#ec4899' : '#6b7280'} 
+                color={focused ? '#ec4899' : '#6b7280'}
               />
             </View>
           ),
@@ -95,11 +105,11 @@ export default function TabLayout() {
         options={{
           title: 'Positions',
           tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer }>
-              <svgTabIcons.positions 
-                width={28} 
+            <View style={styles.iconContainer}>
+              <svgTabIcons.positions
+                width={28}
                 height={28}
-                color={focused ? '#ec4899' : '#6b7280'} 
+                color={focused ? '#ec4899' : '#6b7280'}
               />
             </View>
           ),
@@ -112,10 +122,10 @@ export default function TabLayout() {
           title: 'Account',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
-              <svgTabIcons.account 
-                width={28} 
+              <svgTabIcons.account
+                width={28}
                 height={28}
-                color={focused ? '#ec4899' : '#6b7280'} 
+                color={focused ? '#ec4899' : '#6b7280'}
               />
             </View>
           ),
@@ -138,6 +148,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    marginLeft:5,
+    marginLeft: 5,
   },
 });

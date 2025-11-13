@@ -11,7 +11,7 @@ export function usePostHogTracking() {
     properties?: Record<string, any>
   ) => {
     if (!isInitialized) {
-      console.log('[PostHog] Not initialized, skipping event:', event);
+      // console.log('[PostHog] Not initialized, skipping event:', event);
       return;
     }
 
@@ -22,7 +22,7 @@ export function usePostHogTracking() {
       platform: 'mobile',
     };
 
-    console.log('[PostHog] Tracking event:', event, enhancedProperties);
+    // console.log('[PostHog] Tracking event:', event, enhancedProperties);
     track(event, enhancedProperties);
   }, [track, isInitialized, selectedAccountId]);
 

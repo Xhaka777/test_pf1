@@ -27,6 +27,8 @@ import { useGetAccountDetails } from '@/api/hooks/account-details';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { OverviewAccountType, overviewAccountTypeAtom, overviewSelectedTabAtom } from '@/atoms/overview-atoms';
 import { AccountStatusEnum } from '@/shared/enums';
+import * as Sentry from '@sentry/react-native';
+
 
 export enum DashboardAccountType {
   PROP_FIRM = 'propfirm',

@@ -2,7 +2,7 @@
   "expo": {
     "name": "PropFirmMatch Trading",
     "slug": "prop-firm-one",
-    "version": "1.0.3",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -47,10 +47,14 @@
       },
       "appleTeamId": "292S5A9L2S",
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       }
     },
     "android": {
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundImage": "./assets/images/adaptive-icon-background.png"
@@ -85,7 +89,8 @@
       "expo-asset",
       "expo-secure-store",
       "expo-localization",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true

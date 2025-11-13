@@ -44,9 +44,35 @@ export default function SignUp() {
 
   const onSignUpPress = async () => {
     if (!isLoaded) return;
+    if (!form.name.trim()) {
+        Alert.alert("Missing Information", "Please enter your full name.");
+        return;
+    }
+    if (!form.email.trim()) {
+        Alert.alert("Missing Information", "Please enter your email address.");
+        return;
+    }
+    if (!form.password.trim()) {
+        Alert.alert("Missing Information", "Please enter a password.");
+        return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+        Alert.alert("Invalid Email", "Please enter a valid email address.");
+        return;
+    }
+    
+    // Validate password strength
+    if (form.password.length < 8) {
+        Alert.alert("Weak Password", "Password must be at least 8 characters long.");
+        return;
+    }
+    
     if (!agreedToTerms) {
-      Alert.alert("Terms Required", "Please agree to the Terms of Use and Privacy Policy");
-      return;
+        Alert.alert("Terms Required", "Please agree to the Terms of Use and Privacy Policy");
+        return;
     }
 
     try {

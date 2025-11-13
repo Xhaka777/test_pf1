@@ -90,6 +90,7 @@ export default function LoginScreen() {
         const email = form.email.trim();
         const password = form.password.trim();
 
+        // Check for empty fields
         if (!email && !password) {
             Alert.alert("Missing Information", "Please enter your email and password.");
             return;
@@ -100,6 +101,14 @@ export default function LoginScreen() {
             Alert.alert("Missing Information", "Please enter your password.");
             return;
         }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            Alert.alert("Invalid Email", "Please enter a valid email address.");
+            return;
+        }
+
         trackAuthAction('email_login_attempted', { method: 'email_password' });
 
         console.log('po hin mrena!')
@@ -134,7 +143,34 @@ export default function LoginScreen() {
             }
         } catch (error: any) {
             console.log(JSON.stringify(error, null, 2));
-            const errorMessage = error.errors[0].longMessage;
+
+            // Handle different types of authentication errors with user-friendly messages
+            let errorMessage = "Login failed. Please check your credentials and try again.";
+
+            if (error.errors && error.errors[0]) {
+                const errorCode = error.errors[0].code;
+                const originalMessage = error.errors[0].longMessage;
+
+                // Translate technical errors to user-friendly messages
+                switch (errorCode) {
+                    case 'form_param_format_invalid':
+                        errorMessage = "Please enter a valid email address.";
+                        break;
+                    case 'form_identifier_not_found':
+                        errorMessage = "Account not found. Please check your email address.";
+                        break;
+                    case 'form_password_incorrect':
+                        errorMessage = "Incorrect password. Please try again.";
+                        break;
+                    case 'form_identifier_exists':
+                        errorMessage = "This email is already registered. Please sign in instead.";
+                        break;
+                    default:
+                        // For any other errors, use a generic message instead of technical ones
+                        errorMessage = "Login failed. Please check your credentials and try again.";
+                        break;
+                }
+            }
 
             trackAuthAction('login_failed', {
                 method: 'email_password',
@@ -177,7 +213,7 @@ export default function LoginScreen() {
                 <View className="mb-5">
                     <Text className="text-sm text-white mb-2 font-Inter">Email</Text>
                     <TextInput
-                        className="bg-zinc-900 rounded-lg px-4 py-3 text-base text-white"
+                        className="bg-[#1A1819] border-[#2F2C2D] rounded-lg px-4 py-4 text-base text-white"
                         placeholder="bonie.green@gmail.com"
                         placeholderTextColor="#666"
                         keyboardType="email-address"
@@ -191,7 +227,7 @@ export default function LoginScreen() {
                     <Text className="text-sm text-white mb-2 font-Inter">Password</Text>
                     <View className="relative">
                         <TextInput
-                            className="bg-zinc-900 rounded-lg px-4 py-3 text-base text-white pr-12"
+                            className="bg-[#1A1819] border-[#2F2C2D] rounded-lg px-4 py-4 text-base text-white pr-12"
                             placeholder="••••••••••"
                             placeholderTextColor="#666"
                             secureTextEntry={!showPassword}
@@ -199,7 +235,7 @@ export default function LoginScreen() {
                             onChangeText={(value) => setForm({ ...form, password: value })}
                         />
                         <Pressable
-                            className="absolute right-3 top-3"
+                            className="absolute right-3 top-4"
                             onPress={() => setShowPassword(!showPassword)}>
                             {showPassword ? (
                                 <EyeOff size={20} color="#666" />
@@ -231,10 +267,10 @@ export default function LoginScreen() {
                 </View>
 
                 <TouchableOpacity
-                    className='bg-primary-100 rounded-lg px-4 py-4 items-center mb-2'
+                    className='bg-primary-100 rounded-lg px-4 py-3 items-center mb-2'
                     onPress={onSignInPress}
                 >
-                    <Text className='text-base text-black font-InterSemiBold'>Log in</Text>
+                    <Text className='text-base text-black font-InterMedium'>Log in</Text>
                 </TouchableOpacity>
                 <View className='items-center'>
                     <Text className='text-white font-InterSemiBold'>Don't have an account?<Link href='/(auth)/signup' className='text-primary-100 font-InterSemiBold'> Create Account</Link></Text>

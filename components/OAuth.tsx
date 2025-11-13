@@ -73,31 +73,15 @@ const OAuth = ({ isSignUp = false }: OAuthProps) => {
         <View>
             <View className='flex flex-row justify-center items-center mt-4 gap-x-3'>
                 <View className='flex-1 h-[1px] bg-gray-600' />
-                <Text className='text-xs text-gray-500 font-Inter'>{dividerText}</Text>
+                <Text className='text-sm text-[#898587] font-Inter'>{dividerText}</Text>
                 <View className='flex-1 h-[1px] bg-gray-600' />
             </View>
-
-            {/* Google Sign-In Button */}
-            <CustomButton
-                title={`${actionText} with Google`}
-                className="mt-5 w-full"
-                IconLeft={() => (
-                    <Image
-                        source={icons.google}
-                        resizeMode='contain'
-                        className='w-5 h-5 mx-2'
-                    />
-                )}
-                bgVariant="outline"
-                onPress={onGoogleSignInPress}
-                loading={googleLoading}
-            />
 
             {/* Apple Sign-In Button - Only show on iOS 13+ */}
             {isAppleSignInAvailable && (
                 <CustomButton
                     title={`${actionText} with Apple `}
-                    className="mt-3 w-full"
+                    className="mt-3 w-full rounded-md"
                     IconLeft={() => (
                         <Image
                             source={icons.apple}
@@ -110,6 +94,23 @@ const OAuth = ({ isSignUp = false }: OAuthProps) => {
                     loading={appleLoading}
                 />
             )}
+
+            {/* Google Sign-In Button */}
+            <CustomButton
+                title={`${actionText} with Google`}
+                className="mt-5 w-full rounded-md"
+                IconLeft={() => (
+                    <Image
+                        source={icons.google}
+                        resizeMode='contain'
+                        className='w-5 h-5 mx-2'
+                    />
+                )}
+                bgVariant="outline"
+                onPress={onGoogleSignInPress}
+                loading={googleLoading}
+            />
+
         </View>
     )
 }

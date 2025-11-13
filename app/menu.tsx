@@ -1,7 +1,7 @@
 import { View, Text, SafeAreaView, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useUser } from '@clerk/clerk-expo';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 
 import MenuHeader from '@/components/Header/menuHeader';
 import SelectableButton from '@/components/SelectableButton';
@@ -18,9 +18,19 @@ import { AccountStatusEnum } from '@/constants/enums';
 import { useAccounts } from '@/providers/accounts';
 import { useGetMetrics } from '@/api/hooks/metrics';
 import { ArchiveAccountModal } from '@/components/ArchiveAccountModal';
+import { Redirect, router } from 'expo-router';
 
 const Menu = () => {
   const { user } = useUser();
+  const { isSignedIn, isLoaded, signOut } = useAuth();
+
+  if (!isLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/login" />;
+  }
 
   // Updated state to use the three account types
   const [selectedAccountType, setSelectedAccountType] = useState('propFirm');
@@ -309,25 +319,22 @@ const Menu = () => {
     refetchBrokerAccounts
   ]);
 
-  // Handle sign out
   const handleSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert("Signed out successfully!");
+    Alert.alert("Sign Out", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+            // index.tsx will automatically redirect to login
+          } catch (error) {
+            Alert.alert("Error", "Failed to sign out");
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
   // Handle profile press (passed to Profile component)

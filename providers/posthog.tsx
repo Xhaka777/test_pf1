@@ -27,18 +27,18 @@ export function PostHogProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const initializePostHog = async () => {
       try {
-        console.log('[PostHog] Initializing...');
+        // console.log('[PostHog] Initializing...');
         
         const posthogKey = process.env.EXPO_PUBLIC_POSTHOG_KEY;
         const posthogHost = process.env.EXPO_PUBLIC_POSTHOG_HOST;
 
         if (!posthogKey) {
-          console.warn('[PostHog] Missing EXPO_PUBLIC_POSTHOG_KEY in environment variables');
+          // console.warn('[PostHog] Missing EXPO_PUBLIC_POSTHOG_KEY in environment variables');
           return;
         }
 
         if (!posthogHost) {
-          console.warn('[PostHog] Missing EXPO_PUBLIC_POSTHOG_HOST in environment variables');
+          // console.warn('[PostHog] Missing EXPO_PUBLIC_POSTHOG_HOST in environment variables');
           return;
         }
         
@@ -57,9 +57,9 @@ export function PostHogProvider({ children }: PropsWithChildren) {
 
         setPostHog(client);
         setIsInitialized(true);
-        console.log('[PostHog] ✅ Initialized successfully');
+        // console.log('[PostHog] ✅ Initialized successfully');
       } catch (error) {
-        console.error('[PostHog] ❌ Initialization failed:', error);
+        // console.error('[PostHog] ❌ Initialization failed:', error);
       }
     };
 
@@ -69,7 +69,7 @@ export function PostHogProvider({ children }: PropsWithChildren) {
   // Identify user when signed in
   useEffect(() => {
     if (isInitialized && posthog && isSignedIn && user) {
-      console.log('[PostHog] Identifying user:', user.id);
+      // console.log('[PostHog] Identifying user:', user.id);
       posthog.identify(user.id, {
         email: user.emailAddresses[0]?.emailAddress,
         firstName: user.firstName,
@@ -84,28 +84,28 @@ export function PostHogProvider({ children }: PropsWithChildren) {
   // Reset on sign out
   useEffect(() => {
     if (isInitialized && posthog && !isSignedIn) {
-      console.log('[PostHog] Resetting user session');
+      // console.log('[PostHog] Resetting user session');
       posthog.reset();
     }
   }, [isInitialized, posthog, isSignedIn]);
 
   const identify = (userId: string, properties?: Record<string, any>) => {
     if (posthog && isInitialized) {
-      console.log('[PostHog] Manual identify:', userId);
+      // console.log('[PostHog] Manual identify:', userId);
       posthog.identify(userId, properties);
     }
   };
 
   const track = (event: string, properties?: Record<string, any>) => {
     if (posthog && isInitialized) {
-      console.log('[PostHog] Tracking event:', event, properties);
+      // console.log('[PostHog] Tracking event:', event, properties);
       posthog.capture(event, properties);
     }
   };
 
   const reset = () => {
     if (posthog && isInitialized) {
-      console.log('[PostHog] Manual reset');
+      // console.log('[PostHog] Manual reset');
       posthog.reset();
     }
   };

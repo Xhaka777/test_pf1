@@ -21,6 +21,9 @@ import { PostHogProvider } from '@/providers/posthog'; // Add PostHog provider i
 import { AppState } from 'react-native';
 import { clerkTokenManager } from '@/utils/clerk-token-manager';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { AuthGuard } from '@/providers/Authguard';
+import * as Sentry from '@sentry/react-native';
+
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -37,12 +40,23 @@ const tokenCache = {
   },
 };
 
-// SplashScreen.setOptions({
-//   duration: 1000,
-//   fade: true,
-// });
-
-// SplashScreen.preventAutoHideAsync();
+// In app/_layout.tsx
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: 'production',
+  debug: __DEV__,
+  // Add this to disable problematic web integrations
+  integrations: [
+    // Only include mobile-friendly integrations
+  ],
+  beforeSend: (event) => {
+    // Filter out the history instrumentation errors
+    if (event.exception?.values?.[0]?.value?.includes('addEventListener is not a function')) {
+      return null;
+    }
+    return event;
+  },
+});
 
 // Create a wrapper component for the app content that checks network
 function AppContent() {
@@ -147,7 +161,11 @@ export default function RootLayout() {
       <GestureHandlerRootView className='flex-1'>
         <BottomSheetModalProvider>
           {/* <NetworkProvider> */}
-          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+          <ClerkProvider
+            publishableKey={publishableKey}
+            tokenCache={tokenCache}
+            afterSignOutUrl="/(auth)/login"
+          >
             <ClerkLoaded>
               {/* 🎯 Add PostHog provider here - after Clerk for user identification */}
               <PostHogProvider>
