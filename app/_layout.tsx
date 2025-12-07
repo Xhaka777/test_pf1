@@ -41,22 +41,22 @@ const tokenCache = {
 };
 
 // In app/_layout.tsx
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  environment: 'production',
-  debug: __DEV__,
-  // Add this to disable problematic web integrations
-  integrations: [
-    // Only include mobile-friendly integrations
-  ],
-  beforeSend: (event) => {
-    // Filter out the history instrumentation errors
-    if (event.exception?.values?.[0]?.value?.includes('addEventListener is not a function')) {
-      return null;
-    }
-    return event;
-  },
-});
+// Sentry.init({
+//   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+//   environment: 'production',
+//   debug: __DEV__,
+//   // Add this to disable problematic web integrations
+//   integrations: [
+//     // Only include mobile-friendly integrations
+//   ],
+//   beforeSend: (event) => {
+//     // Filter out the history instrumentation errors
+//     if (event.exception?.values?.[0]?.value?.includes('addEventListener is not a function')) {
+//       return null;
+//     }
+//     return event;
+//   },
+// });
 
 // Create a wrapper component for the app content that checks network
 function AppContent() {

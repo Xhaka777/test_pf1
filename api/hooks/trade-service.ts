@@ -85,6 +85,35 @@ export function useSyncTradesMutation() {
     });
 }
 
+export function useSyncAllTradesMutation() {
+    const { fetchFromApi } = useAuthenticatedApi<TradeServiceData>();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: function () {
+            return fetchFromApi(ApiRoutes.SYNC_ALL_TRADES, {
+                method: 'POST',
+            })
+        },
+        onSuccess: (response: TradeServiceData) => {
+            queryClient.setQueryData([QueryKeys.SYNC_ALL_TRADES], response);
+
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.GET_OPEN_TRADES],
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.GET_TRADE_HISTORY],
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.GET_ACCOUNT_DETAILS],
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.GET_METRICS],
+            });
+        }
+    })
+}
+
 export function useCloseAllTradesMutation() {
     const { fetchFromApi } = useAuthenticatedApi<TradeServiceData>();
     const queryClient = useQueryClient();
