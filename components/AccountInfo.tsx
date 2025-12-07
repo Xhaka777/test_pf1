@@ -43,6 +43,8 @@ export function AccountInfo({
     );
   }
 
+  // console.log('AccountInfo - Account ID:', accountDetails?.account_type);
+
   // ---------- Computed Values ----------
   const openProfitLoss = useMemo(() => {
     try {

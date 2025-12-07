@@ -35,6 +35,14 @@ const Account = () => {
 
   const { data: metricsData } = useGetMetrics(currentAccountId);
 
+  console.log('metricsData', metricsData)
+
+  console.log('Account Screen - Current Account ID:', currentAccountId);
+  console.log('Account Screen - Selected ID:', selectedAccountId);
+  console.log('Account Screen - Preview ID:', selectedPreviewAccountId);
+  console.log('Account Screen - Fetched accountDetails:', accountDetails);
+  console.log('Account Screen - Account Balance:', accountDetails?.balance);
+
   const dailyLoss = useMemo(() => {
     const starting_day_balance =
       (metricsData?.starting_balance ?? 0) - (metricsData?.daily_pl ?? 0);

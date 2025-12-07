@@ -45,6 +45,17 @@ export enum InstrumentTypeEnum {
   METALS = 'Metals',
 }
 
+export enum AccountCategorizationModeEnum {
+  TYPE_BASED = 'type-based',
+  ROLE_BASED = 'role-based',
+}
+
+export enum AccountRoleEnum {
+  ALL = 'all',
+  MASTER = 'master',
+  COPIER = 'copier',
+}
+
 export enum BugReportTypeEnum {
   FEATURE = 'feature',
   IMPROVEMENT = 'improvement',
