@@ -23,6 +23,8 @@ import { useErrorLogsCount } from '@/utils/use-error-logs-count';
 import { useSyncAllTradesMutation } from '@/api/hooks/trade-service';
 import { addErrorLog } from '@/utils/logger';
 import { ErrorLogsModal } from '@/components/ErrorsLogModal';
+import MenuAccounts from '@/components/MenuAccounts';
+import { FileText } from 'lucide-react-native';
 
 const Menu = () => {
   const { user } = useUser();
@@ -585,13 +587,41 @@ const Menu = () => {
     accountBottomSheetRef.current?.dismiss();
   }, []);
 
-  // ✅ Handle search (like web teammate's logic)
+  //  Handle search (like web teammate's logic)
   const handleSearch = useCallback((text: string) => {
     setSearchTerm(text);
   }, []);
 
   // Render account content based on selected account type
   const renderAccountContent = () => {
+    // For role-based categorization, show a unified account list
+    if (categorizationMode === 'role-based') {
+      // Get all prop firm accounts for role-based filtering
+      const allPropFirmAccounts = [
+        ...processedPropFirmAccounts.evaluation,
+        ...processedPropFirmAccounts.funded
+      ];
+
+      return (
+        <ScrollView
+          className='flex-1'
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <MenuAccounts
+            accounts={filteredActiveAccounts} // This already contains the role-filtered accounts
+            onAccountPress={handleAccountPress}
+            accountType="propFirm"
+            activeTab="All" // Use a generic tab name for role-based view
+            currentAccountId={selectedAccountId}
+            onArchivePress={handleArchivePress}
+            context='menu'
+          />
+        </ScrollView>
+      );
+    }
+
+    // For type-based categorization, use the existing logic
     switch (selectedAccountType) {
       case 'propFirm':
         return (
@@ -600,13 +630,11 @@ const Menu = () => {
             showMetrics={false}
             isMenuScreen={true}
             hideTabBar={false}
-            // ✅ Pass filtered data instead of original data
             accountData={finalAccountsToShow}
             isLoading={propFirmAccountsLoading}
             error={propFirmAccountsError}
             onAccountPress={handleAccountPress}
             onRefresh={refetchPropFirmAccounts}
-            //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
             context='menu'
@@ -631,7 +659,6 @@ const Menu = () => {
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
             onAccountPress={handleBrokerAccountPress}
-            //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
             context='menu'
@@ -656,7 +683,6 @@ const Menu = () => {
             brokerAccountsError={brokerAccountsError}
             refetchBrokerAccounts={refetchBrokerAccounts}
             onAccountPress={handleBrokerAccountPress}
-            //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
             context='menu'
@@ -669,13 +695,11 @@ const Menu = () => {
             showTimePeriods={false}
             showMetrics={false}
             isMenuScreen={true}
-
             accountData={finalAccountsToShow}
             isLoading={propFirmAccountsLoading}
             error={propFirmAccountsError}
             onAccountPress={handleAccountPress}
             onRefresh={refetchPropFirmAccounts}
-            //
             currentAccountId={selectedAccountId}
             onArchivePress={handleArchivePress}
             context='menu'
@@ -697,28 +721,29 @@ const Menu = () => {
             </Text>
           </View>
 
-          {/* Categorization Mode Tabs */}
-          <View className="px-6 py-2">
-            <View className="flex-row bg-gray-800 rounded-lg p-1">
+          <View className="px-3 py-2">
+            <View className="flex-row justify-start space-x-2">
               <TouchableOpacity
-                className={`flex-1 py-2 rounded-md ${categorizationMode === 'type-based' ? 'bg-primary-100' : ''}`}
+                className={`py-3 px-4 rounded-lg bg-transparent border items-center justify-center ${categorizationMode === 'type-based' ? 'border-primary-100' : 'border-gray-700'
+                  }`}
                 onPress={() => {
                   setCategorizationMode('type-based');
                   setAccountRoleTab('all');
                 }}
               >
-                <Text className={`text-center text-sm ${categorizationMode === 'type-based' ? 'text-white' : 'text-gray-400'}`}>
+                <Text className="text-white font-Inter text-sm">
                   By Type
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className={`flex-1 py-2 rounded-md ${categorizationMode === 'role-based' ? 'bg-primary-100' : ''}`}
+                className={`py-3 px-4 ml-2 rounded-lg bg-transparent border items-center justify-center ${categorizationMode === 'role-based' ? 'border-primary-100' : 'border-gray-700'
+                  }`}
                 onPress={() => {
                   setCategorizationMode('role-based');
                   setSelectedAccountType('propFirm');
                 }}
               >
-                <Text className={`text-center text-sm ${categorizationMode === 'role-based' ? 'text-white' : 'text-gray-400'}`}>
+                <Text className="text-white font-Inter text-sm">
                   By Role
                 </Text>
               </TouchableOpacity>
@@ -737,7 +762,7 @@ const Menu = () => {
                 additionalStyles="flex-1"
               />
               <SelectableButton
-                text="👑 Master"
+                text="Master"
                 isSelected={accountRoleTab === 'master'}
                 selectedBorderColor="border-primary-100"
                 unselectedBorderColor="border-gray-700"
@@ -813,16 +838,16 @@ const Menu = () => {
             />
           </>
         )}
-        
+
         <View className="px-4 py-2 space-y-2">
           {/* Logs & Errors Button */}
           <TouchableOpacity
-            className="bg-gray-800 p-3 rounded-lg flex-row items-center justify-between border border-gray-600"
+            className="bg-transparent p-2 mb-2 rounded-lg flex-row items-center justify-between border border-gray-700"
             onPress={() => setErrorLogsOpen(true)}
           >
             <View className="flex-row items-center">
-              <Text className="text-gray-400 mr-3">📄</Text>
-              <Text className="text-white text-sm">Logs & Errors</Text>
+              <FileText size={14} color={'#fff'} />
+              <Text className="text-white text-sm font-Inter ml-3">Logs & Errors</Text>
             </View>
             {errorLogsCount > 0 && (
               <View className="bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
@@ -836,20 +861,20 @@ const Menu = () => {
           {/* Sync Buttons Row */}
           <View className="flex-row space-x-2">
             <TouchableOpacity
-              className="flex-1 bg-green-800/20 border border-green-600 p-3 rounded-lg"
+              className="flex-1 bg-transparent border border-[#2fb784] p-2 rounded-lg"
               onPress={handleSyncTrades}
               disabled={isLoading}
             >
-              <Text className={`text-center text-sm ${isLoading ? 'text-gray-400' : 'text-green-400'}`}>
+              <Text className={`text-center text-sm font-InterMedium ${isLoading ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
                 {isLoading ? 'Syncing...' : 'Sync All Trades'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="flex-1 bg-green-800/20 border border-green-600 p-3 rounded-lg"
+              className="flex-1 bg-transparent border border-[#2fb784] p-2 ml-2 rounded-lg"
               onPress={handleSyncAccounts}
               disabled={isSyncingAccounts}
             >
-              <Text className={`text-center text-sm ${isSyncingAccounts ? 'text-gray-400' : 'text-green-400'}`}>
+              <Text className={`text-center text-sm font-InterMedium ${isSyncingAccounts ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
                 {isSyncingAccounts ? 'Syncing...' : 'Sync All Accounts'}
               </Text>
             </TouchableOpacity>
