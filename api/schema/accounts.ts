@@ -183,3 +183,33 @@ export const CopierAccountsSchema = z.object({
 });
 
 export type CopierAccountsSchemaType = z.infer<typeof CopierAccountsSchema>;
+
+export const SyncAccountStatusResultEnum = z.enum([
+  'reactivated',
+  'success',
+  'skipped',
+  'error',
+]);
+
+export const SyncAccountStatusAccountSchema = z.object({
+  account_id: z.number(),
+  account_name: z.string(),
+  previous_status: z.string(),
+  current_status: z.string(),
+  result: SyncAccountStatusResultEnum,
+  message: z.string(),
+});
+
+export type SyncAccountStatusAccount = z.infer<
+  typeof SyncAccountStatusAccountSchema
+>;
+
+export const SyncAccountStatusResponseSchema = z.object({
+  status: z.enum(['partial_success', 'success', 'error']),
+  message: z.string(),
+  accounts: z.array(SyncAccountStatusAccountSchema),
+});
+
+export type SyncAccountStatusResponse = z.infer<
+  typeof SyncAccountStatusResponseSchema
+>;

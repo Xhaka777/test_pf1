@@ -22,6 +22,7 @@ import {
     GenericResponse,
     PropFirmAccountsOverviewSchemaType,
     PropFirmAccountsType,
+    SyncAccountStatusResponse,
     Users,
 } from '../schema'
 import { ApiRoutes, QueryKeys } from '../types';
@@ -319,6 +320,37 @@ export function useAddCTraderAccountMutation() {
             void queryClient.invalidateQueries({
                 queryKey: [QueryKeys.GET_ACCOUNTS]
             })
+        }
+    })
+}
+
+export function useSyncAccountStatus() {
+    const { fetchFromApi } = useAuthenticatedApi<SyncAccountStatusResponse>();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: function () {
+            return fetchFromApi(ApiRoutes.SYNC_ACCOUNT_STATUS, {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.GET_ACCOUNTS],
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.PROP_FIRM_ACCOUNTS]
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.BROKER_ACCOUNTS]
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.FETCH_PROP_FIRM_ACCOUNTS_OVERVIEW]
+            });
+            void queryClient.invalidateQueries({
+                queryKey: [QueryKeys.FETCH_BROKER_ACCOUNTS_OVERVIEW]
+            });
         }
     })
 }

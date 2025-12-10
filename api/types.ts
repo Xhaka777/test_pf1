@@ -142,6 +142,7 @@ export enum ApiRoutes {
   BROKER_ACCOUNTS = '/broker_accounts',
   COPIER_ACCOUNTS = '/copier_accounts',
   COPIER_LOGS = '/copier_logs',
+  SYNC_ACCOUNT_STATUS = '/sync-account-status',
 
   // Account
   ADD_ACCOUNT = '/add_account',

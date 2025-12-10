@@ -13,12 +13,16 @@ import DemoAccBottomSheet from '@/components/AccountBottomSheet';
 import BrokerBottomSheet from '@/components/overview/BrokerBottomSheet';
 import NoPropFirmAccounts from '@/components/NoPropFirmAccounts';
 import NoBrokerAccount from '@/components/NoBrokerAccount';
-import { useArchiveAccountMutation, useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetPropFirmAccounts } from '@/api';
+import { useArchiveAccountMutation, useFetchAccountTrades, useFetchPropFirmAccountsOverview, useGetBrokerAccounts, useGetCopierAccounts, useGetPropFirmAccounts, useSyncAccountStatus } from '@/api';
 import { AccountStatusEnum } from '@/constants/enums';
 import { useAccounts } from '@/providers/accounts';
 import { useGetMetrics } from '@/api/hooks/metrics';
 import { ArchiveAccountModal } from '@/components/ArchiveAccountModal';
 import { Redirect, router } from 'expo-router';
+import { useErrorLogsCount } from '@/utils/use-error-logs-count';
+import { useSyncAllTradesMutation } from '@/api/hooks/trade-service';
+import { addErrorLog } from '@/utils/logger';
+import { ErrorLogsModal } from '@/components/ErrorsLogModal';
 
 const Menu = () => {
   const { user } = useUser();
@@ -46,6 +50,18 @@ const Menu = () => {
   const confirmSignOutSheetRef = useRef<BottomSheet>(null);
   const demoBottomSheetRef = useRef<BottomSheetModal>(null);
   const accountBottomSheetRef = useRef<BottomSheetModal>(null);
+  //
+  const [categorizationMode, setCategorizationMode] = useState<'type-based' | 'role-based'>('type-based');
+  const [accountRoleTab, setAccountRoleTab] = useState<'all' | 'master' | 'copier'>('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncingAccounts, setIsSyncingAccounts] = useState(false);
+  const [errorsLogsOpen, setErrorLogsOpen] = useState(false);
+  //
+  const { data: copierAccounts } = useGetCopierAccounts();
+  const errorLogsCount = useErrorLogsCount();
+  const { mutateAsync: syncAllTrades } = useSyncAllTradesMutation();
+  const { mutateAsync: syncHistory } = useFetchAccountTrades();
+  const { mutateAsync: syncAccountStatus } = useSyncAccountStatus();
 
   const {
     selectedAccountId,
@@ -179,25 +195,58 @@ const Menu = () => {
       allAccounts = processedBrokerAccounts.demo;
     }
 
-    // Filter by ACTIVE status first (like web teammate's logic)
+    // Filter by ACTIVE status first
     const activeAccounts = allAccounts.filter((account) =>
       account.status === AccountStatusEnum.ACTIVE
     );
 
-    // Then apply search filter (like web teammate's logic)
-    return activeAccounts.filter((account) =>
+    // Apply search filter
+    let searchFiltered = activeAccounts.filter((account) =>
       account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       account.id.toString().includes(searchTerm) ||
       (account.currency && account.currency.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (account.firm && account.firm.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+
+    // Apply role-based filtering if in role-based mode
+    if (categorizationMode === 'role-based' && copierAccounts) {
+      searchFiltered = searchFiltered.filter((account) => {
+        if (accountRoleTab === 'all') {
+          return true;
+        }
+
+        // Determine account role based on copier accounts data
+        const isMaster = copierAccounts.copier_accounts?.some(
+          (copierGroup) => copierGroup.master_account === account.id
+        );
+
+        const isCopier = copierAccounts.copier_accounts?.some(
+          (copierGroup) => copierGroup.copier_accounts?.some(
+            (copier) => copier.copy_account === account.id
+          )
+        );
+
+        if (accountRoleTab === 'master') {
+          return isMaster;
+        } else if (accountRoleTab === 'copier') {
+          return isCopier;
+        }
+
+        return false;
+      });
+    }
+
+    return searchFiltered;
   }, [
     selectedAccountType,
     processedPropFirmAccounts.evaluation,
     processedPropFirmAccounts.funded,
     processedBrokerAccounts.live,
     processedBrokerAccounts.demo,
-    searchTerm
+    searchTerm,
+    categorizationMode,
+    accountRoleTab,
+    copierAccounts
   ]);
 
   const filteredArchivedAccounts = useMemo(() => {
@@ -268,6 +317,116 @@ const Menu = () => {
     filteredArchivedAccounts,
     activeOnly
   ]);
+
+  const handleSyncTrades = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [response, historyResponse] = await Promise.all([
+        syncAllTrades(),
+        syncHistory({
+          account: selectedPreviewAccountId ?? selectedAccountId
+        }),
+        new Promise((resolve) => setTimeout(resolve, 3000))
+      ]);
+      if (historyResponse.status === 'success' && response.status === 'success') {
+        Alert.alert('Success', response.message);
+      } else {
+        Alert.alert('Error', response.message);
+      }
+    } catch (error) {
+      if (error instanceof Error && 'httpStatus' in error && error.httpStatus === 429) {
+        Alert.alert('Sync in progress', 'Account synchronization is already in progress. Please wait a moment and try again.');
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedAccountId, selectedPreviewAccountId, syncHistory, syncAllTrades]);
+
+  const handleSyncAccounts = useCallback(async () => {
+    setIsSyncingAccounts(true);
+
+    try {
+      const response = await syncAccountStatus();
+
+      if (response.accounts && response.accounts.length > 0) {
+        const problemAccounts = response.accounts.filter(
+          (acc) => acc.result === 'error' || acc.current_status === 'disconnected'
+        );
+
+        const reactivatedAccounts = response.accounts.filter(
+          (acc) => acc.result === 'reactivated',
+        );
+
+        const logTitle = 'Manual Account Status Sync';
+        let logDescription = `Sync completed: ${response.message}`;
+
+        if (reactivatedAccounts.length > 0) {
+          logDescription += `\n\nReactivated accounts (${reactivatedAccounts.length}):\n`;
+          reactivatedAccounts.forEach((acc) => {
+            logDescription += `• ${acc.account_name}: ${acc.message}\n`;
+          });
+        }
+
+        if (problemAccounts.length > 0) {
+          logDescription += `\n\nAccounts requiring attention (${problemAccounts.length}):\n`;
+          problemAccounts.forEach((acc) => {
+            logDescription += `• ${acc.account_name}: ${acc.message}\n`;
+          });
+        }
+
+        const activeAccounts = response.accounts.filter(
+          (acc) => acc.current_status === 'active' && acc.result !== 'error',
+        );
+
+        if (activeAccounts.length > 0) {
+          logDescription += `\n\nActive accounts (${activeAccounts.length}):\n`;
+          activeAccounts.forEach((acc) => {
+            logDescription += `• ${acc.account_name}\n`;
+          });
+        }
+
+        if (user?.id) {
+          addErrorLog.call({ userId: user.id }, logTitle, logDescription, 'log');
+        }
+      }
+
+      if (response.status === 'success' || response.status === 'partial_success') {
+        const reactivatedCount = response.accounts.filter(
+          (acc) => acc.result === 'reactivated',
+        ).length;
+        const errorCount = response.accounts.filter(
+          (acc) => acc.result === 'error',
+        ).length;
+
+        let description = response.message;
+        if (reactivatedCount > 0) {
+          description += ` ${reactivatedCount} account(s) reactivated.`;
+        }
+        if (errorCount > 0) {
+          description += ` ${errorCount} account(s) had errors.`;
+        }
+
+        Alert.alert(
+          response.status === 'success' ? 'Accounts synced successfully' : 'Accounts partially synced',
+          description
+        );
+      } else {
+        Alert.alert('Error', 'Error syncing accounts');
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && 'httpStatus' in error && error.httpStatus === 429) {
+        Alert.alert('Sync in progress', 'Account synchronization is already in progress. Please wait a moment and try again.');
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setIsSyncingAccounts(false);
+    }
+  }, [syncAccountStatus, user?.id]);
 
   const handleArchivePress = useCallback((account: any) => {
     setAccountToArchive(account);
@@ -538,33 +697,90 @@ const Menu = () => {
             </Text>
           </View>
 
-          {/* Three Account Type Buttons */}
-          <View className="flex-row px-3 py-2 space-x-2">
-            <SelectableButton
-              text="Prop Firm"
-              isSelected={selectedAccountType === 'propFirm'}
-              selectedBorderColor="border-primary-100"
-              unselectedBorderColor="border-gray-700"
-              onPress={() => setSelectedAccountType('propFirm')}
-              additionalStyles="flex-1"
-            />
-            <SelectableButton
-              text="Brokerage"
-              isSelected={selectedAccountType === 'brokerage'}
-              selectedBorderColor="border-primary-100"
-              unselectedBorderColor="border-gray-700"
-              onPress={() => setSelectedAccountType('brokerage')}
-              additionalStyles="flex-1 mx-2"
-            />
-            <SelectableButton
-              text="Practice"
-              isSelected={selectedAccountType === 'practice'}
-              selectedBorderColor="border-primary-100"
-              unselectedBorderColor="border-gray-700"
-              onPress={() => setSelectedAccountType('practice')}
-              additionalStyles="flex-1"
-            />
+          {/* Categorization Mode Tabs */}
+          <View className="px-6 py-2">
+            <View className="flex-row bg-gray-800 rounded-lg p-1">
+              <TouchableOpacity
+                className={`flex-1 py-2 rounded-md ${categorizationMode === 'type-based' ? 'bg-primary-100' : ''}`}
+                onPress={() => {
+                  setCategorizationMode('type-based');
+                  setAccountRoleTab('all');
+                }}
+              >
+                <Text className={`text-center text-sm ${categorizationMode === 'type-based' ? 'text-white' : 'text-gray-400'}`}>
+                  By Type
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className={`flex-1 py-2 rounded-md ${categorizationMode === 'role-based' ? 'bg-primary-100' : ''}`}
+                onPress={() => {
+                  setCategorizationMode('role-based');
+                  setSelectedAccountType('propFirm');
+                }}
+              >
+                <Text className={`text-center text-sm ${categorizationMode === 'role-based' ? 'text-white' : 'text-gray-400'}`}>
+                  By Role
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* Dynamic Tab Section */}
+          {categorizationMode === 'role-based' ? (
+            <View className="flex-row px-3 py-2 space-x-2">
+              <SelectableButton
+                text="All"
+                isSelected={accountRoleTab === 'all'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setAccountRoleTab('all')}
+                additionalStyles="flex-1"
+              />
+              <SelectableButton
+                text="👑 Master"
+                isSelected={accountRoleTab === 'master'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setAccountRoleTab('master')}
+                additionalStyles="flex-1 mx-2"
+              />
+              <SelectableButton
+                text="Copier"
+                isSelected={accountRoleTab === 'copier'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setAccountRoleTab('copier')}
+                additionalStyles="flex-1"
+              />
+            </View>
+          ) : (
+            <View className="flex-row px-3 py-2 space-x-2">
+              <SelectableButton
+                text="Prop Firm"
+                isSelected={selectedAccountType === 'propFirm'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setSelectedAccountType('propFirm')}
+                additionalStyles="flex-1"
+              />
+              <SelectableButton
+                text="Brokerage"
+                isSelected={selectedAccountType === 'brokerage'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setSelectedAccountType('brokerage')}
+                additionalStyles="flex-1 mx-2"
+              />
+              <SelectableButton
+                text="Practice"
+                isSelected={selectedAccountType === 'practice'}
+                selectedBorderColor="border-primary-100"
+                unselectedBorderColor="border-gray-700"
+                onPress={() => setSelectedAccountType('practice')}
+                additionalStyles="flex-1"
+              />
+            </View>
+          )}
 
           {/* Account Content */}
           <ScrollView
@@ -575,6 +791,7 @@ const Menu = () => {
             {renderAccountContent()}
           </ScrollView>
         </View>
+
 
         {/* Profile at bottom */}
         {!archiveModalVisible && (
@@ -596,6 +813,48 @@ const Menu = () => {
             />
           </>
         )}
+        
+        <View className="px-4 py-2 space-y-2">
+          {/* Logs & Errors Button */}
+          <TouchableOpacity
+            className="bg-gray-800 p-3 rounded-lg flex-row items-center justify-between border border-gray-600"
+            onPress={() => setErrorLogsOpen(true)}
+          >
+            <View className="flex-row items-center">
+              <Text className="text-gray-400 mr-3">📄</Text>
+              <Text className="text-white text-sm">Logs & Errors</Text>
+            </View>
+            {errorLogsCount > 0 && (
+              <View className="bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
+                <Text className="text-white text-xs font-medium">
+                  {errorLogsCount > 99 ? '99+' : errorLogsCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Sync Buttons Row */}
+          <View className="flex-row space-x-2">
+            <TouchableOpacity
+              className="flex-1 bg-green-800/20 border border-green-600 p-3 rounded-lg"
+              onPress={handleSyncTrades}
+              disabled={isLoading}
+            >
+              <Text className={`text-center text-sm ${isLoading ? 'text-gray-400' : 'text-green-400'}`}>
+                {isLoading ? 'Syncing...' : 'Sync All Trades'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-green-800/20 border border-green-600 p-3 rounded-lg"
+              onPress={handleSyncAccounts}
+              disabled={isSyncingAccounts}
+            >
+              <Text className={`text-center text-sm ${isSyncingAccounts ? 'text-gray-400' : 'text-green-400'}`}>
+                {isSyncingAccounts ? 'Syncing...' : 'Sync All Accounts'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <DemoAccBottomSheet
           bottomSheetRef={demoBottomSheetRef}
@@ -659,6 +918,11 @@ const Menu = () => {
           open={archiveModalVisible}  // Changed from 'visible' to 'open'
           onOpenChange={setArchiveModalVisible}  // Changed from 'onClose' to 'onOpenChange'
           onArchive={handleArchiveAccount}
+        />
+
+        <ErrorLogsModal
+          open={errorsLogsOpen}
+          onOpenChange={setErrorLogsOpen}
         />
 
       </SafeAreaView>
