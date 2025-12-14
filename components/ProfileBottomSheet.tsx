@@ -26,9 +26,9 @@ const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress }: ProfileBottomShe
     return { text: plan, bgColor: '#45152C', textColor: '#F190BF' };
   }, [currentUser, isLoading]);
 
-  console.log('planInfo', planInfo)
+  // console.log('planInfo', planInfo)
 
-  console.log('user?.imageUrl', user?.imageUrl)
+  // console.log('user?.imageUrl', user?.imageUrl)
 
   return (
     <BottomSheet

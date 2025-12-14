@@ -25,6 +25,8 @@ import { addErrorLog } from '@/utils/logger';
 import { ErrorLogsModal } from '@/components/ErrorsLogModal';
 import MenuAccounts from '@/components/MenuAccounts';
 import { FileText } from 'lucide-react-native';
+import { getAccountRole, organizeAccountsIntoTree } from '@/utils/account-utils';
+import AccountTreeView from '@/components/AccountTreeView';
 
 const Menu = () => {
   const { user } = useUser();
@@ -98,7 +100,7 @@ const Menu = () => {
 
   const archiveAccountMutation = useArchiveAccountMutation();
 
-  console.log('archiveAccountMutation', archiveAccountMutation)
+  // console.log('archiveAccountMutation', archiveAccountMutation)
 
   const currentAccountId = selectedPreviewAccountId ?? selectedAccountId;
   const { data: metricsData } = useGetMetrics(currentAccountId);
@@ -106,6 +108,24 @@ const Menu = () => {
   const lossRate = useMemo(() => {
     return 100 - (metricsData?.win_rate ?? 0);
   }, [metricsData?.win_rate]);
+
+
+  const testMobileErrorLogs = (userId: string) => {
+    // Test the same type of log that appears in the web screenshot
+    addErrorLog.call(
+      { userId },
+      'Account Status Sync',
+      `Sync completed: Processed 11 accounts.
+  Reactivated 0, 2 account(s) require attention.
+  
+  Accounts requiring attention (2):
+  • NewAccount: disconnected - Account status check timed out. Please try again later. Account status check timed out after 15s
+  • LiveAcc: disconnected - Account status check timed out. Please try again later. Account status check timed out after 15s`,
+      'log'
+    );
+
+    console.log('Test log added! Check your mobile badge and modal.');
+  };
 
   const processedPropFirmAccounts = useMemo(() => {
     if (!propFirmAccountsData?.prop_firm_accounts) return { evaluation: [], funded: [] };
@@ -188,7 +208,6 @@ const Menu = () => {
   const filteredActiveAccounts = useMemo(() => {
     let allAccounts = [];
 
-    // Get all accounts based on selected type
     if (selectedAccountType === 'propFirm') {
       allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
     } else if (selectedAccountType === 'brokerage') {
@@ -197,12 +216,10 @@ const Menu = () => {
       allAccounts = processedBrokerAccounts.demo;
     }
 
-    // Filter by ACTIVE status first
     const activeAccounts = allAccounts.filter((account) =>
       account.status === AccountStatusEnum.ACTIVE
     );
 
-    // Apply search filter
     let searchFiltered = activeAccounts.filter((account) =>
       account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       account.id.toString().includes(searchTerm) ||
@@ -210,28 +227,19 @@ const Menu = () => {
       (account.firm && account.firm.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    // Apply role-based filtering if in role-based mode
+    // Apply role-based filtering
     if (categorizationMode === 'role-based' && copierAccounts) {
       searchFiltered = searchFiltered.filter((account) => {
         if (accountRoleTab === 'all') {
           return true;
         }
 
-        // Determine account role based on copier accounts data
-        const isMaster = copierAccounts.copier_accounts?.some(
-          (copierGroup) => copierGroup.master_account === account.id
-        );
-
-        const isCopier = copierAccounts.copier_accounts?.some(
-          (copierGroup) => copierGroup.copier_accounts?.some(
-            (copier) => copier.copy_account === account.id
-          )
-        );
+        const accountRole = getAccountRole(account.id, copierAccounts);
 
         if (accountRoleTab === 'master') {
-          return isMaster;
+          return accountRole === 'master';
         } else if (accountRoleTab === 'copier') {
-          return isCopier;
+          return accountRole === 'copier';
         }
 
         return false;
@@ -241,10 +249,8 @@ const Menu = () => {
     return searchFiltered;
   }, [
     selectedAccountType,
-    processedPropFirmAccounts.evaluation,
-    processedPropFirmAccounts.funded,
-    processedBrokerAccounts.live,
-    processedBrokerAccounts.demo,
+    processedPropFirmAccounts,
+    processedBrokerAccounts,
     searchTerm,
     categorizationMode,
     accountRoleTab,
@@ -594,32 +600,51 @@ const Menu = () => {
 
   // Render account content based on selected account type
   const renderAccountContent = () => {
-    // For role-based categorization, show a unified account list
     if (categorizationMode === 'role-based') {
-      // Get all prop firm accounts for role-based filtering
-      const allPropFirmAccounts = [
-        ...processedPropFirmAccounts.evaluation,
-        ...processedPropFirmAccounts.funded
-      ];
+      // For role-based categorization, use tree structure when showing "All"
+      if (accountRoleTab === 'all') {
+        const treeData = organizeAccountsIntoTree(
+          filteredActiveAccounts,
+          copierAccounts
+        );
 
-      return (
-        <ScrollView
-          className='flex-1'
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          <MenuAccounts
-            accounts={filteredActiveAccounts} // This already contains the role-filtered accounts
-            onAccountPress={handleAccountPress}
-            accountType="propFirm"
-            activeTab="All" // Use a generic tab name for role-based view
-            currentAccountId={selectedAccountId}
-            onArchivePress={handleArchivePress}
-            context='menu'
-          />
-        </ScrollView>
-      );
+        return (
+          <ScrollView
+            className='flex-1'
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <AccountTreeView
+              treeData={treeData}
+              onAccountPress={handleAccountPress}
+              currentAccountId={selectedAccountId}
+              onArchivePress={handleArchivePress}
+              context='menu'
+            />
+          </ScrollView>
+        );
+      } else {
+        // For Master/Copier tabs, show flat list
+        return (
+          <ScrollView
+            className='flex-1'
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <MenuAccounts
+              accounts={filteredActiveAccounts}
+              onAccountPress={handleAccountPress}
+              accountType="propFirm"
+              activeTab="All"
+              currentAccountId={selectedAccountId}
+              onArchivePress={handleArchivePress}
+              context='menu'
+            />
+          </ScrollView>
+        );
+      }
     }
+
 
     // For type-based categorization, use the existing logic
     switch (selectedAccountType) {
@@ -857,6 +882,16 @@ const Menu = () => {
               </View>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            className="bg-blue-500 p-2 rounded-lg"
+            onPress={() => user?.id && testMobileErrorLogs(user.id)}
+          >
+            <Text className="text-white text-center text-sm font-InterMedium">
+              🧪 Add Test Log
+            </Text>
+          </TouchableOpacity>
+
 
           {/* Sync Buttons Row */}
           <View className="flex-row space-x-2">

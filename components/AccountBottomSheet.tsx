@@ -65,7 +65,7 @@ const AccountBottomSheet = ({
         },
     };
 
-    console.log('[AccountBottomSheet] accountData:', accountData);
+    // console.log('[AccountBottomSheet] accountData:', accountData);
 
     const currentConfig = accountData?.type ? accountTypeConfig[accountData.type] : accountTypeConfig.Challenge;
 
@@ -105,7 +105,7 @@ const AccountBottomSheet = ({
 
     const handleActionButtonPress = () => {
         if (!accountData?.id) {
-            console.error('[AccountBottomSheet] No account ID available');
+            // console.error('[AccountBottomSheet] No account ID available');
             return;
         }
 
@@ -114,7 +114,7 @@ const AccountBottomSheet = ({
             bottomSheetRef.current?.close();
             router.push('/(tabs)/trade')
         } else {
-            console.log('[AccountBottomSheet] Switching to account:', accountData.id, accountData.type);
+            // console.log('[AccountBottomSheet] Switching to account:', accountData.id, accountData.type);
             onAccountSelect?.(accountData.id);
             bottomSheetRef.current?.close();
         }

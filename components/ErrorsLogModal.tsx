@@ -114,7 +114,7 @@ export function ErrorLogsModal({ open, onOpenChange }: ErrorLogsModalProps) {
     useEffect(() => {
         if (open) {
             loadLogs();
-            // Animate in from right
+            // Animate in from rightsssss
             Animated.timing(slideAnim, {
                 toValue: 0,
                 duration: 300,
@@ -175,7 +175,7 @@ export function ErrorLogsModal({ open, onOpenChange }: ErrorLogsModalProps) {
                         <View className="flex-row items-center justify-between">
                             <View className="flex-row bg-[#1a1819] rounded-lg p-1">
                                 <TouchableOpacity
-                                    className={`px-4 py-2 rounded-md ${filterType === 'all' ? 'bg-[#0f0e0f]' : ''}`}
+                                    className={`px-4 py-3 rounded-md ${filterType === 'all' ? 'bg-[#0f0e0f]' : ''}`}
                                     onPress={() => setFilterType('all')}
                                     activeOpacity={0.7}
                                 >
@@ -184,7 +184,7 @@ export function ErrorLogsModal({ open, onOpenChange }: ErrorLogsModalProps) {
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    className={`px-4 py-2 rounded-md ${filterType === 'errors' ? 'bg-gray-700' : ''}`}
+                                    className={`px-4 py-3 rounded-md ${filterType === 'errors' ? 'bg-gray-700' : ''}`}
                                     onPress={() => setFilterType('errors')}
                                     activeOpacity={0.7}
                                 >
@@ -193,7 +193,7 @@ export function ErrorLogsModal({ open, onOpenChange }: ErrorLogsModalProps) {
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    className={`px-4 py-2 rounded-md ${filterType === 'logs' ? 'bg-gray-700' : ''}`}
+                                    className={`px-4 py-3 rounded-md ${filterType === 'logs' ? 'bg-gray-700' : ''}`}
                                     onPress={() => setFilterType('logs')}
                                     activeOpacity={0.7}
                                 >
