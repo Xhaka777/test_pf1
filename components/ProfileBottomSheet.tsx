@@ -9,9 +9,10 @@ import { useGetCurrentUser } from '@/api/hooks/auth';
 interface ProfileBottomSheetProps {
   bottomSheetRef: React.RefObject<BottomSheet>;
   onSignOutPress: () => void;
+  onClose: () => void;
 }
 
-const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress }: ProfileBottomSheetProps) => {
+const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress, onClose }: ProfileBottomSheetProps) => {
   const { user } = useUser();
   const snapPoints = useMemo(() => ['10%'], []);
   const { data: currentUser, isLoading } = useGetCurrentUser();
@@ -38,6 +39,7 @@ const ProfileBottomSheet = ({ bottomSheetRef, onSignOutPress }: ProfileBottomShe
       enablePanDownToClose={true}
       backgroundStyle={{ backgroundColor: '#100E0F', borderColor: '#1E1E2D', borderWidth: 1 }}
       handleIndicatorStyle={{ backgroundColor: '#666' }}
+      onClose={onClose}
     >
       <BottomSheetView style={{ flex: 1, height: '5%', padding: 24 }}>
         <View className='flex-row justify-between items-center'>

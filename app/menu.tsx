@@ -27,6 +27,7 @@ import MenuAccounts from '@/components/MenuAccounts';
 import { FileText } from 'lucide-react-native';
 import { getAccountRole, organizeAccountsIntoTree } from '@/utils/account-utils';
 import AccountTreeView from '@/components/AccountTreeView';
+import SearchInput from '@/components/SearchInput';
 
 const Menu = () => {
   const { user } = useUser();
@@ -66,6 +67,8 @@ const Menu = () => {
   const { mutateAsync: syncAllTrades } = useSyncAllTradesMutation();
   const { mutateAsync: syncHistory } = useFetchAccountTrades();
   const { mutateAsync: syncAccountStatus } = useSyncAccountStatus();
+  //
+  const [isProfileBottomSheetOpen, setIsProfileBottomSheetOpen] = useState(false);
 
   const {
     selectedAccountId,
@@ -216,6 +219,11 @@ const Menu = () => {
       allAccounts = processedBrokerAccounts.demo;
     }
 
+    // For role-based mode, always use prop firm accounts
+    if (categorizationMode === 'role-based') {
+      allAccounts = [...processedPropFirmAccounts.evaluation, ...processedPropFirmAccounts.funded];
+    }
+
     const activeAccounts = allAccounts.filter((account) =>
       account.status === AccountStatusEnum.ACTIVE
     );
@@ -256,7 +264,6 @@ const Menu = () => {
     accountRoleTab,
     copierAccounts
   ]);
-
   const filteredArchivedAccounts = useMemo(() => {
     let allAccounts = [];
 
@@ -506,6 +513,7 @@ const Menu = () => {
 
   // Handle profile press (passed to Profile component)
   const handleProfilePress = useCallback(() => {
+    setIsProfileBottomSheetOpen(true);
     bottomSheetRef.current?.expand();
   }, []);
 
@@ -604,7 +612,7 @@ const Menu = () => {
       // For role-based categorization, use tree structure when showing "All"
       if (accountRoleTab === 'all') {
         const treeData = organizeAccountsIntoTree(
-          filteredActiveAccounts,
+          filteredActiveAccounts, // Use filtered accounts here
           copierAccounts
         );
 
@@ -624,7 +632,7 @@ const Menu = () => {
           </ScrollView>
         );
       } else {
-        // For Master/Copier tabs, show flat list
+        // For Master/Copier tabs, show flat list with filtered accounts
         return (
           <ScrollView
             className='flex-1'
@@ -632,7 +640,7 @@ const Menu = () => {
             contentContainerStyle={{ flexGrow: 1 }}
           >
             <MenuAccounts
-              accounts={filteredActiveAccounts}
+              accounts={filteredActiveAccounts} // Use filtered accounts here
               onAccountPress={handleAccountPress}
               accountType="propFirm"
               activeTab="All"
@@ -644,7 +652,6 @@ const Menu = () => {
         );
       }
     }
-
 
     // For type-based categorization, use the existing logic
     switch (selectedAccountType) {
@@ -833,6 +840,13 @@ const Menu = () => {
           )}
 
           {/* Account Content */}
+          {categorizationMode === 'role-based' && (
+            <View className="px-3 pb-2">
+              <SearchInput onSearch={handleSearch} />
+            </View>
+          )}
+
+          {/* Account Content */}
           <ScrollView
             className='flex-1'
             showsVerticalScrollIndicator={false}
@@ -855,6 +869,7 @@ const Menu = () => {
             <ProfileBottomSheet
               bottomSheetRef={bottomSheetRef}
               onSignOutPress={handleConfirmSignOutPress}
+              onClose={() => setIsProfileBottomSheetOpen(false)}
             />
 
             <ConfirmBottomSheet
@@ -864,57 +879,59 @@ const Menu = () => {
           </>
         )}
 
-        <View className="px-4 py-2 space-y-2">
-          {/* Logs & Errors Button */}
-          <TouchableOpacity
-            className="bg-transparent p-2 mb-2 rounded-lg flex-row items-center justify-between border border-gray-700"
-            onPress={() => setErrorLogsOpen(true)}
-          >
-            <View className="flex-row items-center">
-              <FileText size={14} color={'#fff'} />
-              <Text className="text-white text-sm font-Inter ml-3">Logs & Errors</Text>
-            </View>
-            {errorLogsCount > 0 && (
-              <View className="bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
-                <Text className="text-white text-xs font-medium">
-                  {errorLogsCount > 99 ? '99+' : errorLogsCount}
-                </Text>
+        {!isProfileBottomSheetOpen && (
+          <View className="px-4 py-2 space-y-2">
+            {/* Logs & Errors Button */}
+            <TouchableOpacity
+              className="bg-transparent p-2 mb-2 rounded-lg flex-row items-center justify-between border border-gray-700"
+              onPress={() => setErrorLogsOpen(true)}
+            >
+              <View className="flex-row items-center">
+                <FileText size={14} color={'#fff'} />
+                <Text className="text-white text-sm font-Inter ml-3">Logs & Errors</Text>
               </View>
-            )}
-          </TouchableOpacity>
+              {errorLogsCount > 0 && (
+                <View className="bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
+                  <Text className="text-white text-xs font-medium">
+                    {errorLogsCount > 99 ? '99+' : errorLogsCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            className="bg-blue-500 p-2 rounded-lg"
-            onPress={() => user?.id && testMobileErrorLogs(user.id)}
-          >
-            <Text className="text-white text-center text-sm font-InterMedium">
-              🧪 Add Test Log
-            </Text>
-          </TouchableOpacity>
-
-
-          {/* Sync Buttons Row */}
-          <View className="flex-row space-x-2">
             <TouchableOpacity
-              className="flex-1 bg-transparent border border-[#2fb784] p-2 rounded-lg"
-              onPress={handleSyncTrades}
-              disabled={isLoading}
+              className="bg-blue-500 p-2 rounded-lg"
+              onPress={() => user?.id && testMobileErrorLogs(user.id)}
             >
-              <Text className={`text-center text-sm font-InterMedium ${isLoading ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
-                {isLoading ? 'Syncing...' : 'Sync All Trades'}
+              <Text className="text-white text-center text-sm font-InterMedium">
+                🧪 Add Test Log
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-1 bg-transparent border border-[#2fb784] p-2 ml-2 rounded-lg"
-              onPress={handleSyncAccounts}
-              disabled={isSyncingAccounts}
-            >
-              <Text className={`text-center text-sm font-InterMedium ${isSyncingAccounts ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
-                {isSyncingAccounts ? 'Syncing...' : 'Sync All Accounts'}
-              </Text>
-            </TouchableOpacity>
+
+
+            {/* Sync Buttons Row */}
+            <View className="flex-row space-x-2">
+              <TouchableOpacity
+                className="flex-1 bg-transparent border border-[#2fb784] p-2 rounded-lg"
+                onPress={handleSyncTrades}
+                disabled={isLoading}
+              >
+                <Text className={`text-center text-sm font-InterMedium ${isLoading ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
+                  {isLoading ? 'Syncing...' : 'Sync All Trades'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 bg-transparent border border-[#2fb784] p-2 ml-2 rounded-lg"
+                onPress={handleSyncAccounts}
+                disabled={isSyncingAccounts}
+              >
+                <Text className={`text-center text-sm font-InterMedium ${isSyncingAccounts ? 'text-[#2fb784]' : 'text-[#2fb784]'}`}>
+                  {isSyncingAccounts ? 'Syncing...' : 'Sync All Accounts'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         <DemoAccBottomSheet
           bottomSheetRef={demoBottomSheetRef}
